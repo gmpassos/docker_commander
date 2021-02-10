@@ -117,7 +117,7 @@ void main() async {
 
 ## PostgreSQLContainer
 
-A pre-configure PostgreSQL Container:
+A pre-configured PostgreSQL Container:
 
 ```dart
 import 'package:docker_commander/docker_commander_vm.dart';
