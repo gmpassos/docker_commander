@@ -1,3 +1,7 @@
+## 1.0.5
+
+- Fix libraries names.
+
 ## 1.0.4
 
 - Fix library exports.

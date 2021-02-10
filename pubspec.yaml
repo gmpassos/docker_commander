@@ -1,6 +1,6 @@
 name: docker_commander
 description: A Docker manager, for local and remote host machins. Works with personalized containers and pre-configured popular containers.
-version: 1.0.4
+version: 1.0.5
 homepage: https://github.com/gmpassos/docker_commander
 
 environment:
