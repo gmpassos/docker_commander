@@ -31,10 +31,13 @@ void main() async {
   // Run Docker image `hello-world`:
   var dockerContainer = await dockerCommander.run('hello-world');
 
-  // Wait container ready (ensure that)
+  // Waits container to be ready (ensure that the container started).
   await dockerContainer.waitReady();
 
+  /// Waits the container to exit, and gets the exit code:
   var exitCode = await dockerContainer.waitExit();
+  
+  /// Gets all the STDOUT as [String]. 
   var output = dockerContainer.stdout.asString;
   
   print(output);
