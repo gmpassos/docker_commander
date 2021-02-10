@@ -49,14 +49,14 @@ abstract class DockerHost {
   DockerRunner getRunnerByName(String name);
 
   /// Stops a container by [instanceID].
-  Future<bool> stopByInstanceID(int instanceID) async {
+  Future<bool> stopByInstanceID(int instanceID, {Duration timeout}) async {
     var runner = getRunnerByInstanceID(instanceID);
     if (runner == null) return false;
-    return stopByName(runner.name);
+    return stopByName(runner.name, timeout: timeout);
   }
 
   /// Stops a container by [name].
-  Future<bool> stopByName(String name);
+  Future<bool> stopByName(String name, {Duration timeout});
 
   /// Stops all [DockerRunner] returned by [getRunnersInstanceIDs].
   Future<void> stopRunners() async {
@@ -146,7 +146,8 @@ abstract class DockerRunner {
   Future<int> waitExit();
 
   /// Stops this container.
-  Future<bool> stop() => dockerHost.stopByInstanceID(instanceID);
+  Future<bool> stop({Duration timeout}) =>
+      dockerHost.stopByInstanceID(instanceID, timeout: timeout);
 
   @override
   String toString() {

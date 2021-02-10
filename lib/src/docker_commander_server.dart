@@ -3,10 +3,11 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
-import 'package:docker_commander/src/docker_commander_host.dart';
-import 'package:docker_commander/src/docker_commander_local.dart';
 import 'package:logging/logging.dart';
 import 'package:swiss_knife/swiss_knife.dart';
+
+import 'docker_commander_host.dart';
+import 'docker_commander_local.dart';
 
 final _LOG = Logger('docker_commander/server');
 
@@ -491,8 +492,15 @@ class DockerHostServer {
     if (_dockerHostLocal == null) return false;
 
     var instanceID = _getParameterAsInt(parameters, json, 'instanceID');
+    var timeout = _getParameterAsInt(parameters, json, 'timeout');
 
-    var ok = await _dockerHostLocal.stopByInstanceID(instanceID);
+    var timeoutDuration =
+        timeout != null && timeout > 0 ? Duration(seconds: timeout) : null;
+
+    var ok = await _dockerHostLocal.stopByInstanceID(
+      instanceID,
+      timeout: timeoutDuration,
+    );
     return ok;
   }
 

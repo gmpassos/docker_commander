@@ -1,6 +1,5 @@
 @Timeout(Duration(minutes: 2))
-
-import 'package:docker_commander/src/docker_commander_local.dart';
+import 'package:docker_commander/docker_commander_vm.dart';
 import 'package:logging/logging.dart';
 import 'package:test/test.dart';
 

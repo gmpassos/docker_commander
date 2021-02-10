@@ -134,7 +134,7 @@ class PostgreSQLContainer extends DockerContainerConfig {
           containerPorts: [5432],
           environment: {
             if (pgUser != null) 'POSTGRES_USER': pgUser,
-            'POSTGRES_PASSWORD': pgPassword,
+            'POSTGRES_PASSWORD': pgPassword ?? 'postgres',
             if (pgDatabase != null) 'POSTGRES_DB': pgDatabase,
           },
           outputAsLines: true,

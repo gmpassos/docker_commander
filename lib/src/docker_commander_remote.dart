@@ -1,9 +1,10 @@
 import 'dart:convert';
 
-import 'package:docker_commander/src/docker_commander_host.dart';
 import 'package:logging/logging.dart';
 import 'package:mercury_client/mercury_client.dart';
 import 'package:swiss_knife/swiss_knife.dart';
+
+import 'docker_commander_host.dart';
 
 final _LOG = Logger('docker_commander/remote');
 
@@ -176,9 +177,11 @@ class DockerHostRemote extends DockerHost {
       _runners.values.firstWhere((r) => r.name == name, orElse: () => null);
 
   @override
-  Future<bool> stopByName(String name) async {
-    var ok = await _httpClient
-        .getJSON('runner_stop', parameters: {'name': '$name'}) as bool;
+  Future<bool> stopByName(String name, {Duration timeout}) async {
+    var ok = await _httpClient.getJSON('runner_stop', parameters: {
+      'name': '$name',
+      if (timeout != null) 'timeout': '${timeout.inSeconds}',
+    }) as bool;
     return ok;
   }
 

@@ -160,9 +160,14 @@ class DockerHostLocal extends DockerHost {
   }
 
   @override
-  Future<bool> stopByName(String name) async {
+  Future<bool> stopByName(String name, {Duration timeout}) async {
     if (isEmptyString(name)) return false;
-    var process = Process.run(dockerBinaryPath, <String>['stop', name]);
+
+    var time = timeout != null ? timeout.inSeconds : 15;
+    if (time < 1) time = 1;
+
+    var process = Process.run(
+        dockerBinaryPath, <String>['stop', '--time', '$time', name]);
     var result = await process;
     return result.exitCode == 0;
   }

@@ -58,7 +58,7 @@ Here's another usage example for a remote host machine:
 Start `DockerHostServer`:
 
 ```dart
-import 'package:docker_commander/src/docker_commander_server.dart';
+import 'package:docker_commander/docker_commander_vm.dart';
 
 void main() {
   
@@ -79,11 +79,10 @@ void main() {
 
 #### Client
 
-Client side:
+Client side using `DockerHostRemote`:
 
 ```dart
-import 'package:docker_commander/docker_commander.dart';
-import 'package:docker_commander/src/docker_commander_local.dart';
+import 'package:docker_commander/docker_commander_vm.dart';
 
 void main() async {
 
@@ -116,6 +115,39 @@ void main() async {
 
 ```
 
+## PostgreSQLContainer
+
+A pre-configure PostgreSQL Container:
+
+```dart
+import 'package:docker_commander/docker_commander_vm.dart';
+
+void main() async {
+
+  // Creates a `DockerCommander` for a local host machine:
+  var dockerCommander = DockerCommander(DockerHostLocal());
+  
+  // Start PostgreSQL container:
+  var dockerContainer = await PostgreSQLContainer().run(dockerCommander);
+
+  // Wait PostgreSQL to start and be ready to receive requests:
+  await dockerContainer.waitReady();
+
+  // Print the current STDOUT of the container:
+  var output = dockerContainer.stdout.asString;
+  print(output);
+  
+  // Stops PostgreSQL, with a timeout of 20s:
+  await dockerContainer.stop(timeout: Duration(seconds: 20));
+
+  // Wait PostgreSQL to exit and get exit code:
+  var exitCode = await dockerContainer.waitExit();
+
+  // ...
+
+}
+
+```
 
 ## See Also
 

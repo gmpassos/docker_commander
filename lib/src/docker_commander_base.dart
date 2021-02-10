@@ -1,4 +1,4 @@
-import 'package:docker_commander/src/docker_commander_host.dart';
+import 'docker_commander_host.dart';
 
 /// The Docker manager.
 class DockerCommander {
@@ -122,7 +122,7 @@ class DockerContainer {
   Future<int> waitExit() => runner.waitExit();
 
   /// Stops this container.
-  Future<bool> stop() => runner.stop();
+  Future<bool> stop({Duration timeout}) => runner.stop(timeout: timeout);
 
   /// The `STDOUT` of the container.
   Output get stdout => runner.stdout;

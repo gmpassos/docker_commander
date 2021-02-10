@@ -1,3 +1,10 @@
+## 1.0.4
+
+- Fix library exports.
+- Added `timeout` parameters to stop methods.
+- Organize imports.
+- Improved README.md examples.
+
 ## 1.0.3
 
 - Added support to be used in the browser (only with `DockerHostRemote`).

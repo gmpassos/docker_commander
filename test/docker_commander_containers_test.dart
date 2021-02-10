@@ -1,7 +1,5 @@
 @Timeout(Duration(minutes: 2))
-import 'package:docker_commander/docker_commander.dart';
 import 'package:docker_commander/docker_commander_vm.dart';
-import 'package:docker_commander/src/docker_commander_containers.dart';
 import 'package:logging/logging.dart';
 import 'package:test/test.dart';
 
@@ -42,7 +40,8 @@ void main() {
     });
 
     test('PostgreSQL', () async {
-      var dockerContainer = await PostgreSQLContainer().run(dockerCommander);
+      var dockerContainer =
+          await PostgreSQLContainer().run(dockerCommander, hostPorts: [4032]);
 
       _LOG.info(dockerContainer);
 
@@ -61,9 +60,13 @@ void main() {
 
       expect(dockerContainer.id.isNotEmpty, isTrue);
 
-      await dockerContainer.stop();
+      _LOG.info('Stopping PostgreSQL...');
+      await dockerContainer.stop(timeout: Duration(seconds: 5));
 
+      _LOG.info('Wsit exit...');
       var exitCode = await dockerContainer.waitExit();
+      _LOG.info('exitCode: $exitCode');
+
       expect(exitCode == 0 || exitCode == 137, isTrue);
     });
   });
