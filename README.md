@@ -13,9 +13,7 @@ Docker manager, for personalized containers and pre-configured popular container
 
 ## Usage
 
-You can generate a DOM tree using HTML, Object Orientation or manipulating an already instantiated DOM tree.
-
-Here's a simple usage example, that can work in any platform (Web or Native):
+Here's a simple usage example:
 
 ```dart
 import 'package:docker_commander/docker_commander.dart';
