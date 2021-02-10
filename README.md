@@ -19,10 +19,28 @@ Here's a simple usage example, that can work in any platform (Web or Native):
 
 ```dart
 import 'package:docker_commander/docker_commander.dart';
+import 'package:docker_commander/src/docker_commander_host_io.dart';
 
-void main() {
+void main() async {
+  // Creates a `DockerCommander` for local host machine:
+  var dockerCommander = DockerCommander(DockerHostLocal());
+  
+  // Initialize `DockerCommander`:
+  await dockerCommander.initialize();
+  // Ensure that Docker daemon is running.
+  await dockerCommander.checkDaemon();
 
-  // TODO
+  // Run Docker image `hello-world`:
+  var dockerContainer = await dockerCommander.run('hello-world');
+
+  // Wait container ready (ensure that)
+  await dockerContainer.waitReady();
+
+  var exitCode = await dockerContainer.waitExit();
+  var output = dockerContainer.stdout.asString;
+  
+  print(output);
+  print('EXIT CODE: $exitCode');
 }
 
 ```

@@ -7,6 +7,7 @@ import 'docker_commander_host.dart';
 
 final _LOG = Logger('docker_commander/io');
 
+/// [DockerHost] Implementation for Local Docker machine host.
 class DockerHostLocal extends DockerHost {
   String _dockerBinaryPath;
 
@@ -17,16 +18,19 @@ class DockerHostLocal extends DockerHost {
 
   @override
   Future<bool> initialize() async {
-    _dockerBinaryPath ??= await resolveDockerBinaryPath();
+    _dockerBinaryPath ??= await DockerHostLocal.resolveDockerBinaryPath();
     return true;
   }
 
+  /// The Docker binary path.
   String get dockerBinaryPath {
     if (_dockerBinaryPath == null) throw StateError('Null _dockerBinaryPath');
     return _dockerBinaryPath;
   }
 
-  Future<String> resolveDockerBinaryPath() async {
+  /// Resolves the full path of the Docker binary.
+  /// If fails to resolve, returns `docker`.
+  static Future<String> resolveDockerBinaryPath() async {
     var processResult = await Process.run('which', <String>['docker'],
         stdoutEncoding: systemEncoding);
 
@@ -76,7 +80,7 @@ class DockerHostLocal extends DockerHost {
       OutputReadyFunction stderrReadyFunction}) async {
     outputAsLines ??= true;
 
-    var image = resolveImage(imageName, version);
+    var image = DockerHost.resolveImage(imageName, version);
 
     var instanceID = DockerRunner.incrementInstanceID();
 
@@ -115,9 +119,15 @@ class DockerHostLocal extends DockerHost {
 
   Directory _temporaryDirectory;
 
+  /// Returns the temporary directory for this instance.
   Directory get temporaryDirectory {
     _temporaryDirectory ??= _createTemporaryDirectory();
     return _temporaryDirectory;
+  }
+
+  Directory _createTemporaryDirectory() {
+    var systemTemp = Directory.systemTemp;
+    return systemTemp.createTempSync('docker_commander_temp-$session');
   }
 
   void _clearTemporaryDirectory() {
@@ -135,11 +145,6 @@ class DockerHostLocal extends DockerHost {
     }
   }
 
-  Directory _createTemporaryDirectory() {
-    var systemTemp = Directory.systemTemp;
-    return systemTemp.createTempSync('docker_commander_temp-$session');
-  }
-
   int _tempFileCount = 0;
 
   File _createTemporaryFile([String prefix]) {
@@ -154,6 +159,8 @@ class DockerHostLocal extends DockerHost {
     return file;
   }
 
+  /// Closes this instances.
+  /// Clears the [temporaryDirectory] directory if necessary.
   @override
   Future<void> close() async {
     _clearTemporaryDirectory();
@@ -167,7 +174,10 @@ class DockerHostLocal extends DockerHost {
 
 class DockerRunnerLocal extends DockerRunner {
   final Process process;
+
+  /// An optional [File] that contains the container ID.
   final File idFile;
+
   final bool outputAsLines;
 
   final int _outputLimit;
@@ -205,22 +215,14 @@ class DockerRunnerLocal extends DockerRunner {
     if (outputAsLines) {
       var outputStream =
           OutputStream<String>(true, _outputLimit ?? 1000, outputReadyFunction);
-      stdout.transform(systemEncoding.decoder).listen((line) {
-        if (outputReadyFunction(outputStream, line)) {
-          outputStream.markReady();
-        }
-        outputStream.add(line);
-      });
+      stdout
+          .transform(systemEncoding.decoder)
+          .listen((line) => outputStream.add(line));
       return outputStream;
     } else {
       var outputStream = OutputStream<int>(
           false, _outputLimit ?? 1024 * 128, outputReadyFunction);
-      stdout.listen((b) {
-        if (outputReadyFunction(outputStream, b)) {
-          outputStream.markReady();
-        }
-        outputStream.addAll(b);
-      });
+      stdout.listen((b) => outputStream.addAll(b));
       return outputStream;
     }
   }
