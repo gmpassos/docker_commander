@@ -87,28 +87,31 @@ import 'package:docker_commander/src/docker_commander_local.dart';
 
 void main() async {
 
-  // A `DockerHost` running at '10.0.0.52:8099'
-  var dockerHost = DockerHostRemote('10.0.0.52', 8099, username: 'admin', password: '123')
+  // A connect to a `DockerHost` running at '10.0.0.52:8099'
+  var dockerHostRemote = DockerHostRemote('10.0.0.52', 8099, username: 'admin', password: '123')
 
   // Creates a `DockerCommander` for a remote host machine:
-  var dockerCommander = DockerCommander(dockerHost);
+  var dockerCommander = DockerCommander(dockerHostRemote);
   
-  // Initialize `DockerCommander`:
+  // Initialize `DockerCommander` (at remote server):
   await dockerCommander.initialize();
-  // Ensure that Docker daemon is running.
+  // Ensure that Docker daemon is running (at remote server):
   await dockerCommander.checkDaemon();
 
-  // Run Docker image `hello-world`:
+  // Run Docker image `hello-world` (at remote server):
   var dockerContainer = await dockerCommander.run('hello-world');
 
-  // Behavior is the same of example `DockerHostLocal`.
-  
+  // Behavior is the same of example using `DockerHostLocal`.
   // Internal `DockerRunner` will sync remote output automatically:
+
+  // ...
+  
   // Gets all the STDOUT as [String]. 
   var output = dockerContainer.stdout.asString;
   print(output);
   
   // ...
+  
 }
 
 ```
