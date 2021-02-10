@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:swiss_knife/swiss_knife.dart';
 
@@ -13,10 +12,24 @@ abstract class DockerHost {
   /// Initializes instance.
   Future<bool> initialize();
 
+  static List<String> normalizePorts(List<String> ports) {
+    if (ports == null) return null;
+    var ports2 = ports
+        .where((e) => isNotEmptyString(e, trim: true))
+        .map((e) => e.trim())
+        .toList();
+    return ports2.isNotEmpty ? ports2 : null;
+  }
+
   /// Runs a Docker containers with [image] and optional [version].
   Future<DockerRunner> run(String image,
       {String version,
+      List<String> imageArgs,
       String name,
+      List<String> ports,
+      String network,
+      String hostname,
+      Map<String, String> environment,
       bool cleanContainer = true,
       bool outputAsLines = true,
       int outputLimit,
@@ -86,12 +99,18 @@ abstract class DockerRunner {
 
   static int incrementInstanceID() => ++_instanceIDCounter;
 
+  /// [DockerHost] where this container is running.
   final DockerHost dockerHost;
+
+  /// The internal instanceID in [DockerCommander].
   final int instanceID;
+
+  /// The name of this container.
   final String name;
 
   DockerRunner(this.dockerHost, this.instanceID, this.name);
 
+  /// The ID of this container.
   String get id;
 
   static final int DEFAULT_OUTPUT_LIMIT = 1000;
@@ -100,8 +119,10 @@ abstract class DockerRunner {
 
   Output _stderr;
 
+  /// The STDOUT of this container.
   Output get stdout => _stdout;
 
+  /// The STDERR of this container.
   Output get stderr => _stderr;
 
   void setupStdout(OutputStream outputStream) {
@@ -112,13 +133,20 @@ abstract class DockerRunner {
     _stderr = Output(outputStream);
   }
 
+  /// Waits this container to start and be ready.
   Future<bool> waitReady();
 
+  /// Returns [true] if this container is started and ready.
   bool get isReady;
 
+  /// Returns [true] if this containers is running.
   bool get isRunning;
 
+  /// Waits this container to naturally exit.
   Future<int> waitExit();
+
+  /// Stops this container.
+  Future<bool> stop() => dockerHost.stopByInstanceID(instanceID);
 
   @override
   String toString() {
@@ -166,6 +194,7 @@ typedef OutputReadyFunction = bool Function(
 
 /// Handles the output stream of a Docker container.
 class OutputStream<T> {
+  final Encoding _encoding;
   final bool lines;
 
   /// The limit of entries.
@@ -175,7 +204,8 @@ class OutputStream<T> {
   /// Called for each output entry.
   final OutputReadyFunction outputReadyFunction;
 
-  OutputStream(this.lines, this._limit, this.outputReadyFunction);
+  OutputStream(
+      this._encoding, this.lines, this._limit, this.outputReadyFunction);
 
   bool _ready = false;
   final Completer<bool> _readyCompleter = Completer();
@@ -192,7 +222,9 @@ class OutputStream<T> {
   /// Mars this output as ready.
   void markReady() {
     _ready = true;
-    _readyCompleter.complete(true);
+    if (!_readyCompleter.isCompleted) {
+      _readyCompleter.complete(true);
+    }
   }
 
   int get limit => _limit;
@@ -274,7 +306,7 @@ class OutputStream<T> {
     if (lines) {
       return _data.join('\n');
     } else {
-      return systemEncoding.decode(_data as List<int>);
+      return _encoding.decode(_data as List<int>);
     }
   }
 

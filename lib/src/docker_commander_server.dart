@@ -68,6 +68,8 @@ class DockerHostServer {
   }
 
   void start() async {
+    if (_started != null) return;
+
     _LOG.info('[SERVER]\tSTARTING...');
 
     _started = Completer();
@@ -384,21 +386,21 @@ class DockerHostServer {
   }
 
   Future<bool> _processInitialize(
-      HttpRequest request, Map<String, String> parameters, parseJSON) async {
+      HttpRequest request, Map<String, String> parameters, json) async {
     _dockerHostLocal ??= DockerHostLocal();
     var ok = await _dockerHostLocal.initialize();
     return ok;
   }
 
   Future<bool> _processCheckDaemon(
-      HttpRequest request, Map<String, String> parameters, parseJSON) async {
+      HttpRequest request, Map<String, String> parameters, json) async {
     if (_dockerHostLocal == null) return false;
     var ok = await _dockerHostLocal.checkDaemon();
     return ok;
   }
 
   Future<String> _processIDByName(
-      HttpRequest request, Map<String, String> parameters, parseJSON) async {
+      HttpRequest request, Map<String, String> parameters, json) async {
     if (_dockerHostLocal == null) return null;
 
     var name = _getParameter(parameters, json, 'name');
@@ -408,26 +410,45 @@ class DockerHostServer {
   }
 
   Future<bool> _processClose(
-      HttpRequest request, Map<String, String> parameters, parseJSON) async {
+      HttpRequest request, Map<String, String> parameters, json) async {
     if (_dockerHostLocal == null) return false;
     await _dockerHostLocal.close();
     return true;
   }
 
   Future<Map> _processRun(
-      HttpRequest request, Map<String, String> parameters, parseJSON) async {
+      HttpRequest request, Map<String, String> parameters, json) async {
     if (_dockerHostLocal == null) return null;
 
     String imageName = _getParameter(parameters, json, 'image');
     String version = _getParameter(parameters, json, 'version');
+    String imageArgsEncoded = _getParameter(parameters, json, 'imageArgs');
     String name = _getParameter(parameters, json, 'name');
+    String portsLine = _getParameter(parameters, json, 'ports');
+    String network = _getParameter(parameters, json, 'network');
+    String hostname = _getParameter(parameters, json, 'hostname');
+    String environmentLine = _getParameter(parameters, json, 'environment');
     String cleanContainer = _getParameter(parameters, json, 'cleanContainer');
     String outputAsLines = _getParameter(parameters, json, 'outputAsLines');
     String outputLimit = _getParameter(parameters, json, 'outputLimit');
 
+    var ports = isNotEmptyString(portsLine) ? portsLine.split(',') : null;
+
+    var environment = decodeQueryString(environmentLine);
+
+    List<String> imageArgs;
+    if (isNotEmptyString(imageArgsEncoded)) {
+      imageArgs = parseJSON(imageArgsEncoded);
+    }
+
     var runner = await _dockerHostLocal.run(imageName,
         version: version,
+        imageArgs: imageArgs,
         name: name,
+        ports: ports,
+        network: network,
+        hostname: hostname,
+        environment: environment,
         cleanContainer: parseBool(cleanContainer),
         outputAsLines: parseBool(outputAsLines),
         outputLimit: parseInt(outputLimit));
@@ -440,7 +461,7 @@ class DockerHostServer {
   }
 
   Future<bool> _processRunnerWaitReady(
-      HttpRequest request, Map<String, String> parameters, parseJSON) async {
+      HttpRequest request, Map<String, String> parameters, json) async {
     if (_dockerHostLocal == null) return false;
 
     var instanceID = _getParameterAsInt(parameters, json, 'instanceID');
@@ -453,7 +474,7 @@ class DockerHostServer {
   }
 
   Future<int> _processRunnerWaitExit(
-      HttpRequest request, Map<String, String> parameters, parseJSON) async {
+      HttpRequest request, Map<String, String> parameters, json) async {
     if (_dockerHostLocal == null) return null;
 
     var instanceID = _getParameterAsInt(parameters, json, 'instanceID');
@@ -466,7 +487,7 @@ class DockerHostServer {
   }
 
   Future<bool> _processRunnerStop(
-      HttpRequest request, Map<String, String> parameters, parseJSON) async {
+      HttpRequest request, Map<String, String> parameters, json) async {
     if (_dockerHostLocal == null) return false;
 
     var instanceID = _getParameterAsInt(parameters, json, 'instanceID');
@@ -476,7 +497,7 @@ class DockerHostServer {
   }
 
   Future<Map> _processOutput(HttpRequest request, String type,
-      Map<String, String> parameters, parseJSON) async {
+      Map<String, String> parameters, json) async {
     if (_dockerHostLocal == null) return null;
 
     var instanceID = _getParameterAsInt(parameters, json, 'instanceID');

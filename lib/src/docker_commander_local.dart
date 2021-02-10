@@ -72,13 +72,20 @@ class DockerHostLocal extends DockerHost {
   @override
   Future<DockerRunner> run(String imageName,
       {String version,
+      List<String> imageArgs,
       String name,
+      List<String> ports,
+      String network,
+      String hostname,
+      Map<String, String> environment,
       bool cleanContainer = true,
       bool outputAsLines = true,
       int outputLimit,
       OutputReadyFunction stdoutReadyFunction,
       OutputReadyFunction stderrReadyFunction}) async {
     outputAsLines ??= true;
+
+    ports = DockerHost.normalizePorts(ports);
 
     var image = DockerHost.resolveImage(imageName, version);
 
@@ -93,6 +100,35 @@ class DockerHostLocal extends DockerHost {
 
     var cmdArgs = <String>['run', '--name', name];
 
+    if (ports != null) {
+      var portsSet = ports.map((pair) {
+        var parts = pair.split(':');
+        var p1 = parseInt(parts[0]);
+        var p2 = parts.length > 1 ? parseInt(parts[1], p1) : p1;
+        return '$p1:$p2';
+      }).toSet();
+
+      for (var pair in portsSet) {
+        cmdArgs.add('-p');
+        cmdArgs.add(pair);
+      }
+    }
+
+    if (isNotEmptyString(network, trim: true)) {
+      cmdArgs.add('--net');
+      cmdArgs.add(network.trim());
+    }
+
+    if (isNotEmptyString(hostname, trim: true)) {
+      cmdArgs.add('-h');
+      cmdArgs.add(hostname.trim());
+    }
+
+    environment?.forEach((k, v) {
+      cmdArgs.add('-e');
+      cmdArgs.add('$k=$v');
+    });
+
     File idFile;
     if (cleanContainer ?? true) {
       cmdArgs.add('--rm');
@@ -104,6 +140,10 @@ class DockerHostLocal extends DockerHost {
     }
 
     cmdArgs.add(image);
+
+    if (imageArgs != null) {
+      cmdArgs.addAll(imageArgs);
+    }
 
     _LOG.info('run[CMD]>\t$dockerBinaryPath ${cmdArgs.join(' ')}');
 
@@ -239,15 +279,15 @@ class DockerRunnerLocal extends DockerRunner {
   OutputStream _buildOutputStream(
       Stream<List<int>> stdout, OutputReadyFunction outputReadyFunction) {
     if (outputAsLines) {
-      var outputStream =
-          OutputStream<String>(true, _outputLimit ?? 1000, outputReadyFunction);
+      var outputStream = OutputStream<String>(
+          systemEncoding, true, _outputLimit ?? 1000, outputReadyFunction);
       stdout
           .transform(systemEncoding.decoder)
           .listen((line) => outputStream.add(line));
       return outputStream;
     } else {
-      var outputStream = OutputStream<int>(
-          false, _outputLimit ?? 1024 * 128, outputReadyFunction);
+      var outputStream = OutputStream<int>(systemEncoding, false,
+          _outputLimit ?? 1024 * 128, outputReadyFunction);
       stdout.listen((b) => outputStream.addAll(b));
       return outputStream;
     }

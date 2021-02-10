@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:docker_commander/src/docker_commander_host.dart';
 import 'package:logging/logging.dart';
 import 'package:mercury_client/mercury_client.dart';
@@ -89,16 +91,33 @@ class DockerHostRemote extends DockerHost {
   @override
   Future<DockerRunner> run(String image,
       {String version,
+      List<String> imageArgs,
       String name,
+      List<String> ports,
+      String network,
+      String hostname,
+      Map<String, String> environment,
       bool cleanContainer = true,
       bool outputAsLines = true,
       int outputLimit,
       OutputReadyFunction stdoutReadyFunction,
       OutputReadyFunction stderrReadyFunction}) async {
+    cleanContainer ??= true;
+    outputAsLines ??= true;
+
+    var imageArgsEncoded = (imageArgs != null && imageArgs.isNotEmpty)
+        ? encodeJSON(imageArgs)
+        : null;
+
     var response = await _httpClient.getJSON('run', parameters: {
       'image': image,
       'version': version,
+      'imageArgs': imageArgsEncoded,
       'name': name,
+      'ports': DockerHost.normalizePorts(ports)?.join(','),
+      'network': network,
+      'hostname': hostname,
+      'environment': encodeQueryString(environment),
       'cleanContainer': '$cleanContainer',
       'outputAsLines': '$outputAsLines',
       'outputLimit': '$outputLimit',
@@ -203,8 +222,8 @@ class DockerRunnerRemote extends DockerRunner {
   OutputStream _buildOutputStream(
       bool stderr, OutputReadyFunction outputReadyFunction) {
     if (outputAsLines) {
-      var outputStream =
-          OutputStream<String>(true, outputLimit ?? 1000, outputReadyFunction);
+      var outputStream = OutputStream<String>(
+          utf8, true, outputLimit ?? 1000, outputReadyFunction);
 
       OutputClient(dockerHost, this, stderr, outputStream, (entries) {
         for (var e in entries) {
@@ -215,7 +234,7 @@ class DockerRunnerRemote extends DockerRunner {
       return outputStream;
     } else {
       var outputStream = OutputStream<int>(
-          false, outputLimit ?? 1024 * 128, outputReadyFunction);
+          utf8, false, outputLimit ?? 1024 * 128, outputReadyFunction);
 
       OutputClient(dockerHost, this, stderr, outputStream, (entries) {
         outputStream.addAll(entries.cast());

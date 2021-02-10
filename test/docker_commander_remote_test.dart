@@ -1,4 +1,4 @@
-@Timeout(Duration(minutes: 5))
+@Timeout(Duration(minutes: 2))
 
 import 'package:docker_commander/src/docker_commander_remote.dart';
 import 'package:docker_commander/src/docker_commander_server.dart';

@@ -56,7 +56,12 @@ class DockerCommander {
   Future<DockerContainer> run(
     String image, {
     String version,
+    List<String> imageArgs,
     String name,
+    List<String> ports,
+    String network,
+    String hostname,
+    Map<String, String> environment,
     bool cleanContainer = true,
     bool outputAsLines = true,
     int outputLimit,
@@ -68,7 +73,12 @@ class DockerCommander {
     var run = await dockerHost.run(
       image,
       version: version,
+      imageArgs: imageArgs,
       name: name,
+      ports: ports,
+      network: network,
+      hostname: hostname,
+      environment: environment,
       cleanContainer: cleanContainer,
       outputAsLines: outputAsLines,
       outputLimit: outputLimit,
@@ -110,6 +120,9 @@ class DockerContainer {
 
   /// Waits container to exit. Returns the process exit code.
   Future<int> waitExit() => runner.waitExit();
+
+  /// Stops this container.
+  Future<bool> stop() => runner.stop();
 
   /// The `STDOUT` of the container.
   Output get stdout => runner.stdout;
