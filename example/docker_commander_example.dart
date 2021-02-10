@@ -1,5 +1,5 @@
 import 'package:docker_commander/docker_commander.dart';
-import 'package:docker_commander/src/docker_commander_host_io.dart';
+import 'package:docker_commander/src/docker_commander_local.dart';
 
 void main() async {
   var dockerCommander = DockerCommander(DockerHostLocal());

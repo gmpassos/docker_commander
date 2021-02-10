@@ -8,7 +8,10 @@ environment:
 
 dependencies:
   swiss_knife: ^2.5.25
-  logging: ^0.11.0
+    #path: ../swiss_knife
+  mercury_client: ^1.1.18
+    #path: ../mercury_client
+  logging: ^0.11.4
 
 dev_dependencies:
   pedantic: ^1.9.0

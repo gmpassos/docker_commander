@@ -112,10 +112,36 @@ class DockerHostLocal extends DockerHost {
     var runner = DockerRunnerLocal(this, instanceID, name, process, idFile,
         outputAsLines, outputLimit, stdoutReadyFunction, stderrReadyFunction);
 
+    _runners[instanceID] = runner;
+
     await runner.initialize();
 
     return runner;
   }
+
+  @override
+  Future<bool> stopByName(String name) async {
+    if (isEmptyString(name)) return false;
+    var process = Process.run(dockerBinaryPath, <String>['stop', name]);
+    var result = await process;
+    return result.exitCode == 0;
+  }
+
+  final Map<int, DockerRunnerLocal> _runners = {};
+
+  @override
+  List<int> getRunnersInstanceIDs() => _runners.keys.toList();
+
+  @override
+  List<String> getRunnersNames() => _runners.values.map((r) => r.name).toList();
+
+  @override
+  DockerRunnerLocal getRunnerByInstanceID(int instanceID) =>
+      _runners[instanceID];
+
+  @override
+  DockerRunner getRunnerByName(String name) =>
+      _runners.values.firstWhere((r) => r.name == name, orElse: () => null);
 
   Directory _temporaryDirectory;
 
@@ -242,5 +268,15 @@ class DockerRunnerLocal extends DockerRunner {
   bool get isReady => this.stdout.isReady || this.stderr.isReady;
 
   @override
-  Future<int> waitExit() async => process.exitCode;
+  bool get isRunning => _exitCode == null;
+
+  int _exitCode;
+
+  @override
+  Future<int> waitExit() async {
+    if (_exitCode != null) return _exitCode;
+    var code = await process.exitCode;
+    _exitCode = code;
+    return _exitCode;
+  }
 }

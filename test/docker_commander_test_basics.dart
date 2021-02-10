@@ -1,21 +1,18 @@
 import 'package:docker_commander/docker_commander.dart';
-import 'package:docker_commander/src/docker_commander_host_io.dart';
 import 'package:logging/logging.dart';
 import 'package:test/test.dart';
 
 final _LOG = Logger('docker_commander/test');
 
-void main() {
-  Logger.root.level = Level.ALL; // defaults to Level.INFO
-  Logger.root.onRecord.listen((record) {
-    print('${record.time}\t[${record.level.name}]\t${record.message}');
-  });
+typedef DockerHostLocalInstantiator = DockerHost Function();
 
-  group('Docker basics', () {
+void doBasicTests(DockerHostLocalInstantiator dockerHostLocalInstantiator) {
+  group('DockerCommander basics', () {
     DockerCommander dockerCommander;
 
     setUp(() async {
-      dockerCommander = DockerCommander(DockerHostLocal());
+      var dockerHost = dockerHostLocalInstantiator();
+      dockerCommander = DockerCommander(dockerHost);
       _LOG.info('setUp>\tDockerCommander: $dockerCommander');
 
       _LOG.info('setUp>\tDockerCommander.initialize()');

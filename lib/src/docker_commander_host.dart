@@ -23,6 +23,37 @@ abstract class DockerHost {
       OutputReadyFunction stdoutReadyFunction,
       OutputReadyFunction stderrReadyFunction});
 
+  /// Returns a [List<int>] of [DockerRunner] `instanceID`.
+  List<int> getRunnersInstanceIDs();
+
+  /// Returns a [List<String>] of [DockerRunner] `name`.
+  List<String> getRunnersNames();
+
+  /// Returns a [DockerRunner] with [instanceID].
+  DockerRunner getRunnerByInstanceID(int instanceID);
+
+  /// Returns a [DockerRunner] with [name].
+  DockerRunner getRunnerByName(String name);
+
+  /// Stops a container by [instanceID].
+  Future<bool> stopByInstanceID(int instanceID) async {
+    var runner = getRunnerByInstanceID(instanceID);
+    if (runner == null) return false;
+    return stopByName(runner.name);
+  }
+
+  /// Stops a container by [name].
+  Future<bool> stopByName(String name);
+
+  /// Stops all [DockerRunner] returned by [getRunnersInstanceIDs].
+  Future<void> stopRunners() async {
+    var instancesIDs = getRunnersInstanceIDs();
+
+    for (var instanceID in instancesIDs) {
+      await stopByInstanceID(instanceID);
+    }
+  }
+
   /// Checks if Docker daemon is running.
   Future<bool> checkDaemon();
 
@@ -85,6 +116,8 @@ abstract class DockerRunner {
 
   bool get isReady;
 
+  bool get isRunning;
+
   Future<int> waitExit();
 
   @override
@@ -98,6 +131,8 @@ class Output {
   final OutputStream _outputStream;
 
   Output(this._outputStream);
+
+  OutputStream getOutputStream() => _outputStream;
 
   /// Returns all the output as bytes.
   List<int> get asBytes => _outputStream.asBytes;
@@ -114,6 +149,16 @@ class Output {
 
   /// Waits the output to be ready.
   Future<bool> waitReady() => _outputStream.waitReady();
+
+  /// Current length of [_data] buffer.
+  int get entriesLength => _outputStream.entriesLength;
+
+  /// Number of removed entries, due [_limit].
+  int get entriesRemoved => _outputStream.entriesRemoved;
+
+  /// Returns a [List] of entries, from [offset] or [realOffset].
+  List getEntries({int offset, int realOffset}) =>
+      _outputStream.getEntries(offset: offset, realOffset: realOffset);
 }
 
 typedef OutputReadyFunction = bool Function(
@@ -159,6 +204,29 @@ class OutputStream<T> {
   /// The data buffer;
   final List<T> _data = <T>[];
 
+  int _dataRemoved = 0;
+
+  /// Current length of [_data] buffer.
+  int get entriesLength => _data.length;
+
+  /// Number of removed entries, due [_limit].
+  int get entriesRemoved => _dataRemoved;
+
+  /// Returns a [List] of entries, from [offset] or [realOffset].
+  List<T> getEntries({int offset, int realOffset}) {
+    if (realOffset != null) {
+      offset = realOffset - _dataRemoved;
+    }
+
+    offset ??= 0;
+
+    if (offset < 0) {
+      offset = 0;
+    }
+
+    return offset == 0 ? List.unmodifiable(_data) : _data.sublist(offset);
+  }
+
   /// Adds an [entry] to the [_data] buffer.
   void add(T entry) {
     _data.add(entry);
@@ -170,6 +238,7 @@ class OutputStream<T> {
     if (_limit > 0) {
       while (_data.length > _limit) {
         _data.removeAt(0);
+        ++_dataRemoved;
       }
     }
   }
@@ -186,6 +255,7 @@ class OutputStream<T> {
       var rm = _data.length - _limit;
       if (rm > 0) {
         _data.removeRange(0, rm);
+        _dataRemoved += rm;
       }
     }
   }
