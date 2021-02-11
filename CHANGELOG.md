@@ -1,3 +1,10 @@
+## 1.0.6
+
+- Change libraries:
+  - `docker_commander.dart`: standard and portable, even works in the browser through `DockerHostRemote`.
+  - `docker_commander_vm.dart`: VM exclusive features, like `DockerHostLocal` and `DockerHostServer`.
+- Fix Server token validation and ensure authentication in all operations. 
+
 ## 1.0.5
 
 - Fix libraries names.

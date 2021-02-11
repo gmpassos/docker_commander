@@ -26,6 +26,16 @@ class AuthenticationTable {
   }
 }
 
+class Authentication {
+  final String username;
+
+  final String token;
+
+  final bool grant;
+
+  Authentication({this.username, this.token, this.grant = false});
+}
+
 /// A [DockerHost] Server, to be used by [DockerHostRemote].
 class DockerHostServer {
   /// The [HttpServer] port.
@@ -119,16 +129,13 @@ class DockerHostServer {
     var origin = request.headers['Origin'] ??
         'http://${request.headers.host}:$listenPort/';
 
-    request.response.headers
-        .add('Access-Control-Allow-Origin', origin, preserveHeaderCase: true);
-
-    request.response.headers.add('Access-Control-Allow-Methods',
+    setResponseHeader(request, 'Access-Control-Allow-Origin', origin);
+    setResponseHeader(request, 'Access-Control-Allow-Methods',
         'GET,HEAD,PUT,POST,PATCH,DELETE,OPTIONS');
-    request.response.headers.add('Access-Control-Allow-Credentials', 'true');
-
-    request.response.headers.add('Access-Control-Allow-Headers',
+    setResponseHeader(request, 'Access-Control-Allow-Credentials', 'true');
+    setResponseHeader(request, 'Access-Control-Allow-Headers',
         'Content-Type, Access-Control-Allow-Headers, Authorization, x-ijt');
-    request.response.headers.add('Access-Control-Expose-Headers',
+    setResponseHeader(request, 'Access-Control-Expose-Headers',
         'Content-Length, Content-Type, Last-Modified, X-Access-Token, X-Access-Token-Expiration');
   }
 
@@ -295,9 +302,18 @@ class DockerHostServer {
     _LOG.info(
         '[SERVER]\tPROCESS OPERATION>\t operation: $operation ; parameters: $parameters ; body: $body');
 
+    if (operation == 'auth') {
+      return _processAuth(request, parameters, parseJSON(body));
+    }
+
+    var authentication = await checkAuthentication(request, parameters);
+
+    if (!authentication.grant) {
+      request.response.statusCode = HttpStatus.unauthorized;
+      return null;
+    }
+
     switch (operation) {
-      case 'auth':
-        return _processAuth(request, parameters, parseJSON(body));
       case 'initialize':
         return _processInitialize(request, parameters, parseJSON(body));
       case 'check_daemon':
@@ -322,22 +338,8 @@ class DockerHostServer {
     }
   }
 
-  final Map<String, AccessToken> _usersTokens = {};
-
-  bool validateToken(String token) {
-    _checkTokens();
-    var valid = _usersTokens.values.contains(token);
-    return valid;
-  }
-
-  void _checkTokens() {
-    var now = DateTime.now().millisecondsSinceEpoch;
-    var timeout = authenticationTokenTimeout.inMilliseconds;
-    _usersTokens.removeWhere((key, value) => !value.isValid(now, timeout));
-  }
-
-  Future<Map<String, String>> _processAuth(
-      HttpRequest request, Map<String, String> parameters, dynamic json) async {
+  Future<Authentication> checkAuthentication(
+      HttpRequest request, Map<String, String> parameters) async {
     var authorization = request.headers['Authorization']?.first?.trim();
 
     String username;
@@ -357,7 +359,8 @@ class DockerHostServer {
         var ok = validateToken(token);
 
         if (ok) {
-          return _setHeader_X_Access_Token(request, token);
+          setResponseHeader(request, 'X-Access-Token', token);
+          return Authentication(token: token, grant: true);
         }
       }
     }
@@ -368,22 +371,47 @@ class DockerHostServer {
     var ok = await checkPassword(username, password);
     if (!ok) {
       request.response.statusCode = HttpStatus.unauthorized;
-      return null;
+      return Authentication(username: username, grant: false);
     }
 
     _checkTokens();
-    var token =
+    var accessToken =
         _usersTokens.putIfAbsent(username, () => AccessToken(_generateToken()));
 
-    return _setHeader_X_Access_Token(request, token.token);
+    var token = accessToken.token;
+
+    setResponseHeader(request, 'X-Access-Token', token);
+    return Authentication(username: username, token: token, grant: true);
   }
 
-  Map<String, String> _setHeader_X_Access_Token(
-      HttpRequest request, String token) {
-    request.response.headers
-        .add('X-Access-Token', token, preserveHeaderCase: true);
+  void setResponseHeader(HttpRequest request, String key, String value) {
+    request.response.headers.add(key, value, preserveHeaderCase: true);
+  }
 
-    return {'access_token': token};
+  final Map<String, AccessToken> _usersTokens = {};
+
+  bool validateToken(String token) {
+    _checkTokens();
+    var valid = _usersTokens.values.where((a) => a.token == token).isNotEmpty;
+    return valid;
+  }
+
+  void _checkTokens() {
+    var now = DateTime.now().millisecondsSinceEpoch;
+    var timeout = authenticationTokenTimeout.inMilliseconds;
+    _usersTokens.removeWhere((key, value) => !value.isValid(now, timeout));
+  }
+
+  Future<Map<String, String>> _processAuth(
+      HttpRequest request, Map<String, String> parameters, dynamic json) async {
+    var authentication = await checkAuthentication(request, parameters);
+
+    if (!authentication.grant) {
+      request.response.statusCode = HttpStatus.unauthorized;
+      return null;
+    }
+
+    return {'access_token': authentication.token};
   }
 
   Future<bool> _processInitialize(
