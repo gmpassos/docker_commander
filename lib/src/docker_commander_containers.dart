@@ -107,7 +107,7 @@ class DockerContainerConfig {
       image,
       version: version,
       imageArgs: imageArgs,
-      name: name ?? this.name,
+      containerName: name ?? this.name,
       ports: mappedPorts,
       network: network ?? this.network,
       hostname: hostname ?? this.hostname,
@@ -140,5 +140,18 @@ class PostgreSQLContainer extends DockerContainerConfig {
           outputAsLines: true,
           stdoutReadyFunction: (output, line) =>
               line.contains('database system is ready to accept connections'),
+        );
+}
+
+class ApacheHttpdContainer extends DockerContainerConfig {
+  ApacheHttpdContainer({List<int> hostPorts})
+      : super(
+          'httpd',
+          version: 'latest',
+          hostPorts: hostPorts,
+          containerPorts: [80],
+          outputAsLines: true,
+          stderrReadyFunction: (output, line) =>
+              line.contains('Apache') && line.contains('configured'),
         );
 }

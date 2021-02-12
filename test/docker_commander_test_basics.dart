@@ -1,17 +1,29 @@
 import 'package:docker_commander/docker_commander.dart';
 import 'package:logging/logging.dart';
+import 'package:mercury_client/mercury_client.dart';
 import 'package:test/test.dart';
+
+import 'logger_config.dart';
 
 final _LOG = Logger('docker_commander/test');
 
-typedef DockerHostLocalInstantiator = DockerHost Function();
+typedef DockerHostLocalInstantiator = DockerHost Function(int listenPort);
 
-void doBasicTests(DockerHostLocalInstantiator dockerHostLocalInstantiator) {
+void doBasicTests(DockerHostLocalInstantiator dockerHostLocalInstantiator,
+    [dynamic Function() preSetup]) {
   group('DockerCommander basics', () {
     DockerCommander dockerCommander;
 
+    var listenPort = 8099;
+
     setUp(() async {
-      var dockerHost = dockerHostLocalInstantiator();
+      logTitle(_LOG, 'SETUP');
+
+      if (preSetup != null) {
+        listenPort = await preSetup();
+      }
+
+      var dockerHost = dockerHostLocalInstantiator(listenPort);
       dockerCommander = DockerCommander(dockerHost);
       _LOG.info('setUp>\tDockerCommander: $dockerCommander');
 
@@ -29,6 +41,8 @@ void doBasicTests(DockerHostLocalInstantiator dockerHostLocalInstantiator) {
     });
 
     tearDown(() async {
+      logTitle(_LOG, 'TEAR DOWN');
+
       _LOG.info('tearDown>\tDockerCommander: $dockerCommander');
       _LOG.info('tearDown>\tDockerCommander.close()');
       await dockerCommander.close();
@@ -50,6 +64,43 @@ void doBasicTests(DockerHostLocalInstantiator dockerHostLocalInstantiator) {
 
       var output = dockerContainer.stdout.asString;
       expect(output, contains('Hello from Docker!'));
+
+      _LOG.info('<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<');
+      _LOG.info(output);
+      _LOG.info('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>');
+
+      expect(dockerContainer.id.isNotEmpty, isTrue);
+    });
+
+    test('ApacheHttpdContainer', () async {
+      var apachePort = listenPort - 4000;
+
+      _LOG.info('Starting Apache HTTP at port $apachePort');
+
+      var dockerContainer = await ApacheHttpdContainer()
+          .run(dockerCommander, hostPorts: [apachePort]);
+
+      _LOG.info(dockerContainer);
+
+      expect(dockerContainer.instanceID > 0, isTrue);
+      expect(dockerContainer.name.isNotEmpty, isTrue);
+
+      expect(dockerContainer.ports, equals(['$apachePort:80']));
+
+      await dockerContainer.waitReady();
+
+      var hostPort = dockerContainer.hostPorts[0];
+
+      var getURLResponse =
+          await HttpClient('http://localhost:$hostPort/').get('');
+      var getURLContent = getURLResponse.bodyAsString;
+      _LOG.info(getURLContent);
+      expect(getURLContent, contains('<html>'));
+
+      await dockerContainer.stop(timeout: Duration(seconds: 5));
+
+      var output = dockerContainer.stderr.asString;
+      expect(output, contains('Apache'));
 
       _LOG.info('<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<');
       _LOG.info(output);

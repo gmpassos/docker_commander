@@ -12,20 +12,28 @@ abstract class DockerHost {
   /// Initializes instance.
   Future<bool> initialize();
 
-  static List<String> normalizePorts(List<String> ports) {
+  static List<String> normalizeMappedPorts(List<String> ports) {
     if (ports == null) return null;
     var ports2 = ports
         .where((e) => isNotEmptyString(e, trim: true))
         .map((e) => e.trim())
         .toList();
-    return ports2.isNotEmpty ? ports2 : null;
+
+    var portsSet = ports2.map((pair) {
+      var parts = pair.split(':');
+      var p1 = parseInt(parts[0]);
+      var p2 = parts.length > 1 ? parseInt(parts[1], p1) : p1;
+      return '$p1:$p2';
+    }).toSet();
+
+    return portsSet.isNotEmpty ? portsSet.toList() : null;
   }
 
   /// Runs a Docker containers with [image] and optional [version].
   Future<DockerRunner> run(String image,
       {String version,
       List<String> imageArgs,
-      String name,
+      String containerName,
       List<String> ports,
       String network,
       String hostname,
@@ -35,6 +43,17 @@ abstract class DockerHost {
       int outputLimit,
       OutputReadyFunction stdoutReadyFunction,
       OutputReadyFunction stderrReadyFunction});
+
+  /// Executes a [command] inside [containerName] with [args].
+  Future<DockerProcess> exec(
+    String containerName,
+    String command,
+    List<String> args, {
+    bool outputAsLines = true,
+    int outputLimit,
+    OutputReadyFunction stdoutReadyFunction,
+    OutputReadyFunction stderrReadyFunction,
+  });
 
   /// Returns a [List<int>] of [DockerRunner] `instanceID`.
   List<int> getRunnersInstanceIDs();
@@ -52,7 +71,7 @@ abstract class DockerHost {
   Future<bool> stopByInstanceID(int instanceID, {Duration timeout}) async {
     var runner = getRunnerByInstanceID(instanceID);
     if (runner == null) return false;
-    return stopByName(runner.name, timeout: timeout);
+    return stopByName(runner.containerName, timeout: timeout);
   }
 
   /// Stops a container by [name].
@@ -94,7 +113,27 @@ abstract class DockerHost {
 }
 
 /// Represents a Docker container running.
-abstract class DockerRunner {
+abstract class DockerRunner extends DockerProcess {
+  DockerRunner(DockerHost dockerHost, int instanceID, String containerName)
+      : super(dockerHost, instanceID, containerName);
+
+  /// The ID of this container.
+  String get id;
+
+  /// Returns the mapped ports.
+  List<String> get ports;
+
+  /// Stops this container.
+  Future<bool> stop({Duration timeout}) =>
+      dockerHost.stopByInstanceID(instanceID, timeout: timeout);
+
+  @override
+  String toString() {
+    return 'DockerRunner{id: $id, instanceID: $instanceID, containerName: $containerName, ready: $isReady, dockerHost: $dockerHost}';
+  }
+}
+
+abstract class DockerProcess {
   static int _instanceIDCounter = 0;
 
   static int incrementInstanceID() => ++_instanceIDCounter;
@@ -105,13 +144,10 @@ abstract class DockerRunner {
   /// The internal instanceID in [DockerCommander].
   final int instanceID;
 
-  /// The name of this container.
-  final String name;
+  /// The name of the associated container.
+  final String containerName;
 
-  DockerRunner(this.dockerHost, this.instanceID, this.name);
-
-  /// The ID of this container.
-  String get id;
+  DockerProcess(this.dockerHost, this.instanceID, this.containerName);
 
   static final int DEFAULT_OUTPUT_LIMIT = 1000;
 
@@ -126,11 +162,11 @@ abstract class DockerRunner {
   Output get stderr => _stderr;
 
   void setupStdout(OutputStream outputStream) {
-    _stdout = Output(outputStream);
+    _stdout = Output(this, outputStream);
   }
 
   void setupStderr(OutputStream outputStream) {
-    _stderr = Output(outputStream);
+    _stderr = Output(this, outputStream);
   }
 
   /// Waits this container to start and be ready.
@@ -142,24 +178,36 @@ abstract class DockerRunner {
   /// Returns [true] if this containers is running.
   bool get isRunning;
 
+  /// The exist code, returned by [waitExit], or null if still running.
+  int get exitCode;
+
   /// Waits this container to naturally exit.
   Future<int> waitExit();
 
-  /// Stops this container.
-  Future<bool> stop({Duration timeout}) =>
-      dockerHost.stopByInstanceID(instanceID, timeout: timeout);
+  /// Calls [waitExit] and returns [stdout]
+  Future<Output> waitStdout() async {
+    await waitExit();
+    return stdout;
+  }
+
+  /// Calls [waitExit] and returns [stderr]
+  Future<Output> waitStderr() async {
+    await waitExit();
+    return stderr;
+  }
 
   @override
   String toString() {
-    return 'DockerRunner{id: $id, instanceID: $instanceID, name: $name, ready: $isReady, dockerHost: $dockerHost}';
+    return 'DockerProcess{instanceID: $instanceID, ready: $isReady, dockerHost: $dockerHost}';
   }
 }
 
 /// Output wrapper of a Docker container.
 class Output {
+  final DockerProcess dockerProcess;
   final OutputStream _outputStream;
 
-  Output(this._outputStream);
+  Output(this.dockerProcess, this._outputStream);
 
   OutputStream getOutputStream() => _outputStream;
 
@@ -179,6 +227,9 @@ class Output {
   /// Waits the output to be ready.
   Future<bool> waitReady() => _outputStream.waitReady();
 
+  /// Waits STDOUT or STDERR to be ready.
+  Future<bool> waitAnyOutputReady() => _outputStream.waitAnyOutputReady();
+
   /// Current length of [_data] buffer.
   int get entriesLength => _outputStream.entriesLength;
 
@@ -188,10 +239,21 @@ class Output {
   /// Returns a [List] of entries, from [offset] or [realOffset].
   List getEntries({int offset, int realOffset}) =>
       _outputStream.getEntries(offset: offset, realOffset: realOffset);
+
+  /// Calls [dockerProcess.waitExit].
+  Future<int> waitExit() => dockerProcess.waitExit();
+
+  /// Calls [dockerProcess.exitCode].
+  int get exitCode => dockerProcess.exitCode;
+
+  @override
+  String toString() => asString;
 }
 
 typedef OutputReadyFunction = bool Function(
     OutputStream outputStream, dynamic data);
+
+enum OutputReadyType { STDOUT, STDERR, ANY }
 
 /// Handles the output stream of a Docker container.
 class OutputStream<T> {
@@ -205,8 +267,10 @@ class OutputStream<T> {
   /// Called for each output entry.
   final OutputReadyFunction outputReadyFunction;
 
-  OutputStream(
-      this._encoding, this.lines, this._limit, this.outputReadyFunction);
+  final Completer<bool> anyOutputReadyCompleter;
+
+  OutputStream(this._encoding, this.lines, this._limit,
+      this.outputReadyFunction, this.anyOutputReadyCompleter);
 
   bool _ready = false;
   final Completer<bool> _readyCompleter = Completer();
@@ -220,11 +284,22 @@ class OutputStream<T> {
     return await _readyCompleter.future;
   }
 
+  Future<bool> waitAnyOutputReady() async {
+    if (isReady || anyOutputReadyCompleter.isCompleted) {
+      return true;
+    }
+    return await anyOutputReadyCompleter.future;
+  }
+
   /// Mars this output as ready.
   void markReady() {
     _ready = true;
     if (!_readyCompleter.isCompleted) {
       _readyCompleter.complete(true);
+    }
+
+    if (!anyOutputReadyCompleter.isCompleted) {
+      anyOutputReadyCompleter.complete(true);
     }
   }
 

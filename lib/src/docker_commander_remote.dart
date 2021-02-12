@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:logging/logging.dart';
@@ -93,7 +94,7 @@ class DockerHostRemote extends DockerHost {
   Future<DockerRunner> run(String image,
       {String version,
       List<String> imageArgs,
-      String name,
+      String containerName,
       List<String> ports,
       String network,
       String hostname,
@@ -106,6 +107,8 @@ class DockerHostRemote extends DockerHost {
     cleanContainer ??= true;
     outputAsLines ??= true;
 
+    ports = DockerHost.normalizeMappedPorts(ports);
+
     var imageArgsEncoded = (imageArgs != null && imageArgs.isNotEmpty)
         ? encodeJSON(imageArgs)
         : null;
@@ -114,8 +117,8 @@ class DockerHostRemote extends DockerHost {
       'image': image,
       'version': version,
       'imageArgs': imageArgsEncoded,
-      'name': name,
-      'ports': DockerHost.normalizePorts(ports)?.join(','),
+      'name': containerName,
+      'ports': ports?.join(','),
       'network': network,
       'hostname': hostname,
       'environment': encodeQueryString(environment),
@@ -125,20 +128,69 @@ class DockerHostRemote extends DockerHost {
     }) as Map;
 
     var instanceID = response['instanceID'] as int;
-    name = response['name'] as String;
+    containerName = response['name'] as String;
     var id = response['id'] as String;
 
     stdoutReadyFunction ??= (outputStream, data) => true;
     stderrReadyFunction ??= (outputStream, data) => true;
 
-    var runner = DockerRunnerRemote(this, instanceID, name, outputLimit,
-        outputAsLines, stdoutReadyFunction, stderrReadyFunction, id);
+    var runner = DockerRunnerRemote(
+        this,
+        instanceID,
+        containerName,
+        ports,
+        outputLimit,
+        outputAsLines,
+        stdoutReadyFunction,
+        stderrReadyFunction,
+        id);
 
     _runners[instanceID] = runner;
 
     await runner.initialize();
 
     return runner;
+  }
+
+  final Map<int, DockerRunnerRemote> _processes = {};
+
+  @override
+  Future<DockerProcess> exec(
+    String containerName,
+    String command,
+    List<String> args, {
+    bool outputAsLines = true,
+    int outputLimit,
+    OutputReadyFunction stdoutReadyFunction,
+    OutputReadyFunction stderrReadyFunction,
+  }) async {
+    outputAsLines ??= true;
+
+    var argsEncoded =
+        (args != null && args.isNotEmpty) ? encodeJSON(args) : null;
+
+    var response = await _httpClient.getJSON('exec', parameters: {
+      'cmd': command,
+      'args': argsEncoded,
+      'name': containerName,
+      'outputAsLines': '$outputAsLines',
+      'outputLimit': '$outputLimit',
+    }) as Map;
+
+    var instanceID = response['instanceID'] as int;
+    containerName = response['name'] as String;
+
+    stdoutReadyFunction ??= (outputStream, data) => true;
+    stderrReadyFunction ??= (outputStream, data) => true;
+
+    var dockerProcess = DockerProcessRemote(this, instanceID, containerName,
+        outputLimit, outputAsLines, stdoutReadyFunction, stderrReadyFunction);
+
+    _processes[instanceID] = dockerProcess;
+
+    await dockerProcess.initialize();
+
+    return dockerProcess;
   }
 
   Future<OutputSync> runnerGetOutput(
@@ -166,15 +218,16 @@ class DockerHostRemote extends DockerHost {
   List<int> getRunnersInstanceIDs() => _runners.keys.toList();
 
   @override
-  List<String> getRunnersNames() => _runners.values.map((r) => r.name).toList();
+  List<String> getRunnersNames() =>
+      _runners.values.map((r) => r.containerName).toList();
 
   @override
   DockerRunnerRemote getRunnerByInstanceID(int instanceID) =>
       _runners[instanceID];
 
   @override
-  DockerRunner getRunnerByName(String name) =>
-      _runners.values.firstWhere((r) => r.name == name, orElse: () => null);
+  DockerRunner getRunnerByName(String name) => _runners.values
+      .firstWhere((r) => r.containerName == name, orElse: () => null);
 
   @override
   Future<bool> stopByName(String name, {Duration timeout}) async {
@@ -198,35 +251,69 @@ class DockerHostRemote extends DockerHost {
   }
 }
 
-class DockerRunnerRemote extends DockerRunner {
+class DockerRunnerRemote extends DockerProcessRemote implements DockerRunner {
   @override
   final String id;
-  final int outputLimit;
-  final bool outputAsLines;
-  final OutputReadyFunction stdoutReadyFunction;
-  final OutputReadyFunction stderrReadyFunction;
+  final List<String> _ports;
 
   DockerRunnerRemote(
       DockerHostRemote dockerHostRemote,
       int instanceID,
       String name,
-      this.outputLimit,
-      this.outputAsLines,
-      this.stdoutReadyFunction,
-      this.stderrReadyFunction,
+      this._ports,
+      int outputLimit,
+      bool outputAsLines,
+      OutputReadyFunction stdoutReadyFunction,
+      OutputReadyFunction stderrReadyFunction,
       this.id)
-      : super(dockerHostRemote, instanceID, name);
+      : super(dockerHostRemote, instanceID, name, outputLimit, outputAsLines,
+            stdoutReadyFunction, stderrReadyFunction);
+
+  @override
+  List<String> get ports => List.unmodifiable(_ports ?? []);
+
+  @override
+  Future<bool> stop({Duration timeout}) =>
+      dockerHost.stopByInstanceID(instanceID, timeout: timeout);
+}
+
+class DockerProcessRemote extends DockerProcess {
+  final int outputLimit;
+  final bool outputAsLines;
+  final OutputReadyFunction stdoutReadyFunction;
+  final OutputReadyFunction stderrReadyFunction;
+
+  DockerProcessRemote(
+    DockerHostRemote dockerHostRemote,
+    int instanceID,
+    String name,
+    this.outputLimit,
+    this.outputAsLines,
+    this.stdoutReadyFunction,
+    this.stderrReadyFunction,
+  ) : super(dockerHostRemote, instanceID, name);
 
   void initialize() async {
-    setupStdout(_buildOutputStream(false, stdoutReadyFunction));
-    setupStderr(_buildOutputStream(true, stderrReadyFunction));
+    var anyOutputReadyCompleter = Completer<bool>();
+
+    setupStdout(_buildOutputStream(
+        false, stdoutReadyFunction, anyOutputReadyCompleter));
+    setupStderr(
+        _buildOutputStream(true, stderrReadyFunction, anyOutputReadyCompleter));
   }
 
   OutputStream _buildOutputStream(
-      bool stderr, OutputReadyFunction outputReadyFunction) {
+      bool stderr,
+      OutputReadyFunction outputReadyFunction,
+      Completer<bool> anyOutputReadyCompleter) {
     if (outputAsLines) {
       var outputStream = OutputStream<String>(
-          utf8, true, outputLimit ?? 1000, outputReadyFunction);
+        utf8,
+        true,
+        outputLimit ?? 1000,
+        outputReadyFunction,
+        anyOutputReadyCompleter,
+      );
 
       OutputClient(dockerHost, this, stderr, outputStream, (entries) {
         for (var e in entries) {
@@ -237,7 +324,12 @@ class DockerRunnerRemote extends DockerRunner {
       return outputStream;
     } else {
       var outputStream = OutputStream<int>(
-          utf8, false, outputLimit ?? 1024 * 128, outputReadyFunction);
+        utf8,
+        false,
+        outputLimit ?? 1024 * 128,
+        outputReadyFunction,
+        anyOutputReadyCompleter,
+      );
 
       OutputClient(dockerHost, this, stderr, outputStream, (entries) {
         outputStream.addAll(entries.cast());
@@ -275,6 +367,9 @@ class DockerRunnerRemote extends DockerRunner {
   bool get isRunning => _exitCode == null;
 
   int _exitCode;
+
+  @override
+  int get exitCode => _exitCode;
 
   @override
   Future<int> waitExit() async {
@@ -322,17 +417,46 @@ class OutputClient {
   int get realOffset =>
       outputStream.entriesRemoved + outputStream.entriesLength;
 
-  void sync() async {
+  bool _running = true;
+
+  Future<bool> sync() async {
     var outputSync =
         await hostRemote.runnerGetOutput(runner.instanceID, realOffset, stderr);
-    if (outputSync == null) return;
+    if (outputSync == null) return false;
 
-    entryAdder(outputSync.entries);
+    if (!outputSync.running) {
+      _running = false;
+      return false;
+    }
+
+    var entries = outputSync.entries;
+    entryAdder(entries);
+    return entries.isNotEmpty;
   }
 
   void _syncLoop() async {
-    while (runner.isRunning) {
-      await sync();
+    var noDataCounter = 0;
+
+    while (_running && runner.isRunning) {
+      var withData = await sync();
+
+      if (!withData) {
+        ++noDataCounter;
+        var sleep = _resolveNoDataSleep(noDataCounter);
+        await Future.delayed(Duration(milliseconds: sleep), () {});
+      } else {
+        noDataCounter = 0;
+      }
+    }
+  }
+
+  int _resolveNoDataSleep(int noDataCounter) {
+    if (noDataCounter <= 1) {
+      return 50;
+    } else if (noDataCounter <= 100) {
+      return (noDataCounter - 1) * 100;
+    } else {
+      return 10000;
     }
   }
 

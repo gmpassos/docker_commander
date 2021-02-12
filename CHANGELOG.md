@@ -1,3 +1,16 @@
+## 1.0.7
+
+- Added support for Docker exec.
+  - `DockerProcess`: to handle `exec` calls.
+  - `execWhich`: to facilitate binary path resolution inside containers.
+  - `execCat`: to `cat` a file inside the container.
+- Added `ApacheHttpdContainer`, to run a pre-configure Apache HTTPD.
+- Improved `Output` and `OutputStream`:
+  - Correctly detects that associated `DockerProcess` exited.
+  - Improved ready state with `OutputReadyType`.
+  - `DockerHostRemote`: `OutputClient` now sleeps when sync doesn't receive data,
+    to reduce number of calls.
+    
 ## 1.0.6
 
 - Change libraries:

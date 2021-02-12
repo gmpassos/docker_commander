@@ -1,24 +1,41 @@
 @Timeout(Duration(minutes: 2))
 import 'package:docker_commander/docker_commander_vm.dart';
-import 'package:logging/logging.dart';
 import 'package:test/test.dart';
 
 import 'docker_commander_test_basics.dart';
+import 'logger_config.dart';
 
 void main() async {
-  Logger.root.level = Level.ALL; // defaults to Level.INFO
-  Logger.root.onRecord.listen((record) {
-    print('${record.time}\t[${record.level.name}]\t${record.message}');
-  });
+  configureLogger();
 
-  var authenticationTable = AuthenticationTable({'admin': '123'});
+  var usedPorts = <int>{};
 
-  var hostServer = DockerHostServer(
-      (user, pass) async => authenticationTable.checkPassword(user, pass),
-      8099);
+  var preSetup = () async {
+    for (var listenPort = 8090; listenPort <= 8099; ++listenPort) {
+      if (usedPorts.contains(listenPort)) continue;
 
-  await hostServer.startAndWait();
+      try {
+        var authenticationTable = AuthenticationTable({'admin': '123'});
 
-  doBasicTests(() => DockerHostRemote('localhost', hostServer.listenPort,
-      username: 'admin', password: '123'));
+        var hostServer = DockerHostServer(
+            (user, pass) async => authenticationTable.checkPassword(user, pass),
+            listenPort);
+
+        await hostServer.startAndWait();
+
+        usedPorts.add(listenPort);
+
+        return listenPort;
+      } catch (e) {
+        print(e);
+      }
+    }
+
+    return 0;
+  };
+
+  doBasicTests(
+      (listenPort) => DockerHostRemote('localhost', listenPort,
+          username: 'admin', password: '123'),
+      preSetup);
 }

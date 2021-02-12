@@ -104,6 +104,18 @@ class DockerHostServer {
     _acceptLoop();
   }
 
+  void _closeServer({Duration delay}) {
+    delay ??= Duration(milliseconds: 100);
+
+    Future.delayed(delay, () {
+      try {
+        _server.close(force: true);
+      } catch (e) {
+        _LOG.severe('Error closing server', e);
+      }
+    });
+  }
+
   void _acceptLoop() async {
     await for (HttpRequest request in _server) {
       if (request.method == 'OPTION') {
@@ -192,7 +204,7 @@ class DockerHostServer {
     }
 
     print(
-        '[SERVER]\tRESPONSE> responseStatus: ${request.response.statusCode} ; body: $response');
+        '[SERVER]\tRESPONSE> responseStatus: ${request.response.statusCode} ; body: $response >> operation: $operation ; parameters: $parameters');
 
     _setResponseCORS(request);
 
@@ -324,6 +336,8 @@ class DockerHostServer {
         return _processClose(request, parameters, parseJSON(body));
       case 'run':
         return _processRun(request, parameters, parseJSON(body));
+      case 'exec':
+        return _processExec(request, parameters, parseJSON(body));
       case 'stdout':
       case 'stderr':
         return _processOutput(request, operation, parameters, parseJSON(body));
@@ -442,6 +456,7 @@ class DockerHostServer {
       HttpRequest request, Map<String, String> parameters, json) async {
     if (_dockerHostLocal == null) return false;
     await _dockerHostLocal.close();
+    _closeServer(delay: Duration(seconds: 2));
     return true;
   }
 
@@ -473,7 +488,7 @@ class DockerHostServer {
     var runner = await _dockerHostLocal.run(imageName,
         version: version,
         imageArgs: imageArgs,
-        name: name,
+        containerName: name,
         ports: ports,
         network: network,
         hostname: hostname,
@@ -484,8 +499,37 @@ class DockerHostServer {
 
     return {
       'instanceID': runner.instanceID,
-      'name': runner.name,
+      'name': runner.containerName,
       'id': runner.id,
+    };
+  }
+
+  Future<Map> _processExec(
+      HttpRequest request, Map<String, String> parameters, json) async {
+    if (_dockerHostLocal == null) return null;
+
+    String cmd = _getParameter(parameters, json, 'cmd');
+    String argsEncoded = _getParameter(parameters, json, 'args');
+    String containerName = _getParameter(parameters, json, 'name');
+    String outputAsLines = _getParameter(parameters, json, 'outputAsLines');
+    String outputLimit = _getParameter(parameters, json, 'outputLimit');
+
+    List<String> args;
+    if (isNotEmptyString(argsEncoded)) {
+      args = parseJSON(argsEncoded);
+    }
+
+    var dockerProcess = await _dockerHostLocal.exec(
+      containerName,
+      cmd,
+      args,
+      outputAsLines: parseBool(outputAsLines),
+      outputLimit: parseInt(outputLimit),
+    );
+
+    return {
+      'instanceID': dockerProcess.instanceID,
+      'name': dockerProcess.containerName,
     };
   }
 
