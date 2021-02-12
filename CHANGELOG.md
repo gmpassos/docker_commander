@@ -1,3 +1,7 @@
+## 1.0.8
+
+- Fix `stop` command for `DockerHostRemote` and `DockerHostServer`.
+
 ## 1.0.7
 
 - Added support for Docker exec.

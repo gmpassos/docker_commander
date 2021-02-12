@@ -563,14 +563,14 @@ class DockerHostServer {
       HttpRequest request, Map<String, String> parameters, json) async {
     if (_dockerHostLocal == null) return false;
 
-    var instanceID = _getParameterAsInt(parameters, json, 'instanceID');
+    var name = _getParameter(parameters, json, 'name');
     var timeout = _getParameterAsInt(parameters, json, 'timeout');
 
     var timeoutDuration =
         timeout != null && timeout > 0 ? Duration(seconds: timeout) : null;
 
-    var ok = await _dockerHostLocal.stopByInstanceID(
-      instanceID,
+    var ok = await _dockerHostLocal.stopByName(
+      name,
       timeout: timeoutDuration,
     );
     return ok;
