@@ -18,8 +18,7 @@ Docker manager, for personalized containers and pre-configured popular container
 Here's a simple usage example for a local host machine:
 
 ```dart
-import 'package:docker_commander/docker_commander.dart';
-import 'package:docker_commander/src/docker_commander_local.dart';
+import 'package:docker_commander/docker_commander_vm.dart';
 
 void main() async {
   // Creates a `DockerCommander` for a local host machine:
@@ -60,7 +59,7 @@ Start `DockerHostServer`:
 ```dart
 import 'package:docker_commander/docker_commander_vm.dart';
 
-void main() {
+void main() async {
   
   // A simple username and password table:
   var authenticationTable = AuthenticationTable({'admin': '123'});
@@ -87,7 +86,7 @@ import 'package:docker_commander/docker_commander_vm.dart';
 void main() async {
 
   // Connect to a `DockerHost` running at '10.0.0.52:8099'
-  var dockerHostRemote = DockerHostRemote('10.0.0.52', 8099, username: 'admin', password: '123')
+  var dockerHostRemote = DockerHostRemote('10.0.0.52', 8099, username: 'admin', password: '123');
 
   // Creates a `DockerCommander` for a remote host machine:
   var dockerCommander = DockerCommander(dockerHostRemote);
@@ -136,6 +135,16 @@ void main() async {
   // Print the current STDOUT of the container:
   var output = dockerContainer.stdout.asString;
   print(output);
+
+  // Execute inside the container a `psql` command:
+  var execPsql = await dockerContainer.exec('/usr/bin/psql',
+      ['-d','postgres', '-U','postgres', '-c','\\l']);
+
+  // Wait command to execute:
+  var execPsqlExitCode = await execPsql.waitExit();
+
+  // Command output:
+  print( execPsql.stdout.asString );
   
   // Stops PostgreSQL, with a timeout of 20s:
   await dockerContainer.stop(timeout: Duration(seconds: 20));
@@ -149,12 +158,54 @@ void main() async {
 
 ```
 
+## ApacheHttpdContainer
+
+A pre-configured container for the famous Apache HTTPD:
+
+```dart
+import 'package:docker_commander/docker_commander_vm.dart';
+import 'package:mercury_client/mercury_client.dart';
+
+void main() async {
+    var dockerCommander = DockerCommander(DockerHostLocal());
+  
+    // The host port to map internal container port (httpd at port 80).
+    var apachePort = 8081;
+    
+    var dockerContainer = await ApacheHttpdContainer()
+        .run(dockerCommander, hostPorts: [apachePort]);
+    
+    // Wait Apache to be ready...
+    await dockerContainer.waitReady();
+
+    // Get HTTPD configuration file:
+    var httpdConf = await dockerContainer.execCat('/usr/local/apache2/conf/httpd.conf');
+
+    // Get the host port of Apache HTTPD.
+    var hostPort = dockerContainer.hostPorts[0];
+    // Request a HTTP GET using hostPort:
+    var response = await HttpClient('http://localhost:$hostPort/').get('index.html');
+    
+    // The body of the response
+    var content = response.bodyAsString;
+    print(content);
+    
+    // Stop Apache HTTPD:
+    await dockerContainer.stop(timeout: Duration(seconds: 5));
+
+}
+
+```
+
 ## See Also
 
 See [package docker_commander_test][docker_commander_test], for unit test framework with [Docker][docker] containers.
 
+Thanks to [isoos@GitHub][github_isoos], author of the precursor package `docker_process`, that was substituted by this one. 
+
 [docker_commander_test]:https://github.com/gmpassos/docker_commander_test
 [docker]:https://www.docker.com/
+[github_isoos]: https://github.com/isoos
 
 ## Features and bugs
 
@@ -164,9 +215,9 @@ Please file feature requests and bugs at the [issue tracker][tracker].
 
 ## Author
 
-Graciliano M. Passos: [gmpassos@GitHub][github].
+Graciliano M. Passos: [gmpassos@GitHub][github_gmp].
 
-[github]: https://github.com/gmpassos
+[github_gmp]: https://github.com/gmpassos
 
 ## License
 

@@ -29,20 +29,39 @@ abstract class DockerHost {
     return portsSet.isNotEmpty ? portsSet.toList() : null;
   }
 
-  /// Runs a Docker containers with [image] and optional [version].
-  Future<DockerRunner> run(String image,
-      {String version,
-      List<String> imageArgs,
-      String containerName,
-      List<String> ports,
-      String network,
-      String hostname,
-      Map<String, String> environment,
-      bool cleanContainer = true,
-      bool outputAsLines = true,
-      int outputLimit,
+  static OutputReadyType resolveOutputReadyType(
       OutputReadyFunction stdoutReadyFunction,
-      OutputReadyFunction stderrReadyFunction});
+      OutputReadyFunction stderrReadyFunction) {
+    var outputReadyType = OutputReadyType.STDOUT;
+
+    if ((stdoutReadyFunction != null && stderrReadyFunction != null) ||
+        (stdoutReadyFunction == null && stderrReadyFunction == null)) {
+      outputReadyType = OutputReadyType.ANY;
+    } else if (stdoutReadyFunction != null) {
+      outputReadyType = OutputReadyType.STDOUT;
+    } else if (stderrReadyFunction != null) {
+      outputReadyType = OutputReadyType.STDERR;
+    }
+    return outputReadyType;
+  }
+
+  /// Runs a Docker containers with [image] and optional [version].
+  Future<DockerRunner> run(
+    String image, {
+    String version,
+    List<String> imageArgs,
+    String containerName,
+    List<String> ports,
+    String network,
+    String hostname,
+    Map<String, String> environment,
+    bool cleanContainer = true,
+    bool outputAsLines = true,
+    int outputLimit,
+    OutputReadyFunction stdoutReadyFunction,
+    OutputReadyFunction stderrReadyFunction,
+    OutputReadyType outputReadyType,
+  });
 
   /// Executes a [command] inside [containerName] with [args].
   Future<DockerProcess> exec(
@@ -53,6 +72,7 @@ abstract class DockerHost {
     int outputLimit,
     OutputReadyFunction stdoutReadyFunction,
     OutputReadyFunction stderrReadyFunction,
+    OutputReadyType outputReadyType,
   });
 
   /// Returns a [List<int>] of [DockerRunner] `instanceID`.
@@ -155,11 +175,16 @@ abstract class DockerProcess {
 
   Output _stderr;
 
+  OutputReadyType _outputReadyType;
+
   /// The STDOUT of this container.
   Output get stdout => _stdout;
 
   /// The STDERR of this container.
   Output get stderr => _stderr;
+
+  /// The ready output behavior.
+  OutputReadyType get outputReadyType => _outputReadyType;
 
   void setupStdout(OutputStream outputStream) {
     _stdout = Output(this, outputStream);
@@ -169,11 +194,39 @@ abstract class DockerProcess {
     _stderr = Output(this, outputStream);
   }
 
+  void setupOutputReadyType(OutputReadyType outputReadyType) {
+    _outputReadyType = outputReadyType;
+  }
+
   /// Waits this container to start and be ready.
-  Future<bool> waitReady();
+  Future<bool> waitReady() async {
+    if (isReady) return true;
+
+    switch (outputReadyType) {
+      case OutputReadyType.STDOUT:
+        return stdout.waitReady();
+      case OutputReadyType.STDERR:
+        return stderr.waitReady();
+      case OutputReadyType.ANY:
+        return stdout.waitAnyOutputReady();
+      default:
+        return stdout.waitReady();
+    }
+  }
 
   /// Returns [true] if this container is started and ready.
-  bool get isReady;
+  bool get isReady {
+    switch (outputReadyType) {
+      case OutputReadyType.STDOUT:
+        return stdout.isReady;
+      case OutputReadyType.STDERR:
+        return stderr.isReady;
+      case OutputReadyType.ANY:
+        return stdout.isReady || stderr.isReady;
+      default:
+        return stdout.isReady;
+    }
+  }
 
   /// Returns [true] if this containers is running.
   bool get isRunning;
@@ -253,6 +306,7 @@ class Output {
 typedef OutputReadyFunction = bool Function(
     OutputStream outputStream, dynamic data);
 
+/// Indicates which output should be ready.
 enum OutputReadyType { STDOUT, STDERR, ANY }
 
 /// Handles the output stream of a Docker container.

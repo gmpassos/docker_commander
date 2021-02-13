@@ -47,6 +47,8 @@ void doBasicTests(DockerHostLocalInstantiator dockerHostLocalInstantiator,
       _LOG.info('tearDown>\tDockerCommander.close()');
       await dockerCommander.close();
       _LOG.info('tearDown>\tDockerCommander: $dockerCommander');
+
+      dockerCommander = null;
     });
 
     test('Image: hello-world', () async {

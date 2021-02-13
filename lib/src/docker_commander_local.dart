@@ -99,8 +99,8 @@ class DockerHostLocal extends DockerHost {
       containerName = 'docker_commander-$session-$instanceID';
     }
 
-    outputReadyType ??=
-        _resolveOutputReadyType(stdoutReadyFunction, stderrReadyFunction);
+    outputReadyType ??= DockerHost.resolveOutputReadyType(
+        stdoutReadyFunction, stderrReadyFunction);
 
     stdoutReadyFunction ??= (outputStream, data) => true;
     stderrReadyFunction ??= (outputStream, data) => true;
@@ -170,22 +170,6 @@ class DockerHostLocal extends DockerHost {
     return runner;
   }
 
-  OutputReadyType _resolveOutputReadyType(
-      OutputReadyFunction stdoutReadyFunction,
-      OutputReadyFunction stderrReadyFunction) {
-    var outputReadyType = OutputReadyType.STDOUT;
-
-    if ((stdoutReadyFunction != null && stderrReadyFunction != null) ||
-        (stdoutReadyFunction == null && stderrReadyFunction == null)) {
-      outputReadyType = OutputReadyType.ANY;
-    } else if (stdoutReadyFunction != null) {
-      outputReadyType = OutputReadyType.STDOUT;
-    } else if (stderrReadyFunction != null) {
-      outputReadyType = OutputReadyType.STDERR;
-    }
-    return outputReadyType;
-  }
-
   final Map<int, DockerProcess> _processes = {};
 
   @override
@@ -201,8 +185,8 @@ class DockerHostLocal extends DockerHost {
   }) async {
     var instanceID = DockerProcess.incrementInstanceID();
 
-    outputReadyType ??=
-        _resolveOutputReadyType(stdoutReadyFunction, stderrReadyFunction);
+    outputReadyType ??= DockerHost.resolveOutputReadyType(
+        stdoutReadyFunction, stderrReadyFunction);
 
     stdoutReadyFunction ??= (outputStream, data) => true;
     stderrReadyFunction ??= (outputStream, data) => true;
@@ -348,9 +332,33 @@ class DockerRunnerLocal extends DockerProcessLocal implements DockerRunner {
     await super.initialize();
 
     if (idFile != null) {
+      await _waitFile(idFile);
       _id = idFile.readAsStringSync().trim();
     } else {
       _id = await dockerHost.getContainerIDByName(containerName);
+    }
+  }
+
+  Future<bool> _waitFile(File file, {Duration timeout}) async {
+    if (file == null) return false;
+    if (file.existsSync()) return true;
+
+    timeout ??= Duration(minutes: 1);
+    var init = DateTime.now().millisecondsSinceEpoch;
+
+    var retry = 0;
+    while (true) {
+      var exists = file.existsSync();
+      if (exists) return true;
+
+      var elapsed = DateTime.now().millisecondsSinceEpoch - init;
+      if (elapsed >= timeout.inMilliseconds) return false;
+
+      ++retry;
+      var sleep = Math.min(1000, 10 * retry);
+
+      await Future.delayed(Duration(milliseconds: sleep));
+      return exists;
     }
   }
 
@@ -375,7 +383,7 @@ class DockerProcessLocal extends DockerProcess {
 
   final OutputReadyFunction _stdoutReadyFunction;
   final OutputReadyFunction _stderrReadyFunction;
-  final OutputReadyType outputReadyType;
+  final OutputReadyType _outputReadyType;
 
   DockerProcessLocal(
       DockerHostLocal dockerHost,
@@ -386,7 +394,7 @@ class DockerProcessLocal extends DockerProcess {
       this._outputLimit,
       this._stdoutReadyFunction,
       this._stderrReadyFunction,
-      this.outputReadyType)
+      this._outputReadyType)
       : super(dockerHost, instanceID, containerName);
 
   final Completer<int> _exitCompleter = Completer();
@@ -401,11 +409,13 @@ class DockerProcessLocal extends DockerProcess {
         process.stdout, _stdoutReadyFunction, anyOutputReadyCompleter));
     setupStderr(_buildOutputStream(
         process.stderr, _stderrReadyFunction, anyOutputReadyCompleter));
+    setupOutputReadyType(_outputReadyType);
 
     await waitReady();
   }
 
   void _setExitCode(int exitCode) {
+    if (_exitCode != null) return;
     _exitCode = exitCode;
     _exitCompleter.complete(exitCode);
     this.stdout.getOutputStream().markReady();
@@ -487,7 +497,7 @@ class DockerProcessLocal extends DockerProcess {
   Future<int> waitExit() async {
     if (_exitCode != null) return _exitCode;
     var code = await _exitCompleter.future;
-    _exitCode = code;
+    _exitCode ??= code;
     return _exitCode;
   }
 }

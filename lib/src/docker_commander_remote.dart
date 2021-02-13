@@ -91,19 +91,22 @@ class DockerHostRemote extends DockerHost {
   }
 
   @override
-  Future<DockerRunner> run(String image,
-      {String version,
-      List<String> imageArgs,
-      String containerName,
-      List<String> ports,
-      String network,
-      String hostname,
-      Map<String, String> environment,
-      bool cleanContainer = true,
-      bool outputAsLines = true,
-      int outputLimit,
-      OutputReadyFunction stdoutReadyFunction,
-      OutputReadyFunction stderrReadyFunction}) async {
+  Future<DockerRunner> run(
+    String image, {
+    String version,
+    List<String> imageArgs,
+    String containerName,
+    List<String> ports,
+    String network,
+    String hostname,
+    Map<String, String> environment,
+    bool cleanContainer = true,
+    bool outputAsLines = true,
+    int outputLimit,
+    OutputReadyFunction stdoutReadyFunction,
+    OutputReadyFunction stderrReadyFunction,
+    OutputReadyType outputReadyType,
+  }) async {
     cleanContainer ??= true;
     outputAsLines ??= true;
 
@@ -131,6 +134,9 @@ class DockerHostRemote extends DockerHost {
     containerName = response['name'] as String;
     var id = response['id'] as String;
 
+    outputReadyType ??= DockerHost.resolveOutputReadyType(
+        stdoutReadyFunction, stderrReadyFunction);
+
     stdoutReadyFunction ??= (outputStream, data) => true;
     stderrReadyFunction ??= (outputStream, data) => true;
 
@@ -143,6 +149,7 @@ class DockerHostRemote extends DockerHost {
         outputAsLines,
         stdoutReadyFunction,
         stderrReadyFunction,
+        outputReadyType,
         id);
 
     _runners[instanceID] = runner;
@@ -163,6 +170,7 @@ class DockerHostRemote extends DockerHost {
     int outputLimit,
     OutputReadyFunction stdoutReadyFunction,
     OutputReadyFunction stderrReadyFunction,
+    OutputReadyType outputReadyType,
   }) async {
     outputAsLines ??= true;
 
@@ -180,11 +188,21 @@ class DockerHostRemote extends DockerHost {
     var instanceID = response['instanceID'] as int;
     containerName = response['name'] as String;
 
+    outputReadyType ??= DockerHost.resolveOutputReadyType(
+        stdoutReadyFunction, stderrReadyFunction);
+
     stdoutReadyFunction ??= (outputStream, data) => true;
     stderrReadyFunction ??= (outputStream, data) => true;
 
-    var dockerProcess = DockerProcessRemote(this, instanceID, containerName,
-        outputLimit, outputAsLines, stdoutReadyFunction, stderrReadyFunction);
+    var dockerProcess = DockerProcessRemote(
+        this,
+        instanceID,
+        containerName,
+        outputLimit,
+        outputAsLines,
+        stdoutReadyFunction,
+        stderrReadyFunction,
+        outputReadyType);
 
     _processes[instanceID] = dockerProcess;
 
@@ -249,6 +267,11 @@ class DockerHostRemote extends DockerHost {
         parameters: {'instanceID': '$instanceID'}) as int;
     return code;
   }
+
+  @override
+  String toString() {
+    return 'DockerHostRemote{serverHost: $serverHost, serverPort: $serverPort, secure: $secure, username: $username}';
+  }
 }
 
 class DockerRunnerRemote extends DockerProcessRemote implements DockerRunner {
@@ -265,9 +288,10 @@ class DockerRunnerRemote extends DockerProcessRemote implements DockerRunner {
       bool outputAsLines,
       OutputReadyFunction stdoutReadyFunction,
       OutputReadyFunction stderrReadyFunction,
+      OutputReadyType outputReadyType,
       this.id)
       : super(dockerHostRemote, instanceID, name, outputLimit, outputAsLines,
-            stdoutReadyFunction, stderrReadyFunction);
+            stdoutReadyFunction, stderrReadyFunction, outputReadyType);
 
   @override
   List<String> get ports => List.unmodifiable(_ports ?? []);
@@ -280,8 +304,10 @@ class DockerRunnerRemote extends DockerProcessRemote implements DockerRunner {
 class DockerProcessRemote extends DockerProcess {
   final int outputLimit;
   final bool outputAsLines;
-  final OutputReadyFunction stdoutReadyFunction;
-  final OutputReadyFunction stderrReadyFunction;
+
+  final OutputReadyFunction _stdoutReadyFunction;
+  final OutputReadyFunction _stderrReadyFunction;
+  final OutputReadyType _outputReadyType;
 
   DockerProcessRemote(
     DockerHostRemote dockerHostRemote,
@@ -289,17 +315,19 @@ class DockerProcessRemote extends DockerProcess {
     String name,
     this.outputLimit,
     this.outputAsLines,
-    this.stdoutReadyFunction,
-    this.stderrReadyFunction,
+    this._stdoutReadyFunction,
+    this._stderrReadyFunction,
+    this._outputReadyType,
   ) : super(dockerHostRemote, instanceID, name);
 
   void initialize() async {
     var anyOutputReadyCompleter = Completer<bool>();
 
     setupStdout(_buildOutputStream(
-        false, stdoutReadyFunction, anyOutputReadyCompleter));
-    setupStderr(
-        _buildOutputStream(true, stderrReadyFunction, anyOutputReadyCompleter));
+        false, _stdoutReadyFunction, anyOutputReadyCompleter));
+    setupStderr(_buildOutputStream(
+        true, _stderrReadyFunction, anyOutputReadyCompleter));
+    setupOutputReadyType(_outputReadyType);
   }
 
   OutputStream _buildOutputStream(
@@ -342,31 +370,17 @@ class DockerProcessRemote extends DockerProcess {
   @override
   DockerHostRemote get dockerHost => super.dockerHost as DockerHostRemote;
 
-  bool _ready = false;
-
-  @override
-  bool get isReady {
-    return _ready;
-  }
-
-  @override
-  Future<bool> waitReady() async {
-    if (_ready) {
-      return true;
-    }
-
-    var ready = await dockerHost.runnerWaitReady(instanceID);
-    if (ready) {
-      _ready = true;
-    }
-
-    return _ready;
-  }
-
   @override
   bool get isRunning => _exitCode == null;
 
   int _exitCode;
+
+  void _setExitCode(int exitCode) {
+    if (_exitCode != null) return;
+    _exitCode = exitCode;
+    stdout.getOutputStream().markReady();
+    stderr.getOutputStream().markReady();
+  }
 
   @override
   int get exitCode => _exitCode;
@@ -376,7 +390,7 @@ class DockerProcessRemote extends DockerProcess {
     if (_exitCode != null) return _exitCode;
 
     var code = await dockerHost.runnerWaitExit(instanceID);
-    _exitCode ??= code;
+    _setExitCode(code);
 
     return _exitCode;
   }
@@ -419,25 +433,44 @@ class OutputClient {
 
   bool _running = true;
 
+  int _errorCount = 0;
+
   Future<bool> sync() async {
-    var outputSync =
-        await hostRemote.runnerGetOutput(runner.instanceID, realOffset, stderr);
+    OutputSync outputSync;
+    try {
+      outputSync = await hostRemote.runnerGetOutput(
+          runner.instanceID, realOffset, stderr);
+      _errorCount = 0;
+    } catch (e) {
+      if (_errorCount++ >= 3 || !runner.isRunning) {
+        _running = false;
+      }
+      if (runner.isRunning) {
+        _LOG.warning('Error synching output: $runner', e);
+      }
+      return false;
+    }
+
     if (outputSync == null) return false;
 
     if (!outputSync.running) {
       _running = false;
-      return false;
     }
 
     var entries = outputSync.entries;
-    entryAdder(entries);
-    return entries.isNotEmpty;
+
+    if (entries != null) {
+      entryAdder(entries);
+      return entries.isNotEmpty;
+    } else {
+      return false;
+    }
   }
 
   void _syncLoop() async {
     var noDataCounter = 0;
 
-    while (_running && runner.isRunning) {
+    while (_running) {
       var withData = await sync();
 
       if (!withData) {

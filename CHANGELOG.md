@@ -1,3 +1,15 @@
+## 1.0.9
+
+- `DockerHost.run` and `DockerHost.exec`: 
+  - exposed parameter `outputReadyType`.
+- Fixed `DockerProcessRemote` and `DockerRunnerRemote` to use
+  local resolution of output ready state.
+- Fixed sync of outputs of `DockerProcessRemote`:
+  - now retries in case of network error and also finalizes sync loop,
+    also checking if `DockerProcessRemote` was finished.
+- Fixed read of `--cidfile`: now waits for the CID file to exist.
+- Added `ApacheHttpdContainer` example to `README.md`.
+
 ## 1.0.8
 
 - Fix `stop` command for `DockerHostRemote` and `DockerHostServer`.
