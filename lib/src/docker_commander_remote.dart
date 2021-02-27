@@ -92,7 +92,7 @@ class DockerHostRemote extends DockerHost {
 
   @override
   Future<DockerRunner> run(
-    String image, {
+    String imageName, {
     String version,
     List<String> imageArgs,
     String containerName,
@@ -117,7 +117,7 @@ class DockerHostRemote extends DockerHost {
         : null;
 
     var response = await _httpClient.getJSON('run', parameters: {
-      'image': image,
+      'image': imageName,
       'version': version,
       'imageArgs': imageArgsEncoded,
       'name': containerName,
@@ -140,10 +140,13 @@ class DockerHostRemote extends DockerHost {
     stdoutReadyFunction ??= (outputStream, data) => true;
     stderrReadyFunction ??= (outputStream, data) => true;
 
+    var image = DockerHost.resolveImage(imageName, version);
+
     var runner = DockerRunnerRemote(
         this,
         instanceID,
         containerName,
+        image,
         ports,
         outputLimit,
         outputAsLines,
@@ -159,7 +162,7 @@ class DockerHostRemote extends DockerHost {
     return runner;
   }
 
-  final Map<int, DockerRunnerRemote> _processes = {};
+  final Map<int, DockerProcessRemote> _processes = {};
 
   @override
   Future<DockerProcess> exec(
@@ -211,7 +214,54 @@ class DockerHostRemote extends DockerHost {
     return dockerProcess;
   }
 
-  Future<OutputSync> runnerGetOutput(
+  @override
+  Future<DockerProcess> command(
+    String command,
+    List<String> args, {
+    bool outputAsLines = true,
+    int outputLimit,
+    OutputReadyFunction stdoutReadyFunction,
+    OutputReadyFunction stderrReadyFunction,
+    OutputReadyType outputReadyType,
+  }) async {
+    outputAsLines ??= true;
+
+    var argsEncoded =
+        (args != null && args.isNotEmpty) ? encodeJSON(args) : null;
+
+    var response = await _httpClient.getJSON('command', parameters: {
+      'cmd': command,
+      'args': argsEncoded,
+      'outputAsLines': '$outputAsLines',
+      'outputLimit': '$outputLimit',
+    }) as Map;
+
+    var instanceID = response['instanceID'] as int;
+
+    outputReadyType ??= DockerHost.resolveOutputReadyType(
+        stdoutReadyFunction, stderrReadyFunction);
+
+    stdoutReadyFunction ??= (outputStream, data) => true;
+    stderrReadyFunction ??= (outputStream, data) => true;
+
+    var dockerProcess = DockerProcessRemote(
+        this,
+        instanceID,
+        '',
+        outputLimit,
+        outputAsLines,
+        stdoutReadyFunction,
+        stderrReadyFunction,
+        outputReadyType);
+
+    _processes[instanceID] = dockerProcess;
+
+    await dockerProcess.initialize();
+
+    return dockerProcess;
+  }
+
+  Future<OutputSync> processGetOutput(
       int instanceID, int realOffset, bool stderr) async {
     var response = await _httpClient.getJSON(stderr ? 'stderr' : 'stdout',
         parameters: {'instanceID': '$instanceID', 'realOffset': '$realOffset'});
@@ -233,11 +283,17 @@ class DockerHostRemote extends DockerHost {
   final Map<int, DockerRunnerRemote> _runners = {};
 
   @override
+  bool isContainerRunnerRunning(String containerName) =>
+      getRunnerByName(containerName)?.isRunning ?? false;
+
+  @override
   List<int> getRunnersInstanceIDs() => _runners.keys.toList();
 
   @override
-  List<String> getRunnersNames() =>
-      _runners.values.map((r) => r.containerName).toList();
+  List<String> getRunnersNames() => _runners.values
+      .map((r) => r.containerName)
+      .where((n) => n != null && n.isNotEmpty)
+      .toList();
 
   @override
   DockerRunnerRemote getRunnerByInstanceID(int instanceID) =>
@@ -248,6 +304,10 @@ class DockerHostRemote extends DockerHost {
       .firstWhere((r) => r.containerName == name, orElse: () => null);
 
   @override
+  DockerProcess getProcessByInstanceID(int instanceID) =>
+      _processes[instanceID];
+
+  @override
   Future<bool> stopByName(String name, {Duration timeout}) async {
     var ok = await _httpClient.getJSON('runner_stop', parameters: {
       'name': '$name',
@@ -256,15 +316,15 @@ class DockerHostRemote extends DockerHost {
     return ok;
   }
 
-  Future<bool> runnerWaitReady(int instanceID) async {
-    var ok = await _httpClient.getJSON('runner_wait_ready',
+  Future<bool> processWaitReady(int instanceID) async {
+    var ok = await _httpClient.getJSON('wait_ready',
         parameters: {'instanceID': '$instanceID'}) as bool;
     return ok;
   }
 
-  Future<int> runnerWaitExit(int instanceID) async {
-    var code = await _httpClient.getJSON('runner_wait_exit',
-        parameters: {'instanceID': '$instanceID'}) as int;
+  Future<int> processWaitExit(int instanceID) async {
+    var code = await _httpClient
+        .getJSON('wait_exit', parameters: {'instanceID': '$instanceID'}) as int;
     return code;
   }
 
@@ -277,12 +337,17 @@ class DockerHostRemote extends DockerHost {
 class DockerRunnerRemote extends DockerProcessRemote implements DockerRunner {
   @override
   final String id;
+
+  @override
+  final String image;
+
   final List<String> _ports;
 
   DockerRunnerRemote(
       DockerHostRemote dockerHostRemote,
       int instanceID,
-      String name,
+      String containerName,
+      this.image,
       this._ports,
       int outputLimit,
       bool outputAsLines,
@@ -290,8 +355,15 @@ class DockerRunnerRemote extends DockerProcessRemote implements DockerRunner {
       OutputReadyFunction stderrReadyFunction,
       OutputReadyType outputReadyType,
       this.id)
-      : super(dockerHostRemote, instanceID, name, outputLimit, outputAsLines,
-            stdoutReadyFunction, stderrReadyFunction, outputReadyType);
+      : super(
+            dockerHostRemote,
+            instanceID,
+            containerName,
+            outputLimit,
+            outputAsLines,
+            stdoutReadyFunction,
+            stderrReadyFunction,
+            outputReadyType);
 
   @override
   List<String> get ports => List.unmodifiable(_ports ?? []);
@@ -299,6 +371,11 @@ class DockerRunnerRemote extends DockerProcessRemote implements DockerRunner {
   @override
   Future<bool> stop({Duration timeout}) =>
       dockerHost.stopByInstanceID(instanceID, timeout: timeout);
+
+  @override
+  String toString() {
+    return 'DockerRunnerRemote{id: $id, image: $image, containerName: $containerName}';
+  }
 }
 
 class DockerProcessRemote extends DockerProcess {
@@ -312,13 +389,13 @@ class DockerProcessRemote extends DockerProcess {
   DockerProcessRemote(
     DockerHostRemote dockerHostRemote,
     int instanceID,
-    String name,
+    String containerName,
     this.outputLimit,
     this.outputAsLines,
     this._stdoutReadyFunction,
     this._stderrReadyFunction,
     this._outputReadyType,
-  ) : super(dockerHostRemote, instanceID, name);
+  ) : super(dockerHostRemote, instanceID, containerName);
 
   void initialize() async {
     var anyOutputReadyCompleter = Completer<bool>();
@@ -386,10 +463,16 @@ class DockerProcessRemote extends DockerProcess {
   int get exitCode => _exitCode;
 
   @override
-  Future<int> waitExit() async {
+  Future<int> waitExit({int desiredExitCode}) async {
+    var exitCode = await _waitExitImpl();
+    if (desiredExitCode != null && exitCode != desiredExitCode) return null;
+    return exitCode;
+  }
+
+  Future<int> _waitExitImpl() async {
     if (_exitCode != null) return _exitCode;
 
-    var code = await dockerHost.runnerWaitExit(instanceID);
+    var code = await dockerHost.processWaitExit(instanceID);
     _setExitCode(code);
 
     return _exitCode;
@@ -417,7 +500,7 @@ class OutputSync {
 class OutputClient {
   final DockerHostRemote hostRemote;
 
-  final DockerRunnerRemote runner;
+  final DockerProcessRemote process;
 
   final bool stderr;
 
@@ -425,7 +508,7 @@ class OutputClient {
 
   final void Function(List entries) entryAdder;
 
-  OutputClient(this.hostRemote, this.runner, this.stderr, this.outputStream,
+  OutputClient(this.hostRemote, this.process, this.stderr, this.outputStream,
       this.entryAdder);
 
   int get realOffset =>
@@ -438,15 +521,15 @@ class OutputClient {
   Future<bool> sync() async {
     OutputSync outputSync;
     try {
-      outputSync = await hostRemote.runnerGetOutput(
-          runner.instanceID, realOffset, stderr);
+      outputSync = await hostRemote.processGetOutput(
+          process.instanceID, realOffset, stderr);
       _errorCount = 0;
     } catch (e) {
-      if (_errorCount++ >= 3 || !runner.isRunning) {
+      if (_errorCount++ >= 3 || !process.isRunning) {
         _running = false;
       }
-      if (runner.isRunning) {
-        _LOG.warning('Error synching output: $runner', e);
+      if (process.isRunning) {
+        _LOG.warning('Error synching output: $process', e);
       }
       return false;
     }

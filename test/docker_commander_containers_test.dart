@@ -1,6 +1,7 @@
 @Timeout(Duration(minutes: 2))
 import 'package:docker_commander/docker_commander_vm.dart';
 import 'package:logging/logging.dart';
+import 'package:mercury_client/mercury_client.dart';
 import 'package:test/test.dart';
 
 import 'logger_config.dart';
@@ -141,6 +142,100 @@ void main() {
       _LOG.info('exitCode: $exitCode');
 
       expect(exitCode == 0 || exitCode == 137, isTrue);
+    });
+
+    test('NGINX', () async {
+      var network = await dockerCommander.createNetwork();
+
+      expect(network, isNotEmpty);
+
+      var apacheContainer = await ApacheHttpdContainer().run(dockerCommander,
+          hostPorts: [4081], network: network, hostname: 'apache');
+      expect(await apacheContainer.waitReady(), isTrue);
+
+      _LOG.info('Started Apache HTTPD... $apacheContainer');
+
+      expect(apacheContainer.instanceID > 0, isTrue);
+      expect(apacheContainer.name.isNotEmpty, isTrue);
+
+      var apacheIP = await dockerCommander.getContainerIP(apacheContainer.name);
+      _LOG.info('Apache HTTPD IP:  $apacheIP');
+      expect(apacheIP, isNotEmpty);
+
+      var dockerContainer = await NginxContainer('', hostPorts: [4082])
+          .run(dockerCommander, network: network, hostname: 'nginx');
+
+      _LOG.info(dockerContainer);
+
+      expect(dockerContainer.instanceID > 0, isTrue);
+      expect(dockerContainer.name.isNotEmpty, isTrue);
+
+      await dockerContainer.waitReady();
+
+      var match = await dockerContainer.stdout
+          .waitForDataMatch('nginx', timeout: Duration(seconds: 10));
+
+      _LOG.info('Data match: $match');
+
+      var output = dockerContainer.stdout.asString;
+
+      _LOG.info(output);
+
+      expect(output, contains('nginx'));
+
+      expect(dockerContainer.id.isNotEmpty, isTrue);
+
+      var nginxConfig = NginxReverseProxyConfigurer(
+          [NginxServerConfig('localhost', 'apache', 80, false)]).build();
+
+      await dockerContainer.putFile('/etc/nginx/nginx.conf', nginxConfig,
+          sudo: true);
+
+      _LOG.info('------------------------------------------------------------');
+      _LOG.info(nginxConfig);
+      _LOG.info('------------------------------------------------------------');
+
+      var testOK = await dockerContainer.testConfiguration();
+
+      _LOG.info('Nginx test config: $testOK');
+      expect(testOK, isTrue);
+
+      var reloadOK = await dockerContainer.reloadConfiguration();
+      _LOG.info('Nginx reload: $reloadOK');
+      expect(reloadOK, isTrue);
+
+      var apacheContent =
+          (await HttpClient('http://localhost:4081/').get('')).bodyAsString;
+      expect(apacheContent, contains('<html>'));
+
+      _LOG.info(
+          '------------------------------------------------------------ apacheContent:');
+      _LOG.info(apacheContent);
+      _LOG.info('------------------------------------------------------------');
+
+      var nginxContent =
+          (await HttpClient('http://localhost:4082/').get('')).bodyAsString;
+      expect(nginxContent, contains('<html>'));
+
+      _LOG.info(
+          '------------------------------------------------------------ nginxContent:');
+      _LOG.info(nginxContent);
+      _LOG.info('------------------------------------------------------------');
+
+      expect(nginxContent, equals(apacheContent));
+
+      _LOG.info('Stopping Nginx...');
+      await dockerContainer.stop(timeout: Duration(seconds: 5));
+
+      _LOG.info('Wait exit...');
+      var exitCode = await dockerContainer.waitExit();
+      _LOG.info('exitCode: $exitCode');
+      expect(exitCode == 0 || exitCode == 137, isTrue);
+
+      _LOG.info('Stopping Apache HTTPD...');
+      await apacheContainer.stop(timeout: Duration(seconds: 5));
+
+      await dockerCommander.removeNetwork(network);
     });
   });
 }

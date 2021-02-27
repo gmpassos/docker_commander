@@ -338,13 +338,15 @@ class DockerHostServer {
         return _processRun(request, parameters, parseJSON(body));
       case 'exec':
         return _processExec(request, parameters, parseJSON(body));
+      case 'command':
+        return _processCommand(request, parameters, parseJSON(body));
       case 'stdout':
       case 'stderr':
         return _processOutput(request, operation, parameters, parseJSON(body));
-      case 'runner_wait_ready':
-        return _processRunnerWaitReady(request, parameters, parseJSON(body));
-      case 'runner_wait_exit':
-        return _processRunnerWaitExit(request, parameters, parseJSON(body));
+      case 'wait_ready':
+        return _processWaitReady(request, parameters, parseJSON(body));
+      case 'wait_exit':
+        return _processWaitExit(request, parameters, parseJSON(body));
       case 'runner_stop':
         return _processRunnerStop(request, parameters, parseJSON(body));
       default:
@@ -514,10 +516,7 @@ class DockerHostServer {
     String outputAsLines = _getParameter(parameters, json, 'outputAsLines');
     String outputLimit = _getParameter(parameters, json, 'outputLimit');
 
-    List<String> args;
-    if (isNotEmptyString(argsEncoded)) {
-      args = parseJSON(argsEncoded);
-    }
+    var args = _decodeArgs(argsEncoded);
 
     var dockerProcess = await _dockerHostLocal.exec(
       containerName,
@@ -533,26 +532,57 @@ class DockerHostServer {
     };
   }
 
-  Future<bool> _processRunnerWaitReady(
+  Future<Map> _processCommand(
+      HttpRequest request, Map<String, String> parameters, json) async {
+    if (_dockerHostLocal == null) return null;
+
+    String cmd = _getParameter(parameters, json, 'cmd');
+    String argsEncoded = _getParameter(parameters, json, 'args');
+    String outputAsLines = _getParameter(parameters, json, 'outputAsLines');
+    String outputLimit = _getParameter(parameters, json, 'outputLimit');
+
+    var args = _decodeArgs(argsEncoded);
+
+    var dockerProcess = await _dockerHostLocal.command(
+      cmd,
+      args,
+      outputAsLines: parseBool(outputAsLines),
+      outputLimit: parseInt(outputLimit),
+    );
+
+    return {'instanceID': dockerProcess.instanceID};
+  }
+
+  List<String> _decodeArgs(String argsEncoded) {
+    if (isNotEmptyString(argsEncoded)) {
+      var list = parseJSON(argsEncoded) as List;
+      return list.cast<String>().toList();
+    }
+    return null;
+  }
+
+  Future<bool> _processWaitReady(
       HttpRequest request, Map<String, String> parameters, json) async {
     if (_dockerHostLocal == null) return false;
 
     var instanceID = _getParameterAsInt(parameters, json, 'instanceID');
 
-    var runner = _dockerHostLocal.getRunnerByInstanceID(instanceID);
+    var runner = _dockerHostLocal.getProcessByInstanceID(instanceID);
+    runner ??= _dockerHostLocal.getRunnerByInstanceID(instanceID);
     if (runner == null) return false;
 
     var ok = await runner.waitReady();
     return ok;
   }
 
-  Future<int> _processRunnerWaitExit(
+  Future<int> _processWaitExit(
       HttpRequest request, Map<String, String> parameters, json) async {
     if (_dockerHostLocal == null) return null;
 
     var instanceID = _getParameterAsInt(parameters, json, 'instanceID');
 
-    var runner = _dockerHostLocal.getRunnerByInstanceID(instanceID);
+    var runner = _dockerHostLocal.getProcessByInstanceID(instanceID);
+    runner ??= _dockerHostLocal.getRunnerByInstanceID(instanceID);
     if (runner == null) return null;
 
     var ok = await runner.waitExit();
@@ -583,10 +613,12 @@ class DockerHostServer {
     var instanceID = _getParameterAsInt(parameters, json, 'instanceID');
     var realOffset = _getParameterAsInt(parameters, json, 'realOffset');
 
-    var runner = _dockerHostLocal.getRunnerByInstanceID(instanceID);
-    if (runner == null) return {'running': true};
+    var process = _dockerHostLocal.getProcessByInstanceID(instanceID);
+    process ??= _dockerHostLocal.getRunnerByInstanceID(instanceID);
 
-    var output = type == 'stderr' ? runner.stderr : runner.stdout;
+    if (process == null) return {'running': false};
+
+    var output = type == 'stderr' ? process.stderr : process.stdout;
 
     var length = output.entriesLength;
     var removed = output.entriesRemoved;

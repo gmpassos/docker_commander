@@ -91,6 +91,9 @@ void doBasicTests(DockerHostLocalInstantiator dockerHostLocalInstantiator,
 
       await dockerContainer.waitReady();
 
+      var containersNames = await dockerCommander.psContainerNames();
+      expect(containersNames, contains(dockerContainer.name));
+
       var hostPort = dockerContainer.hostPorts[0];
 
       var getURLResponse =

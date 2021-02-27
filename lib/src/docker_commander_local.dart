@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:logging/logging.dart';
 import 'package:swiss_knife/swiss_knife.dart';
 
+import 'docker_commander_commands.dart';
 import 'docker_commander_host.dart';
 
 final _LOG = Logger('docker_commander/io');
@@ -114,14 +115,34 @@ class DockerHostLocal extends DockerHost {
       }
     }
 
+    String containerNetwork;
+
     if (isNotEmptyString(network, trim: true)) {
+      containerNetwork = network.trim();
       cmdArgs.add('--net');
-      cmdArgs.add(network.trim());
+      cmdArgs.add(containerNetwork);
+
+      var networkHostsIPs = getNetworkRunnersHostnamesAndIPs(network);
+
+      for (var networkContainerName in networkHostsIPs.keys) {
+        if (networkContainerName == containerName) continue;
+
+        var hostMaps = networkHostsIPs[networkContainerName];
+
+        for (var host in hostMaps.keys) {
+          var ip = hostMaps[host];
+          cmdArgs.add('--add-host');
+          cmdArgs.add('$host:$ip');
+        }
+      }
     }
 
+    String containerHostname;
+
     if (isNotEmptyString(hostname, trim: true)) {
+      containerHostname = hostname.trim();
       cmdArgs.add('-h');
-      cmdArgs.add(hostname.trim());
+      cmdArgs.add(containerHostname);
     }
 
     environment?.forEach((k, v) {
@@ -153,9 +174,12 @@ class DockerHostLocal extends DockerHost {
         this,
         instanceID,
         containerName,
+        image,
         process,
         idFile,
         ports,
+        containerNetwork,
+        containerHostname,
         outputAsLines,
         outputLimit,
         stdoutReadyFunction,
@@ -165,9 +189,33 @@ class DockerHostLocal extends DockerHost {
     _runners[instanceID] = runner;
     _processes[instanceID] = runner;
 
-    await runner.initialize();
+    var ok = await _initializeAndWaitReady(runner, () async {
+      if (containerNetwork != null) {
+        await _configureContainerNetwork(containerNetwork, runner);
+      }
+    });
+
+    if (ok) {
+      _LOG.info('Runner[$ok]: $runner');
+    }
 
     return runner;
+  }
+
+  void _configureContainerNetwork(
+      String network, DockerRunnerLocal runner) async {
+    if (isEmptyString(network)) return;
+    var runnersHostsAndIPs = getNetworkRunnersHostnamesAndIPs(network);
+
+    var oks =
+        await DockerCMD.addContainersHostMapping(this, runnersHostsAndIPs);
+
+    var someFail = oks.values.contains('false');
+
+    if (someFail) {
+      _LOG.warning(
+          'Error configuring containers host mapping> $runnersHostsAndIPs');
+    }
   }
 
   final Map<int, DockerProcess> _processes = {};
@@ -183,6 +231,8 @@ class DockerHostLocal extends DockerHost {
     OutputReadyFunction stderrReadyFunction,
     OutputReadyType outputReadyType,
   }) async {
+    if (!isContainerRunnerRunning(containerName)) return null;
+
     var instanceID = DockerProcess.incrementInstanceID();
 
     outputReadyType ??= DockerHost.resolveOutputReadyType(
@@ -192,7 +242,7 @@ class DockerHostLocal extends DockerHost {
     stderrReadyFunction ??= (outputStream, data) => true;
 
     var cmdArgs = ['exec', containerName, command, ...?args];
-    _LOG.info('exec[CMD]>\t$dockerBinaryPath ${cmdArgs.join(' ')}');
+    _LOG.info('docker exec [CMD]>\t$dockerBinaryPath ${cmdArgs.join(' ')}');
 
     var process = await Process.start(dockerBinaryPath, cmdArgs);
 
@@ -209,7 +259,79 @@ class DockerHostLocal extends DockerHost {
 
     _processes[instanceID] = dockerProcess;
 
-    await dockerProcess.initialize();
+    var ok = await _initializeAndWaitReady(dockerProcess);
+    if (ok) {
+      _LOG.info('Exec[$ok]: $dockerProcess');
+    }
+
+    return dockerProcess;
+  }
+
+  Future<bool> _initializeAndWaitReady(DockerProcessLocal dockerProcess,
+      [Function() onInitialize]) async {
+    var ok = await dockerProcess.initialize();
+
+    if (!ok) {
+      _LOG.warning('Initialization issue for $dockerProcess');
+      return false;
+    }
+
+    if (onInitialize != null) {
+      var ret = onInitialize();
+      if (ret is Future) {
+        await ret;
+      }
+    }
+
+    var ready = await dockerProcess.waitReady();
+    if (!ready) {
+      _LOG.warning('Ready issue for $dockerProcess');
+      return false;
+    }
+
+    return ok;
+  }
+
+  @override
+  Future<DockerProcess> command(
+    String command,
+    List<String> args, {
+    bool outputAsLines = true,
+    int outputLimit,
+    OutputReadyFunction stdoutReadyFunction,
+    OutputReadyFunction stderrReadyFunction,
+    OutputReadyType outputReadyType,
+  }) async {
+    var instanceID = DockerProcess.incrementInstanceID();
+
+    outputReadyType ??= DockerHost.resolveOutputReadyType(
+        stdoutReadyFunction, stderrReadyFunction);
+
+    stdoutReadyFunction ??= (outputStream, data) => true;
+    stderrReadyFunction ??= (outputStream, data) => true;
+
+    var cmdArgs = [command, ...?args];
+    _LOG.info('docker command [CMD]>\t$dockerBinaryPath ${cmdArgs.join(' ')}');
+
+    var process = await Process.start(dockerBinaryPath, cmdArgs);
+
+    var dockerProcess = DockerProcessLocal(
+        this,
+        instanceID,
+        '',
+        process,
+        outputAsLines,
+        outputLimit,
+        stdoutReadyFunction,
+        stderrReadyFunction,
+        outputReadyType);
+
+    _processes[instanceID] = dockerProcess;
+
+    var ok = await _initializeAndWaitReady(dockerProcess);
+    if (ok) {
+      _LOG.info('Command[$ok]: $dockerProcess');
+    }
 
     return dockerProcess;
   }
@@ -230,11 +352,45 @@ class DockerHostLocal extends DockerHost {
   final Map<int, DockerRunnerLocal> _runners = {};
 
   @override
+  bool isContainerRunnerRunning(String containerName) =>
+      getRunnerByName(containerName)?.isRunning ?? false;
+
+  List<String> getRunnersIPs() => _runners.values.map((e) => e.ip).toList();
+
+  List<String> getNetworkRunnersIPs(String network) => _runners.values
+      .where((e) => e.network == network)
+      .map((e) => e.ip)
+      .toList();
+
+  List<String> getNetworkRunnersHostnames(String network) => _runners.values
+      .where((e) => e.network == network)
+      .map((e) => e.hostname)
+      .toList();
+
+  List<String> getNetworkRunnersNames(String network) => _runners.values
+      .where((e) => e.network == network)
+      .map((e) => e.containerName)
+      .toList();
+
+  Map<String, String> getNetworkRunnersIPsAndHostnames(String network) =>
+      Map.fromEntries(_runners.values
+          .where((e) => e.network == network)
+          .map((e) => MapEntry(e.ip, e.hostname)));
+
+  Map<String, Map<String, String>> getNetworkRunnersHostnamesAndIPs(
+          String network) =>
+      Map.fromEntries(_runners.values
+          .where((r) => r.network == network)
+          .map((r) => MapEntry(r.containerName, {r.hostname: r.ip})));
+
+  @override
   List<int> getRunnersInstanceIDs() => _runners.keys.toList();
 
   @override
-  List<String> getRunnersNames() =>
-      _runners.values.map((r) => r.containerName).toList();
+  List<String> getRunnersNames() => _runners.values
+      .map((r) => r.containerName)
+      .where((n) => n != null && n.isNotEmpty)
+      .toList();
 
   @override
   DockerRunnerLocal getRunnerByInstanceID(int instanceID) =>
@@ -243,6 +399,10 @@ class DockerHostLocal extends DockerHost {
   @override
   DockerRunner getRunnerByName(String name) => _runners.values
       .firstWhere((r) => r.containerName == name, orElse: () => null);
+
+  @override
+  DockerProcessLocal getProcessByInstanceID(int instanceID) =>
+      _processes[instanceID];
 
   Directory _temporaryDirectory;
 
@@ -300,17 +460,27 @@ class DockerHostLocal extends DockerHost {
 }
 
 class DockerRunnerLocal extends DockerProcessLocal implements DockerRunner {
+  @override
+  final String image;
+
   /// An optional [File] that contains the container ID.
   final File idFile;
+
   final List<String> _ports;
+
+  final String network;
+  final String hostname;
 
   DockerRunnerLocal(
       DockerHostLocal dockerHost,
       int instanceID,
       String containerName,
+      this.image,
       Process process,
       this.idFile,
       this._ports,
+      this.network,
+      this.hostname,
       bool outputAsLines,
       int outputLimit,
       OutputReadyFunction stdoutReadyFunction,
@@ -327,45 +497,57 @@ class DockerRunnerLocal extends DockerProcessLocal implements DockerRunner {
             stderrReadyFunction,
             outputReadyType);
 
+  String _id;
+
   @override
-  void initialize() async {
-    await super.initialize();
+  String get id => _id;
+
+  String _ip;
+
+  String get ip => _ip;
+
+  @override
+  Future<bool> initialize() async {
+    var ok = await super.initialize();
 
     if (idFile != null) {
-      await _waitFile(idFile);
+      var fileExists = await _waitFile(idFile);
+      if (!fileExists) {
+        _LOG.warning("idFile doesn't exists: $idFile");
+      }
       _id = idFile.readAsStringSync().trim();
     } else {
       _id = await dockerHost.getContainerIDByName(containerName);
     }
+
+    _ip = await DockerCMD.getContainerIP(dockerHost, id);
+
+    return ok;
   }
 
   Future<bool> _waitFile(File file, {Duration timeout}) async {
     if (file == null) return false;
-    if (file.existsSync()) return true;
+    if (file.existsSync() && file.lengthSync() > 1) return true;
 
     timeout ??= Duration(minutes: 1);
     var init = DateTime.now().millisecondsSinceEpoch;
 
     var retry = 0;
     while (true) {
-      var exists = file.existsSync();
+      var exists = file.existsSync() && file.lengthSync() > 1;
       if (exists) return true;
 
-      var elapsed = DateTime.now().millisecondsSinceEpoch - init;
-      if (elapsed >= timeout.inMilliseconds) return false;
+      var now = DateTime.now().millisecondsSinceEpoch;
+      var elapsed = now - init;
+      var remainingTime = timeout.inMilliseconds - elapsed;
+      if (remainingTime < 0) return false;
 
       ++retry;
       var sleep = Math.min(1000, 10 * retry);
 
       await Future.delayed(Duration(milliseconds: sleep));
-      return exists;
     }
   }
-
-  String _id;
-
-  @override
-  String get id => _id;
 
   @override
   List<String> get ports => List.unmodifiable(_ports ?? []);
@@ -373,6 +555,11 @@ class DockerRunnerLocal extends DockerProcessLocal implements DockerRunner {
   @override
   Future<bool> stop({Duration timeout}) =>
       dockerHost.stopByInstanceID(instanceID, timeout: timeout);
+
+  @override
+  String toString() {
+    return 'DockerRunnerLocal{id: $id, image: $image, containerName: $containerName}';
+  }
 }
 
 class DockerProcessLocal extends DockerProcess {
@@ -399,7 +586,7 @@ class DockerProcessLocal extends DockerProcess {
 
   final Completer<int> _exitCompleter = Completer();
 
-  void initialize() async {
+  Future<bool> initialize() async {
     // ignore: unawaited_futures
     process.exitCode.then(_setExitCode);
 
@@ -411,7 +598,7 @@ class DockerProcessLocal extends DockerProcess {
         process.stderr, _stderrReadyFunction, anyOutputReadyCompleter));
     setupOutputReadyType(_outputReadyType);
 
-    await waitReady();
+    return true;
   }
 
   void _setExitCode(int exitCode) {
@@ -494,7 +681,13 @@ class DockerProcessLocal extends DockerProcess {
   int get exitCode => _exitCode;
 
   @override
-  Future<int> waitExit() async {
+  Future<int> waitExit({int desiredExitCode}) async {
+    var exitCode = await _waitExitImpl();
+    if (desiredExitCode != null && exitCode != desiredExitCode) return null;
+    return exitCode;
+  }
+
+  Future<int> _waitExitImpl() async {
     if (_exitCode != null) return _exitCode;
     var code = await _exitCompleter.future;
     _exitCode ??= code;

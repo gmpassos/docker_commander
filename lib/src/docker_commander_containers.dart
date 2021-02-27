@@ -4,7 +4,7 @@ import 'docker_commander_base.dart';
 import 'docker_commander_host.dart';
 
 /// Configuration for a Container.
-class DockerContainerConfig {
+class DockerContainerConfig<D extends DockerContainer> {
   final String image;
   final String version;
   final List<String> imageArgs;
@@ -56,7 +56,7 @@ class DockerContainerConfig {
     OutputReadyFunction stdoutReadyFunction,
     OutputReadyFunction stderrReadyFunction,
   }) {
-    return DockerContainerConfig(
+    return DockerContainerConfig<D>(
       image ?? this.image,
       version: version ?? this.version,
       imageArgs: imageArgs ?? this.imageArgs,
@@ -75,7 +75,7 @@ class DockerContainerConfig {
     );
   }
 
-  Future<DockerContainer> run(DockerCommander dockerCommander,
+  Future<D> run(DockerCommander dockerCommander,
       {String name,
       String network,
       String hostname,
@@ -103,7 +103,7 @@ class DockerContainerConfig {
       mappedPorts = mappedPorts.toSet().toList();
     }
 
-    return dockerCommander.run(
+    var dockerContainer = dockerCommander.run(
       image,
       version: version,
       imageArgs: imageArgs,
@@ -117,11 +117,18 @@ class DockerContainerConfig {
       outputLimit: outputLimit ?? this.outputLimit,
       stdoutReadyFunction: stdoutReadyFunction,
       stderrReadyFunction: stderrReadyFunction,
+      dockerContainerInstantiator: instantiateDockerContainer,
     );
+
+    return dockerContainer.then((value) => value as D);
+  }
+
+  D instantiateDockerContainer(DockerRunner runner) {
+    return null;
   }
 }
 
-class PostgreSQLContainer extends DockerContainerConfig {
+class PostgreSQLContainer extends DockerContainerConfig<DockerContainer> {
   PostgreSQLContainer(
       {String pgUser,
       String pgPassword,
@@ -143,7 +150,7 @@ class PostgreSQLContainer extends DockerContainerConfig {
         );
 }
 
-class ApacheHttpdContainer extends DockerContainerConfig {
+class ApacheHttpdContainer extends DockerContainerConfig<DockerContainer> {
   ApacheHttpdContainer({List<int> hostPorts})
       : super(
           'httpd',

@@ -1,9 +1,10 @@
 import 'package:swiss_knife/swiss_knife.dart';
 
+import 'docker_commander_commands.dart';
 import 'docker_commander_host.dart';
 
 /// The Docker manager.
-class DockerCommander {
+class DockerCommander extends DockerCMDExecutor {
   /// Docker machine host.
   final DockerHost dockerHost;
 
@@ -69,10 +70,11 @@ class DockerCommander {
     int outputLimit,
     OutputReadyFunction stdoutReadyFunction,
     OutputReadyFunction stderrReadyFunction,
+    DockerContainerInstantiator dockerContainerInstantiator,
   }) async {
     await ensureInitialized();
 
-    var run = await dockerHost.run(
+    var runner = await dockerHost.run(
       image,
       version: version,
       imageArgs: imageArgs,
@@ -88,8 +90,83 @@ class DockerCommander {
       stderrReadyFunction: stderrReadyFunction,
     );
 
-    return DockerContainer(run);
+    DockerContainer dockerContainer;
+
+    if (dockerContainerInstantiator != null) {
+      dockerContainer = dockerContainerInstantiator(runner);
+    }
+
+    dockerContainer ??= DockerContainer(runner);
+
+    return dockerContainer;
   }
+
+  @override
+  bool isContainerRunnerRunning(String containerName) =>
+      dockerHost.isContainerRunnerRunning(containerName);
+
+  @override
+  Future<DockerProcess> exec(
+    String containerName,
+    String command,
+    List<String> args, {
+    bool outputAsLines = true,
+    int outputLimit,
+    OutputReadyFunction stdoutReadyFunction,
+    OutputReadyFunction stderrReadyFunction,
+    OutputReadyType outputReadyType,
+  }) async {
+    await ensureInitialized();
+    return dockerHost.exec(containerName, command, args,
+        outputAsLines: outputAsLines,
+        outputLimit: outputLimit,
+        stdoutReadyFunction: stdoutReadyFunction,
+        stderrReadyFunction: stderrReadyFunction,
+        outputReadyType: outputReadyType);
+  }
+
+  @override
+  Future<DockerProcess> command(
+    String command,
+    List<String> args, {
+    bool outputAsLines = true,
+    int outputLimit,
+    OutputReadyFunction stdoutReadyFunction,
+    OutputReadyFunction stderrReadyFunction,
+    OutputReadyType outputReadyType,
+  }) async {
+    await ensureInitialized();
+    return dockerHost.command(command, args,
+        outputAsLines: outputAsLines,
+        outputLimit: outputLimit,
+        stdoutReadyFunction: stdoutReadyFunction,
+        stderrReadyFunction: stderrReadyFunction,
+        outputReadyType: outputReadyType);
+  }
+
+  /// Executes Docker command `docker ps --format "{{.Names}}"`
+  Future<List<String>> psContainerNames({bool all = true}) async {
+    return DockerCMD.psContainerNames(this, all: all);
+  }
+
+  int _networkCounter = 0;
+
+  /// Creates a Docker network with [networkName].
+  Future<String> createNetwork([String networkName]) {
+    if (isEmptyString(networkName, trim: true)) {
+      networkName =
+          'docker_commander_network-${dockerHost.session}-${++_networkCounter}';
+    }
+    return DockerCMD.createNetwork(this, networkName);
+  }
+
+  /// Removes a Docker network with [networkName].
+  Future<bool> removeNetwork(String networkName) =>
+      DockerCMD.removeNetwork(this, networkName);
+
+  /// Returns the container IP by [name].
+  Future<String> getContainerIP(String name) async =>
+      DockerCMD.getContainerIP(this, name);
 
   /// Closes this instances, and internal [dockerHost].
   Future<void> close() async {
@@ -105,6 +182,9 @@ class DockerCommander {
     return 'DockerCommander{dockerHost: $dockerHost, lastDaemonCheck: $lastDaemonCheck}';
   }
 }
+
+typedef DockerContainerInstantiator = DockerContainer Function(
+    DockerRunner runner);
 
 /// A Docker container being executed.
 class DockerContainer {
@@ -135,11 +215,24 @@ class DockerContainer {
 
   /// Executes a [command] inside this container with [args]
   /// (if [isRunning] or returns null).
-  Future<DockerProcess> exec(String command, List<String> args) {
+  Future<DockerProcess> exec(
+    String command,
+    List<String> args, {
+    bool outputAsLines = true,
+    int outputLimit,
+    OutputReadyFunction stdoutReadyFunction,
+    OutputReadyFunction stderrReadyFunction,
+    OutputReadyType outputReadyType,
+  }) {
     if (!isRunning) {
       return null;
     }
-    return runner.dockerHost.exec(name, command, args);
+    return runner.dockerHost.exec(name, command, args,
+        outputAsLines: outputAsLines,
+        outputLimit: outputLimit,
+        stdoutReadyFunction: stdoutReadyFunction,
+        stderrReadyFunction: stderrReadyFunction,
+        outputReadyType: outputReadyType);
   }
 
   /// Calls [exec] than [waitExit].
@@ -149,33 +242,36 @@ class DockerContainer {
   }
 
   /// Calls [exec] than [waitStdout].
-  Future<Output> execAndWaitStdout(String command, List<String> args) async {
+  Future<Output> execAndWaitStdout(String command, List<String> args,
+      {int desiredExitCode}) async {
     var process = await exec(command, args);
-    return process.waitStdout();
+    return process.waitStdout(desiredExitCode: desiredExitCode);
   }
 
   /// Calls [exec] than [waitStderr].
-  Future<Output> execAndWaitStderr(String command, List<String> args) async {
+  Future<Output> execAndWaitStderr(String command, List<String> args,
+      {int desiredExitCode}) async {
     var process = await exec(command, args);
-    return process.waitStderr();
+    return process.waitStderr(desiredExitCode: desiredExitCode);
   }
 
   /// Calls [execAndWaitStdoutAsString] and returns [Output.asString].
   Future<String> execAndWaitStdoutAsString(String command, List<String> args,
-      {bool trim = false}) async {
-    var output = await execAndWaitStdout(command, args);
-    if (output == null) return null;
-    var s = output.asString;
-    if (trim ?? false) {
-      s = s.trim();
-    }
-    return s;
+      {bool trim = false, int desiredExitCode}) async {
+    var output = await execAndWaitStdout(command, args,
+        desiredExitCode: desiredExitCode);
+    return _waitOutputAsString(output, trim);
   }
 
   /// Calls [execAndWaitStderrAsString] and returns [Output.asString].
   Future<String> execAndWaitStderrAsString(String command, List<String> args,
-      {bool trim = false}) async {
-    var output = await execAndWaitStderr(command, args);
+      {bool trim = false, int desiredExitCode}) async {
+    var output = await execAndWaitStderr(command, args,
+        desiredExitCode: desiredExitCode);
+    return _waitOutputAsString(output, trim);
+  }
+
+  String _waitOutputAsString(Output output, bool trim) {
     if (output == null) return null;
     var s = output.asString;
     if (trim ?? false) {
@@ -184,37 +280,37 @@ class DockerContainer {
     return s;
   }
 
-  final Map<String, String> _whichCache = {};
-
   /// Call POSIX `which` command.
   /// Calls [exec] with command `which` and args [commandName].
   /// Caches response than returns the executable path for [commandName].
-  Future<String> execWhich(String commandName, {bool ignoreCache}) async {
-    ignoreCache ??= false;
-
-    var cached = !ignoreCache ? _whichCache[commandName] : null;
-    if (cached != null) {
-      return cached.isNotEmpty ? cached : null;
-    }
-
-    var path =
-        await execAndWaitStdoutAsString('which', [commandName], trim: true);
-    path ??= '';
-
-    _whichCache[commandName] = path;
-    return path.isNotEmpty ? path : null;
-  }
+  Future<String> execWhich(String commandName,
+          {bool ignoreCache, String def}) async =>
+      runner.dockerHost
+          .execWhich(name, commandName, ignoreCache: ignoreCache, def: def);
 
   /// Call POSIX `cat` command.
   /// Calls [exec] with command `cat` and args [filePath].
   /// Returns the executable path for [filePath].
   Future<String> execCat(String filePath, {bool trim = false}) async {
-    var catBin = await execWhich('cat');
-    catBin ??= '/bin/cat';
-    var content =
-        await execAndWaitStdoutAsString(catBin, [filePath], trim: trim);
-    return content;
+    return DockerCMD.execCat(runner.dockerHost, name, filePath, trim: trim);
   }
+
+  /// Executes a shell [script]. Tries to use `bash` or `sh`.
+  /// Note that [script] should be inline, without line breaks (`\n`).
+  Future<DockerProcess> execShell(String script, {bool sudo = false}) async =>
+      DockerCMD.execShell(runner.dockerHost, name, script, sudo: sudo);
+
+  /// Save the file [filePath] with [content], inside [containerName].
+  Future<bool> putFile(String filePath, String content,
+          {bool sudo = false, bool append = false}) async =>
+      DockerCMD.putFile(runner.dockerHost, name, filePath, content,
+          sudo: sudo, append: append);
+
+  /// Append to the file [filePath] with [content], inside [containerName].
+  Future<bool> appendFile(String filePath, String content,
+          {bool sudo = false}) async =>
+      DockerCMD.appendFile(runner.dockerHost, name, filePath, content,
+          sudo: sudo);
 
   /// Stops this container.
   Future<bool> stop({Duration timeout}) => runner.stop(timeout: timeout);

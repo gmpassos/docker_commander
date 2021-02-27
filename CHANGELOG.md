@@ -1,3 +1,11 @@
+## 1.0.10
+
+- `NginxContainer`: NGINX container with a `NginxReverseProxyConfigurer`.
+- Added support to include in each container of the same network the IP of other hosts.
+- Added command helpers `execShell`, `putFile` and `appendFile`. 
+- Added helpers to wait data in stdout/stderr: `waitData` `waitForDataMatch`.
+- Fix remote operations: `wait_ready` and `wait_exit`.
+
 ## 1.0.9
 
 - `DockerHost.run` and `DockerHost.exec`: 

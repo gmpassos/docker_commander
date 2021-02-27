@@ -25,6 +25,8 @@ void main() async {
 
         usedPorts.add(listenPort);
 
+        await Future.delayed(Duration(seconds: 1));
+
         return listenPort;
       } catch (e) {
         print(e);
