@@ -3,7 +3,7 @@ import 'package:swiss_knife/swiss_knife.dart';
 import 'docker_commander_base.dart';
 import 'docker_commander_host.dart';
 
-/// Configuration for a Container.
+/// Base class for pre-configured containers.
 class DockerContainerConfig<D extends DockerContainer> {
   final String image;
   final String version;
@@ -132,6 +132,7 @@ class DockerContainerConfig<D extends DockerContainer> {
   Future<bool> initializeContainer(D dockerContainer) => null;
 }
 
+/// PostgreSQL pre-configured container.
 class PostgreSQLContainer extends DockerContainerConfig<DockerContainer> {
   PostgreSQLContainer(
       {String pgUser,
@@ -154,6 +155,7 @@ class PostgreSQLContainer extends DockerContainerConfig<DockerContainer> {
         );
 }
 
+/// Apache HTTPD pre-configured container.
 class ApacheHttpdContainer extends DockerContainerConfig<DockerContainer> {
   ApacheHttpdContainer({List<int> hostPorts})
       : super(

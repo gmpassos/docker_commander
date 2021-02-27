@@ -31,6 +31,7 @@ class DockerContainerNginx extends DockerContainer {
   }
 }
 
+/// NGINX pre-configured container.
 class NginxContainer extends DockerContainerConfig<DockerContainerNginx> {
   final String config;
 
@@ -84,7 +85,7 @@ class NginxContainer extends DockerContainerConfig<DockerContainerNginx> {
   }
 }
 
-///
+/// NGINX reverse proxy configurer.
 class NginxReverseProxyConfigurer {
   static const String _templateMain = '''
 

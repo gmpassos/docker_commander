@@ -105,8 +105,8 @@ void main() async {
   // Run Docker image `hello-world` (at remote server):
   var dockerContainer = await dockerCommander.run('hello-world');
 
-  // Behavior is the same of example using `DockerHostLocal`.
-  // Internal `DockerRunner` will sync remote output automatically!
+  // The behavior is the same of the example using `DockerHostLocal`.
+  // The internal `DockerRunner` will sync remote output (stdout/sdterr) automatically!
 
   // ...
   
@@ -220,7 +220,7 @@ void main() async {
   var dockerCommander = DockerCommander(DockerHostLocal());
   // Initialize `DockerCommander`:
   await dockerCommander.initialize();
-  
+
   // Docker Network for Apache HTTPD and NGINX containers:
   var network = await dockerCommander.createNetwork();
 
@@ -232,18 +232,18 @@ void main() async {
   // docker host `apache` at port 80 (without HTTPS).
   var nginxConfig = NginxReverseProxyConfigurer(
       [NginxServerConfig('localhost', 'apache', 80, false)]).build();
-  
+
   // Start a NGINX container using generated configuration.
   var nginxContainer = await NginxContainer(nginxConfig, hostPorts: [4082])
       .run(dockerCommander, network: network, hostname: 'nginx');
 
   // Request apache:80 (mapped in the host machine to localhost:4081)
-  // trough NGINX reverse proxy at localhost:4082 
+  // trough NGINX reverse proxy at localhost:4082
   var response = await HttpClient('http://localhost:4082/').get('');
 
   // The Apache HTTPD response content:
   var apacheContent = response.bodyAsString;
-  
+
   print(apacheContent);
 
   // Stop NGINX:
@@ -251,7 +251,9 @@ void main() async {
 
   // Apache Apache HTTPD:
   await apacheContainer.stop(timeout: Duration(seconds: 5));
-  
+
+  // Remove Docker network:
+  await dockerCommander.removeNetwork(network);
 }
 ```
 

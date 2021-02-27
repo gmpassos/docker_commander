@@ -1,3 +1,10 @@
+## 1.0.12
+
+- Improve example.
+- Improve README.
+- Improve documentation.
+- Fix typo.
+
 ## 1.0.11
 
 - Improve NGINX integration.
