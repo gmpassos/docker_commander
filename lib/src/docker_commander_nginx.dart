@@ -1,9 +1,21 @@
+import 'package:logging/logging.dart';
+import 'package:swiss_knife/swiss_knife.dart';
+
 import 'docker_commander_base.dart';
 import 'docker_commander_containers.dart';
 import 'docker_commander_host.dart';
 
+final _LOG = Logger('docker_commander/NginxContainer');
+
 class DockerContainerNginx extends DockerContainer {
-  DockerContainerNginx(DockerRunner runner) : super(runner);
+  final NginxContainer containerConfig;
+
+  DockerContainerNginx(DockerRunner runner, this.containerConfig)
+      : super(runner);
+
+  String get config => containerConfig.config;
+
+  String get configPath => containerConfig.configPath;
 
   Future<bool> testConfiguration() async {
     var nginxBin = await execWhich('nginx');
@@ -20,8 +32,13 @@ class DockerContainerNginx extends DockerContainer {
 }
 
 class NginxContainer extends DockerContainerConfig<DockerContainerNginx> {
-  NginxContainer(String config, {List<int> hostPorts})
-      : super(
+  final String config;
+
+  final String configPath;
+
+  NginxContainer(this.config, {List<int> hostPorts, String configPath})
+      : configPath = configPath ?? '/etc/nginx/nginx.conf',
+        super(
           'nginx',
           version: 'latest',
           hostPorts: hostPorts,
@@ -33,7 +50,38 @@ class NginxContainer extends DockerContainerConfig<DockerContainerNginx> {
 
   @override
   DockerContainerNginx instantiateDockerContainer(DockerRunner runner) =>
-      DockerContainerNginx(runner);
+      DockerContainerNginx(runner, this);
+
+  @override
+  Future<bool> initializeContainer(DockerContainerNginx dockerContainer) async {
+    if (isEmptyString(config)) return true;
+
+    var putOK = await dockerContainer.putFile(configPath, config, sudo: true);
+    if (!putOK) {
+      _LOG.severe(
+          "Can't put int container `${dockerContainer.name}` config file at: $configPath");
+      return false;
+    }
+
+    var testOK = await dockerContainer.testConfiguration();
+    if (!testOK) {
+      _LOG.severe(
+          'Nginx configuration test failed! container: `${dockerContainer.name}` ; path: $configPath');
+      return false;
+    }
+
+    var reloadOK = await dockerContainer.reloadConfiguration();
+    if (!reloadOK) {
+      _LOG.severe(
+          'Error reloading NGINX configuration! container: `${dockerContainer.name}` ; path: $configPath');
+      return false;
+    }
+
+    // Some delay to reload NGINX configuration.
+    await Future.delayed(Duration(seconds: 1));
+
+    return true;
+  }
 }
 
 ///

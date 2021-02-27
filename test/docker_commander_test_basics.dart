@@ -59,8 +59,6 @@ void doBasicTests(DockerHostLocalInstantiator dockerHostLocalInstantiator,
       expect(dockerContainer.instanceID > 0, isTrue);
       expect(dockerContainer.name.isNotEmpty, isTrue);
 
-      await dockerContainer.waitReady();
-
       var exitCode = await dockerContainer.waitExit();
       expect(exitCode, equals(0));
 
@@ -88,8 +86,6 @@ void doBasicTests(DockerHostLocalInstantiator dockerHostLocalInstantiator,
       expect(dockerContainer.name.isNotEmpty, isTrue);
 
       expect(dockerContainer.ports, equals(['$apachePort:80']));
-
-      await dockerContainer.waitReady();
 
       var containersNames = await dockerCommander.psContainerNames();
       expect(containersNames, contains(dockerContainer.name));

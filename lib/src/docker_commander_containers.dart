@@ -120,12 +120,16 @@ class DockerContainerConfig<D extends DockerContainer> {
       dockerContainerInstantiator: instantiateDockerContainer,
     );
 
-    return dockerContainer.then((value) => value as D);
+    return dockerContainer.then((value) async {
+      var d = value as D;
+      await initializeContainer(d);
+      return d;
+    });
   }
 
-  D instantiateDockerContainer(DockerRunner runner) {
-    return null;
-  }
+  D instantiateDockerContainer(DockerRunner runner) => null;
+
+  Future<bool> initializeContainer(D dockerContainer) => null;
 }
 
 class PostgreSQLContainer extends DockerContainerConfig<DockerContainer> {

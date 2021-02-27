@@ -9,7 +9,16 @@
 [![Code size](https://img.shields.io/github/languages/code-size/gmpassos/docker_commander?logo=github&logoColor=white)](https://github.com/gmpassos/docker_commander)
 [![License](https://img.shields.io/github/license/gmpassos/docker_commander?logo=open-source-initiative&logoColor=green)](https://github.com/gmpassos/docker_commander/blob/master/LICENSE)
 
-Docker manager, for personalized containers and pre-configured popular containers.
+[Docker][docker] manager to easily automate a Docker Daemon:
+  - Supports personalized containers. 
+  - Helpers to build a Docker network.
+  - Helpers to manipulate files inside a running container.
+  - Built-in pre-configured popular containers:
+    - [PostgreSQL][postgresql]
+    - [Apache HTTPD][apache]
+    - [NGINX][nginx]
+
+[docker]:https://www.docker.com/
 
 ## Usage
 
@@ -31,9 +40,6 @@ void main() async {
 
   // Run Docker image `hello-world`:
   var dockerContainer = await dockerCommander.run('hello-world');
-
-  // Waits container to be ready (ensure that the container started).
-  await dockerContainer.waitReady();
 
   // Waits the container to exit, and gets the exit code:
   var exitCode = await dockerContainer.waitExit();
@@ -116,7 +122,7 @@ void main() async {
 
 ## PostgreSQLContainer
 
-A pre-configured PostgreSQL Container:
+A pre-configured [PostgreSQL][postgresql] Container:
 
 ```dart
 import 'package:docker_commander/docker_commander_vm.dart';
@@ -125,12 +131,11 @@ void main() async {
 
   // Creates a `DockerCommander` for a local host machine:
   var dockerCommander = DockerCommander(DockerHostLocal());
+  // Initialize `DockerCommander`:
+  await dockerCommander.initialize();
   
   // Start PostgreSQL container:
   var dockerContainer = await PostgreSQLContainer().run(dockerCommander);
-
-  // Wait PostgreSQL to start and be ready to receive requests:
-  await dockerContainer.waitReady();
 
   // Print the current STDOUT of the container:
   var output = dockerContainer.stdout.asString;
@@ -158,9 +163,11 @@ void main() async {
 
 ```
 
+[postgresql]:https://www.postgresql.org/
+
 ## ApacheHttpdContainer
 
-A pre-configured container for the famous Apache HTTPD:
+A pre-configured container for the famous [Apache HTTPD][apache]:
 
 ```dart
 import 'package:docker_commander/docker_commander_vm.dart';
@@ -168,16 +175,15 @@ import 'package:mercury_client/mercury_client.dart';
 
 void main() async {
     var dockerCommander = DockerCommander(DockerHostLocal());
-  
+    // Initialize `DockerCommander`:
+    await dockerCommander.initialize();
+    
     // The host port to map internal container port (httpd at port 80).
     var apachePort = 8081;
     
     var dockerContainer = await ApacheHttpdContainer()
         .run(dockerCommander, hostPorts: [apachePort]);
     
-    // Wait Apache to be ready...
-    await dockerContainer.waitReady();
-
     // Get HTTPD configuration file:
     var httpdConf = await dockerContainer.execCat('/usr/local/apache2/conf/httpd.conf');
 
@@ -196,6 +202,60 @@ void main() async {
 }
 
 ```
+
+[apache]:https://httpd.apache.org/
+
+## NginxContainer
+
+A pre-configured container for the famous [NGINX][nginx] proxy server.
+
+This example shows a [NGINX][nginx] reverse proxy, that redirects HTTP requests at `localhost:4082`
+to the internal Apache container, with hostname `apache`, at port `80`.
+
+```dart
+import 'package:docker_commander/docker_commander_vm.dart';
+import 'package:mercury_client/mercury_client.dart';
+
+void main() async {
+  var dockerCommander = DockerCommander(DockerHostLocal());
+  // Initialize `DockerCommander`:
+  await dockerCommander.initialize();
+  
+  // Docker Network for Apache HTTPD and NGINX containers:
+  var network = await dockerCommander.createNetwork();
+
+  // Start Apache HTTPD, mapping port 80 to 4081.
+  var apacheContainer = await ApacheHttpdContainer().run(dockerCommander,
+      hostPorts: [4081], network: network, hostname: 'apache');
+
+  // Generate a NGINX configuration, mapping domain `localhost` to
+  // docker host `apache` at port 80 (without HTTPS).
+  var nginxConfig = NginxReverseProxyConfigurer(
+      [NginxServerConfig('localhost', 'apache', 80, false)]).build();
+  
+  // Start a NGINX container using generated configuration.
+  var nginxContainer = await NginxContainer(nginxConfig, hostPorts: [4082])
+      .run(dockerCommander, network: network, hostname: 'nginx');
+
+  // Request apache:80 (mapped in the host machine to localhost:4081)
+  // trough NGINX reverse proxy at localhost:4082 
+  var response = await HttpClient('http://localhost:4082/').get('');
+
+  // The Apache HTTPD response content:
+  var apacheContent = response.bodyAsString;
+  
+  print(apacheContent);
+
+  // Stop NGINX:
+  await nginxContainer.stop(timeout: Duration(seconds: 5));
+
+  // Apache Apache HTTPD:
+  await apacheContainer.stop(timeout: Duration(seconds: 5));
+  
+}
+```
+
+[nginx]:https://www.nginx.com/
 
 ## See Also
 

@@ -52,8 +52,6 @@ void main() {
       expect(dockerContainer.instanceID > 0, isTrue);
       expect(dockerContainer.name.isNotEmpty, isTrue);
 
-      await dockerContainer.waitReady();
-
       var output = dockerContainer.stdout.asString;
       expect(
           output, contains('database system is ready to accept connections'));
@@ -98,8 +96,6 @@ void main() {
 
       expect(dockerContainer.instanceID > 0, isTrue);
       expect(dockerContainer.name.isNotEmpty, isTrue);
-
-      await dockerContainer.waitReady();
 
       var output = dockerContainer.stderr.asString;
       expect(output, contains('Apache'));
@@ -162,45 +158,45 @@ void main() {
       _LOG.info('Apache HTTPD IP:  $apacheIP');
       expect(apacheIP, isNotEmpty);
 
-      var dockerContainer = await NginxContainer('', hostPorts: [4082])
+      var nginxConfig = NginxReverseProxyConfigurer(
+          [NginxServerConfig('localhost', 'apache', 80, false)]).build();
+
+      var nginxContainer = await NginxContainer(nginxConfig, hostPorts: [4082])
           .run(dockerCommander, network: network, hostname: 'nginx');
 
-      _LOG.info(dockerContainer);
+      _LOG.info(nginxContainer);
 
-      expect(dockerContainer.instanceID > 0, isTrue);
-      expect(dockerContainer.name.isNotEmpty, isTrue);
+      expect(nginxContainer.instanceID > 0, isTrue);
+      expect(nginxContainer.name.isNotEmpty, isTrue);
 
-      await dockerContainer.waitReady();
-
-      var match = await dockerContainer.stdout
+      var match = await nginxContainer.stdout
           .waitForDataMatch('nginx', timeout: Duration(seconds: 10));
 
       _LOG.info('Data match: $match');
 
-      var output = dockerContainer.stdout.asString;
+      var output = nginxContainer.stdout.asString;
 
       _LOG.info(output);
 
       expect(output, contains('nginx'));
 
-      expect(dockerContainer.id.isNotEmpty, isTrue);
+      expect(nginxContainer.id.isNotEmpty, isTrue);
 
-      var nginxConfig = NginxReverseProxyConfigurer(
-          [NginxServerConfig('localhost', 'apache', 80, false)]).build();
-
-      await dockerContainer.putFile('/etc/nginx/nginx.conf', nginxConfig,
-          sudo: true);
+      var configFileContent =
+          await nginxContainer.execCat(nginxContainer.configPath);
 
       _LOG.info('------------------------------------------------------------');
-      _LOG.info(nginxConfig);
+      _LOG.info(configFileContent);
       _LOG.info('------------------------------------------------------------');
 
-      var testOK = await dockerContainer.testConfiguration();
+      expect(configFileContent, contains('apache'));
+
+      var testOK = await nginxContainer.testConfiguration();
 
       _LOG.info('Nginx test config: $testOK');
       expect(testOK, isTrue);
 
-      var reloadOK = await dockerContainer.reloadConfiguration();
+      var reloadOK = await nginxContainer.reloadConfiguration();
       _LOG.info('Nginx reload: $reloadOK');
       expect(reloadOK, isTrue);
 
@@ -225,10 +221,10 @@ void main() {
       expect(nginxContent, equals(apacheContent));
 
       _LOG.info('Stopping Nginx...');
-      await dockerContainer.stop(timeout: Duration(seconds: 5));
+      await nginxContainer.stop(timeout: Duration(seconds: 5));
 
       _LOG.info('Wait exit...');
-      var exitCode = await dockerContainer.waitExit();
+      var exitCode = await nginxContainer.waitExit();
       _LOG.info('exitCode: $exitCode');
       expect(exitCode == 0 || exitCode == 137, isTrue);
 

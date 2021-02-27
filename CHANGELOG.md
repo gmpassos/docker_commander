@@ -1,3 +1,9 @@
+## 1.0.11
+
+- Improve NGINX integration.
+- Improve README.
+- `DockerHostRemote`: ensure that `waitReady` is called in initialization.
+
 ## 1.0.10
 
 - `NginxContainer`: NGINX container with a `NginxReverseProxyConfigurer`.

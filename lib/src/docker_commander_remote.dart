@@ -157,9 +157,38 @@ class DockerHostRemote extends DockerHost {
 
     _runners[instanceID] = runner;
 
-    await runner.initialize();
+    var ok = await _initializeAndWaitReady(runner);
+
+    if (ok) {
+      _LOG.info('Runner[$ok]: $runner');
+    }
 
     return runner;
+  }
+
+  Future<bool> _initializeAndWaitReady(DockerProcessRemote dockerProcess,
+      [Function() onInitialize]) async {
+    var ok = await dockerProcess.initialize();
+
+    if (!ok) {
+      _LOG.warning('Initialization issue for $dockerProcess');
+      return false;
+    }
+
+    if (onInitialize != null) {
+      var ret = onInitialize();
+      if (ret is Future) {
+        await ret;
+      }
+    }
+
+    var ready = await dockerProcess.waitReady();
+    if (!ready) {
+      _LOG.warning('Ready issue for $dockerProcess');
+      return false;
+    }
+
+    return ok;
   }
 
   final Map<int, DockerProcessRemote> _processes = {};
@@ -209,7 +238,11 @@ class DockerHostRemote extends DockerHost {
 
     _processes[instanceID] = dockerProcess;
 
-    await dockerProcess.initialize();
+    var ok = await _initializeAndWaitReady(dockerProcess);
+
+    if (ok) {
+      _LOG.info('Exec[$ok]: $dockerProcess');
+    }
 
     return dockerProcess;
   }
@@ -256,7 +289,11 @@ class DockerHostRemote extends DockerHost {
 
     _processes[instanceID] = dockerProcess;
 
-    await dockerProcess.initialize();
+    var ok = await _initializeAndWaitReady(dockerProcess);
+
+    if (ok) {
+      _LOG.info('Command[$ok]: $dockerProcess');
+    }
 
     return dockerProcess;
   }
@@ -397,7 +434,7 @@ class DockerProcessRemote extends DockerProcess {
     this._outputReadyType,
   ) : super(dockerHostRemote, instanceID, containerName);
 
-  void initialize() async {
+  Future<bool> initialize() async {
     var anyOutputReadyCompleter = Completer<bool>();
 
     setupStdout(_buildOutputStream(
@@ -405,6 +442,8 @@ class DockerProcessRemote extends DockerProcess {
     setupStderr(_buildOutputStream(
         true, _stderrReadyFunction, anyOutputReadyCompleter));
     setupOutputReadyType(_outputReadyType);
+
+    return true;
   }
 
   OutputStream _buildOutputStream(
