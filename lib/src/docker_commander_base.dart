@@ -68,7 +68,7 @@ class DockerCommander extends DockerCMDExecutor {
     String hostname,
     Map<String, String> environment,
     Map<String, String> volumes,
-    bool cleanContainer = true,
+    bool cleanContainer = false,
   }) async {
     await ensureInitialized();
     return dockerHost.createContainer(containerName, imageName,

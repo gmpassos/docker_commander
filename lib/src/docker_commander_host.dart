@@ -76,7 +76,7 @@ abstract class DockerHost extends DockerCMDExecutor {
     String hostname,
     Map<String, String> environment,
     Map<String, String> volumes,
-    bool cleanContainer = true,
+    bool cleanContainer = false,
   });
 
   /// Removes a container by [containerNameOrID].

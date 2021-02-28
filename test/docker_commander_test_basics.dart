@@ -85,6 +85,13 @@ void doBasicTests(DockerHostLocalInstantiator dockerHostLocalInstantiator,
       expect(containerInfos.containerName, isNotNull);
       expect(containerInfos.id, isNotNull);
 
+      var started =
+          await dockerCommander.startContainer(containerInfos.containerName);
+      expect(started, isTrue);
+
+      await dockerCommander.stopContainer(containerInfos.containerName,
+          timeout: Duration(seconds: 5));
+
       var ok =
           await dockerCommander.removeContainer(containerInfos.containerName);
       expect(ok, isTrue);

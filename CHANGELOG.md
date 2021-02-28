@@ -1,3 +1,7 @@
+## 1.0.14
+
+- Force usage of `cidfile` for better id resolution.
+
 ## 1.0.13
 
 - Add support to create a container and start it.

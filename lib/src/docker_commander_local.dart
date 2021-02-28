@@ -159,12 +159,11 @@ class DockerHostLocal extends DockerHost {
     File idFile;
     if (cleanContainer ?? true) {
       cmdArgs.add('--rm');
-
-      idFile = _createTemporaryFile('cidfile');
-
-      cmdArgs.add('--cidfile');
-      cmdArgs.add(idFile.path);
     }
+
+    idFile = _createTemporaryFile('cidfile');
+    cmdArgs.add('--cidfile');
+    cmdArgs.add(idFile.path);
 
     cmdArgs.add(image);
 
@@ -182,7 +181,7 @@ class DockerHostLocal extends DockerHost {
     String hostname,
     Map<String, String> environment,
     Map<String, String> volumes,
-    bool cleanContainer = true,
+    bool cleanContainer = false,
   }) async {
     if (isEmptyString(containerName, trim: true)) {
       return null;

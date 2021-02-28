@@ -98,7 +98,7 @@ class DockerHostRemote extends DockerHost {
       String hostname,
       Map<String, String> environment,
       Map<String, String> volumes,
-      bool cleanContainer = true}) async {
+      bool cleanContainer = false}) async {
     cleanContainer ??= true;
 
     ports = DockerHost.normalizeMappedPorts(ports);
