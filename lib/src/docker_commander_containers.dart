@@ -15,6 +15,7 @@ class DockerContainerConfig<D extends DockerContainer> {
   final List<int> hostPorts;
   final List<int> containerPorts;
   final Map<String, String> environment;
+  final Map<String, String> volumes;
   final bool cleanContainer;
   final int outputLimit;
   final bool outputAsLines;
@@ -32,6 +33,7 @@ class DockerContainerConfig<D extends DockerContainer> {
     this.hostPorts,
     this.containerPorts,
     this.environment,
+    this.volumes,
     this.cleanContainer,
     this.outputLimit,
     this.outputAsLines,
@@ -50,6 +52,7 @@ class DockerContainerConfig<D extends DockerContainer> {
     List<int> hostPorts,
     List<int> containerPorts,
     Map<String, String> environment,
+    Map<String, String> volumes,
     bool cleanContainer,
     int outputLimit,
     bool outputAsLines,
@@ -67,6 +70,7 @@ class DockerContainerConfig<D extends DockerContainer> {
       hostPorts: hostPorts ?? this.hostPorts,
       containerPorts: containerPorts ?? this.containerPorts,
       environment: environment ?? this.environment,
+      volumes: volumes ?? this.volumes,
       cleanContainer: cleanContainer ?? this.cleanContainer,
       outputLimit: outputLimit ?? this.outputLimit,
       outputAsLines: outputAsLines ?? this.outputAsLines,
@@ -112,6 +116,7 @@ class DockerContainerConfig<D extends DockerContainer> {
       network: network ?? this.network,
       hostname: hostname ?? this.hostname,
       environment: environment,
+      volumes: volumes,
       cleanContainer: cleanContainer ?? this.cleanContainer,
       outputAsLines: outputAsLines,
       outputLimit: outputLimit ?? this.outputLimit,

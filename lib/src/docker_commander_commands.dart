@@ -195,7 +195,7 @@ abstract class DockerCMD {
         }).join('\n') +
         '\n';
 
-    return appendFile(executor, containerName, '/etc/hosts', hostMap,
+    return appendFileContent(executor, containerName, '/etc/hosts', hostMap,
         sudo: true);
   }
 
@@ -237,8 +237,8 @@ abstract class DockerCMD {
   }
 
   /// Save the file [filePath] with [content], inside [containerName].
-  static Future<bool> putFile(DockerCMDExecutor executor, String containerName,
-      String filePath, String content,
+  static Future<bool> putFileContent(DockerCMDExecutor executor,
+      String containerName, String filePath, String content,
       {bool sudo = false, bool append = false}) async {
     var base64Bin = await executor.execWhich(containerName, 'base64',
         def: '/usr/bin/base64');
@@ -257,11 +257,43 @@ abstract class DockerCMD {
   }
 
   /// Append to the file [filePath] with [content], inside [containerName].
-  static Future<bool> appendFile(DockerCMDExecutor executor,
+  static Future<bool> appendFileContent(DockerCMDExecutor executor,
       String containerName, String filePath, String content,
       {bool sudo = false}) async {
-    return putFile(executor, containerName, filePath, content,
+    return putFileContent(executor, containerName, filePath, content,
         sudo: sudo, append: true);
+  }
+
+  /// Copy a host file, at [hostFilePath], inside a container,
+  /// of name [containerName], with internal file path [containerFilePath].
+  static Future<bool> copyFileToContainer(
+      DockerCMDExecutor executor,
+      String containerName,
+      String hostFilePath,
+      String containerFilePath) async {
+    if (isEmptyString(containerName) ||
+        isEmptyString(containerFilePath) ||
+        isEmptyString(hostFilePath)) return false;
+
+    var cmd = await executor
+        .command('cp', [hostFilePath, '$containerName:$containerFilePath']);
+    return cmd.waitExitAndConfirm(0);
+  }
+
+  /// Copy a file inside a container, of name [containerName] and path [containerFilePath],
+  /// to the host machine, at [hostFilePath].
+  static Future<bool> copyFileFromContainer(
+      DockerCMDExecutor executor,
+      String containerFilePath,
+      String containerName,
+      String hostFilePath) async {
+    if (isEmptyString(containerName) ||
+        isEmptyString(containerFilePath) ||
+        isEmptyString(hostFilePath)) return false;
+
+    var cmd = await executor
+        .command('cp', ['$containerName:$containerFilePath', hostFilePath]);
+    return cmd.waitExitAndConfirm(0);
   }
 
   /// Executes Docker command `docker ps --format "{{.Names}}"`

@@ -1,3 +1,8 @@
+## 1.0.13
+
+- Add support to create a container and start it.
+- Add volume parameters for `run` and `createContainer`.
+
 ## 1.0.12
 
 - Improve example.

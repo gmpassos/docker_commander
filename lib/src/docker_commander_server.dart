@@ -334,6 +334,8 @@ class DockerHostServer {
         return _processIDByName(request, parameters, parseJSON(body));
       case 'close':
         return _processClose(request, parameters, parseJSON(body));
+      case 'create':
+        return _processCreate(request, parameters, parseJSON(body));
       case 'run':
         return _processRun(request, parameters, parseJSON(body));
       case 'exec':
@@ -347,8 +349,8 @@ class DockerHostServer {
         return _processWaitReady(request, parameters, parseJSON(body));
       case 'wait_exit':
         return _processWaitExit(request, parameters, parseJSON(body));
-      case 'runner_stop':
-        return _processRunnerStop(request, parameters, parseJSON(body));
+      case 'stop':
+        return _processStop(request, parameters, parseJSON(body));
       default:
         return null;
     }
@@ -462,6 +464,48 @@ class DockerHostServer {
     return true;
   }
 
+  Future<Map> _processCreate(
+      HttpRequest request, Map<String, String> parameters, json) async {
+    if (_dockerHostLocal == null) return null;
+
+    String imageName = _getParameter(parameters, json, 'image');
+    String version = _getParameter(parameters, json, 'version');
+    String containerName = _getParameter(parameters, json, 'name');
+    String portsLine = _getParameter(parameters, json, 'ports');
+    String network = _getParameter(parameters, json, 'network');
+    String hostname = _getParameter(parameters, json, 'hostname');
+    String environmentLine = _getParameter(parameters, json, 'environment');
+    String volumesLine = _getParameter(parameters, json, 'volumes');
+    String cleanContainer = _getParameter(parameters, json, 'cleanContainer');
+
+    var ports = isNotEmptyString(portsLine) ? portsLine.split(',') : null;
+
+    var environment = decodeQueryString(environmentLine);
+
+    var volumes = decodeQueryString(volumesLine);
+
+    var containerInfos = await _dockerHostLocal.createContainer(
+      containerName,
+      imageName,
+      version: version,
+      ports: ports,
+      network: network,
+      hostname: hostname,
+      environment: environment,
+      volumes: volumes,
+      cleanContainer: parseBool(cleanContainer),
+    );
+
+    return {
+      'containerName': containerInfos.containerName,
+      'id': containerInfos.id,
+      'image': imageName,
+      'ports': ports,
+      'network': network,
+      'hostname': hostname,
+    };
+  }
+
   Future<Map> _processRun(
       HttpRequest request, Map<String, String> parameters, json) async {
     if (_dockerHostLocal == null) return null;
@@ -474,6 +518,7 @@ class DockerHostServer {
     String network = _getParameter(parameters, json, 'network');
     String hostname = _getParameter(parameters, json, 'hostname');
     String environmentLine = _getParameter(parameters, json, 'environment');
+    String volumesLine = _getParameter(parameters, json, 'volumes');
     String cleanContainer = _getParameter(parameters, json, 'cleanContainer');
     String outputAsLines = _getParameter(parameters, json, 'outputAsLines');
     String outputLimit = _getParameter(parameters, json, 'outputLimit');
@@ -481,6 +526,8 @@ class DockerHostServer {
     var ports = isNotEmptyString(portsLine) ? portsLine.split(',') : null;
 
     var environment = decodeQueryString(environmentLine);
+
+    var volumes = decodeQueryString(volumesLine);
 
     List<String> imageArgs;
     if (isNotEmptyString(imageArgsEncoded)) {
@@ -495,13 +542,14 @@ class DockerHostServer {
         network: network,
         hostname: hostname,
         environment: environment,
+        volumes: volumes,
         cleanContainer: parseBool(cleanContainer),
         outputAsLines: parseBool(outputAsLines),
         outputLimit: parseInt(outputLimit));
 
     return {
       'instanceID': runner.instanceID,
-      'name': runner.containerName,
+      'containerName': runner.containerName,
       'id': runner.id,
     };
   }
@@ -528,7 +576,7 @@ class DockerHostServer {
 
     return {
       'instanceID': dockerProcess.instanceID,
-      'name': dockerProcess.containerName,
+      'containerName': dockerProcess.containerName,
     };
   }
 
@@ -589,7 +637,7 @@ class DockerHostServer {
     return ok;
   }
 
-  Future<bool> _processRunnerStop(
+  Future<bool> _processStop(
       HttpRequest request, Map<String, String> parameters, json) async {
     if (_dockerHostLocal == null) return false;
 

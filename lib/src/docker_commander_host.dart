@@ -6,6 +6,24 @@ import 'package:swiss_knife/swiss_knife.dart';
 import 'docker_commander_base.dart';
 import 'docker_commander_commands.dart';
 
+/// Basic infos of a Container.
+class ContainerInfos {
+  final String containerName;
+  String id;
+  final String image;
+  final List<String> ports;
+  final String containerNetwork;
+  final String containerHostname;
+
+  ContainerInfos(this.containerName, this.id, this.image, this.ports,
+      this.containerNetwork, this.containerHostname);
+
+  @override
+  String toString() {
+    return 'ContainerInfos{containerName: $containerName, id: $id; image: $image, ports: $ports, containerNetwork: $containerNetwork, containerHostname: $containerHostname}';
+  }
+}
+
 /// Base class for Docker machine host.
 abstract class DockerHost extends DockerCMDExecutor {
   final int session;
@@ -48,6 +66,31 @@ abstract class DockerHost extends DockerCMDExecutor {
     return outputReadyType;
   }
 
+  /// Creates a Docker containers with [image] and optional [version].
+  Future<ContainerInfos> createContainer(
+    String containerName,
+    String imageName, {
+    String version,
+    List<String> ports,
+    String network,
+    String hostname,
+    Map<String, String> environment,
+    Map<String, String> volumes,
+    bool cleanContainer = true,
+  });
+
+  /// Removes a container by [containerNameOrID].
+  Future<bool> removeContainer(String containerNameOrID) async {
+    var process = await command('rm', [containerNameOrID]);
+    return process.waitExitAndConfirm(0);
+  }
+
+  /// Starts a container by [containerNameOrID].
+  Future<bool> startContainer(String containerNameOrID) async {
+    var process = await command('start', [containerNameOrID]);
+    return process.waitExitAndConfirm(0);
+  }
+
   /// Runs a Docker containers with [image] and optional [version].
   Future<DockerRunner> run(
     String image, {
@@ -58,6 +101,7 @@ abstract class DockerHost extends DockerCMDExecutor {
     String network,
     String hostname,
     Map<String, String> environment,
+    Map<String, String> volumes,
     bool cleanContainer = true,
     bool outputAsLines = true,
     int outputLimit,

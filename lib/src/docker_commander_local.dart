@@ -9,6 +9,22 @@ import 'docker_commander_host.dart';
 
 final _LOG = Logger('docker_commander/io');
 
+class ContainerInfosLocal extends ContainerInfos {
+  final File idFile;
+  final List<String> args;
+
+  ContainerInfosLocal(
+      String containerName,
+      String image,
+      this.idFile,
+      List<String> ports,
+      String containerNetwork,
+      String containerHostname,
+      this.args)
+      : super(containerName, null, image, ports, containerNetwork,
+            containerHostname);
+}
+
 /// [DockerHost] Implementation for Local Docker machine host.
 class DockerHostLocal extends DockerHost {
   String _dockerBinaryPath;
@@ -71,42 +87,23 @@ class DockerHostLocal extends DockerHost {
     return id;
   }
 
-  @override
-  Future<DockerRunner> run(
-    String imageName, {
+  ContainerInfosLocal _buildContainerArgs(
+    String cmd,
+    String imageName,
     String version,
-    List<String> imageArgs,
     String containerName,
     List<String> ports,
     String network,
     String hostname,
     Map<String, String> environment,
-    bool cleanContainer = true,
-    bool outputAsLines = true,
-    int outputLimit,
-    OutputReadyFunction stdoutReadyFunction,
-    OutputReadyFunction stderrReadyFunction,
-    OutputReadyType outputReadyType,
-  }) async {
-    outputAsLines ??= true;
+    Map<String, String> volumes,
+    bool cleanContainer,
+  ) {
+    var image = DockerHost.resolveImage(imageName, version);
 
     ports = DockerHost.normalizeMappedPorts(ports);
 
-    var image = DockerHost.resolveImage(imageName, version);
-
-    var instanceID = DockerProcess.incrementInstanceID();
-
-    if (isEmptyString(containerName, trim: true)) {
-      containerName = 'docker_commander-$session-$instanceID';
-    }
-
-    outputReadyType ??= DockerHost.resolveOutputReadyType(
-        stdoutReadyFunction, stderrReadyFunction);
-
-    stdoutReadyFunction ??= (outputStream, data) => true;
-    stderrReadyFunction ??= (outputStream, data) => true;
-
-    var cmdArgs = <String>['run', '--name', containerName];
+    var cmdArgs = <String>[cmd, '--name', containerName];
 
     if (ports != null) {
       for (var pair in ports) {
@@ -145,9 +142,18 @@ class DockerHostLocal extends DockerHost {
       cmdArgs.add(containerHostname);
     }
 
+    volumes?.forEach((k, v) {
+      if (isNotEmptyString(k) && isNotEmptyString(k)) {
+        cmdArgs.add('-v');
+        cmdArgs.add('$k:$v');
+      }
+    });
+
     environment?.forEach((k, v) {
-      cmdArgs.add('-e');
-      cmdArgs.add('$k=$v');
+      if (isNotEmptyString(k)) {
+        cmdArgs.add('-e');
+        cmdArgs.add('$k=$v');
+      }
     });
 
     File idFile;
@@ -162,6 +168,140 @@ class DockerHostLocal extends DockerHost {
 
     cmdArgs.add(image);
 
+    return ContainerInfosLocal(containerName, image, idFile, ports,
+        containerNetwork, containerHostname, cmdArgs);
+  }
+
+  @override
+  Future<ContainerInfos> createContainer(
+    String containerName,
+    String imageName, {
+    String version,
+    List<String> ports,
+    String network,
+    String hostname,
+    Map<String, String> environment,
+    Map<String, String> volumes,
+    bool cleanContainer = true,
+  }) async {
+    if (isEmptyString(containerName, trim: true)) {
+      return null;
+    }
+
+    var containerInfos = _buildContainerArgs(
+      'create',
+      imageName,
+      version,
+      containerName,
+      ports,
+      network,
+      hostname,
+      environment,
+      volumes,
+      cleanContainer,
+    );
+
+    var cmdArgs = containerInfos.args;
+
+    _LOG.info('create[CMD]>\t$dockerBinaryPath ${cmdArgs.join(' ')}');
+
+    var process = await Process.start(dockerBinaryPath, cmdArgs);
+    var exitCode = await process.exitCode;
+
+    if (containerInfos.idFile != null) {
+      var id = await _getContainerID(
+          containerInfos.containerName, containerInfos.idFile);
+      containerInfos.id = id;
+    }
+
+    return exitCode == 0 ? containerInfos : null;
+  }
+
+  Future<String> _getContainerID(String containerName, File idFile) async {
+    String id;
+    if (idFile != null) {
+      var fileExists = await _waitFile(idFile);
+      if (!fileExists) {
+        _LOG.warning("idFile doesn't exists: $idFile");
+      }
+      id = idFile.readAsStringSync().trim();
+    } else {
+      id = await getContainerIDByName(containerName);
+    }
+    return id;
+  }
+
+  Future<bool> _waitFile(File file, {Duration timeout}) async {
+    if (file == null) return false;
+    if (file.existsSync() && file.lengthSync() > 1) return true;
+
+    timeout ??= Duration(minutes: 1);
+    var init = DateTime.now().millisecondsSinceEpoch;
+
+    var retry = 0;
+    while (true) {
+      var exists = file.existsSync() && file.lengthSync() > 1;
+      if (exists) return true;
+
+      var now = DateTime.now().millisecondsSinceEpoch;
+      var elapsed = now - init;
+      var remainingTime = timeout.inMilliseconds - elapsed;
+      if (remainingTime < 0) return false;
+
+      ++retry;
+      var sleep = Math.min(1000, 10 * retry);
+
+      await Future.delayed(Duration(milliseconds: sleep));
+    }
+  }
+
+  @override
+  Future<DockerRunner> run(
+    String imageName, {
+    String version,
+    List<String> imageArgs,
+    String containerName,
+    List<String> ports,
+    String network,
+    String hostname,
+    Map<String, String> environment,
+    Map<String, String> volumes,
+    bool cleanContainer = true,
+    bool outputAsLines = true,
+    int outputLimit,
+    OutputReadyFunction stdoutReadyFunction,
+    OutputReadyFunction stderrReadyFunction,
+    OutputReadyType outputReadyType,
+  }) async {
+    outputAsLines ??= true;
+
+    outputReadyType ??= DockerHost.resolveOutputReadyType(
+        stdoutReadyFunction, stderrReadyFunction);
+
+    stdoutReadyFunction ??= (outputStream, data) => true;
+    stderrReadyFunction ??= (outputStream, data) => true;
+
+    var instanceID = DockerProcess.incrementInstanceID();
+
+    if (isEmptyString(containerName, trim: true)) {
+      containerName = 'docker_commander-$session-$instanceID';
+    }
+
+    var containerInfos = _buildContainerArgs(
+      'run',
+      imageName,
+      version,
+      containerName,
+      ports,
+      network,
+      hostname,
+      environment,
+      volumes,
+      cleanContainer,
+    );
+
+    var cmdArgs = containerInfos.args;
+
     if (imageArgs != null) {
       cmdArgs.addAll(imageArgs);
     }
@@ -170,16 +310,18 @@ class DockerHostLocal extends DockerHost {
 
     var process = await Process.start(dockerBinaryPath, cmdArgs);
 
+    var containerNetwork = containerInfos.containerNetwork;
+
     var runner = DockerRunnerLocal(
         this,
         instanceID,
-        containerName,
-        image,
+        containerInfos.containerName,
+        containerInfos.image,
         process,
-        idFile,
-        ports,
+        containerInfos.idFile,
+        containerInfos.ports,
         containerNetwork,
-        containerHostname,
+        containerInfos.containerHostname,
         outputAsLines,
         outputLimit,
         stdoutReadyFunction,
@@ -497,6 +639,9 @@ class DockerRunnerLocal extends DockerProcessLocal implements DockerRunner {
             stderrReadyFunction,
             outputReadyType);
 
+  @override
+  DockerHostLocal get dockerHost => super.dockerHost as DockerHostLocal;
+
   String _id;
 
   @override
@@ -510,43 +655,11 @@ class DockerRunnerLocal extends DockerProcessLocal implements DockerRunner {
   Future<bool> initialize() async {
     var ok = await super.initialize();
 
-    if (idFile != null) {
-      var fileExists = await _waitFile(idFile);
-      if (!fileExists) {
-        _LOG.warning("idFile doesn't exists: $idFile");
-      }
-      _id = idFile.readAsStringSync().trim();
-    } else {
-      _id = await dockerHost.getContainerIDByName(containerName);
-    }
+    _id = await dockerHost._getContainerID(containerName, idFile);
 
     _ip = await DockerCMD.getContainerIP(dockerHost, id);
 
     return ok;
-  }
-
-  Future<bool> _waitFile(File file, {Duration timeout}) async {
-    if (file == null) return false;
-    if (file.existsSync() && file.lengthSync() > 1) return true;
-
-    timeout ??= Duration(minutes: 1);
-    var init = DateTime.now().millisecondsSinceEpoch;
-
-    var retry = 0;
-    while (true) {
-      var exists = file.existsSync() && file.lengthSync() > 1;
-      if (exists) return true;
-
-      var now = DateTime.now().millisecondsSinceEpoch;
-      var elapsed = now - init;
-      var remainingTime = timeout.inMilliseconds - elapsed;
-      if (remainingTime < 0) return false;
-
-      ++retry;
-      var sleep = Math.min(1000, 10 * retry);
-
-      await Future.delayed(Duration(milliseconds: sleep));
-    }
   }
 
   @override

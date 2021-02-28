@@ -10,6 +10,9 @@ class DockerCommander extends DockerCMDExecutor {
 
   DockerCommander(this.dockerHost);
 
+  /// Returns [dockerHost.session]
+  int get session => dockerHost.session;
+
   int _initialized = 0;
 
   /// Initializes instance.
@@ -55,7 +58,42 @@ class DockerCommander extends DockerCMDExecutor {
     return dockerHost.checkDaemon();
   }
 
-  /// Runs a Docker container, using [image] and optional [verion].
+  /// Creates a Docker container with [containerName], [image] and optional [version].
+  Future<ContainerInfos> createContainer(
+    String containerName,
+    String imageName, {
+    String version,
+    List<String> ports,
+    String network,
+    String hostname,
+    Map<String, String> environment,
+    Map<String, String> volumes,
+    bool cleanContainer = true,
+  }) async {
+    await ensureInitialized();
+    return dockerHost.createContainer(containerName, imageName,
+        version: version,
+        ports: ports,
+        network: network,
+        hostname: hostname,
+        environment: environment,
+        volumes: volumes,
+        cleanContainer: cleanContainer);
+  }
+
+  /// Removes a container by [containerNameOrID].
+  Future<bool> removeContainer(String containerNameOrID) =>
+      dockerHost.removeContainer(containerNameOrID);
+
+  /// Starts a container by [containerNameOrID].
+  Future<bool> startContainer(String containerNameOrID) =>
+      dockerHost.startContainer(containerNameOrID);
+
+  /// Stops a container by [containerNameOrID] with an optional [timeout].
+  Future<bool> stopContainer(String containerNameOrID, {Duration timeout}) =>
+      dockerHost.stopByName(containerNameOrID, timeout: timeout);
+
+  /// Runs a Docker container, using [image] and optional [version].
   Future<DockerContainer> run(
     String image, {
     String version,
@@ -65,6 +103,7 @@ class DockerCommander extends DockerCMDExecutor {
     String network,
     String hostname,
     Map<String, String> environment,
+    Map<String, String> volumes,
     bool cleanContainer = true,
     bool outputAsLines = true,
     int outputLimit,
@@ -83,6 +122,7 @@ class DockerCommander extends DockerCMDExecutor {
       network: network,
       hostname: hostname,
       environment: environment,
+      volumes: volumes,
       cleanContainer: cleanContainer,
       outputAsLines: outputAsLines,
       outputLimit: outputLimit,
@@ -301,15 +341,15 @@ class DockerContainer {
       DockerCMD.execShell(runner.dockerHost, name, script, sudo: sudo);
 
   /// Save the file [filePath] with [content], inside [containerName].
-  Future<bool> putFile(String filePath, String content,
+  Future<bool> putFileContent(String filePath, String content,
           {bool sudo = false, bool append = false}) async =>
-      DockerCMD.putFile(runner.dockerHost, name, filePath, content,
+      DockerCMD.putFileContent(runner.dockerHost, name, filePath, content,
           sudo: sudo, append: append);
 
   /// Append to the file [filePath] with [content], inside [containerName].
-  Future<bool> appendFile(String filePath, String content,
+  Future<bool> appendFileContent(String filePath, String content,
           {bool sudo = false}) async =>
-      DockerCMD.appendFile(runner.dockerHost, name, filePath, content,
+      DockerCMD.appendFileContent(runner.dockerHost, name, filePath, content,
           sudo: sudo);
 
   /// Stops this container.

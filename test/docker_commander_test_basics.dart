@@ -72,6 +72,24 @@ void doBasicTests(DockerHostLocalInstantiator dockerHostLocalInstantiator,
       expect(dockerContainer.id.isNotEmpty, isTrue);
     });
 
+    test('Create Image hello-world', () async {
+      var session = dockerCommander.session;
+      var containerName = 'docker_commander_test-hello-world-$session';
+
+      var containerInfos =
+          await dockerCommander.createContainer(containerName, 'hello-world');
+
+      _LOG.info(containerInfos);
+
+      expect(containerInfos, isNotNull);
+      expect(containerInfos.containerName, isNotNull);
+      expect(containerInfos.id, isNotNull);
+
+      var ok =
+          await dockerCommander.removeContainer(containerInfos.containerName);
+      expect(ok, isTrue);
+    });
+
     test('ApacheHttpdContainer', () async {
       var apachePort = listenPort - 4000;
 

@@ -57,7 +57,8 @@ class NginxContainer extends DockerContainerConfig<DockerContainerNginx> {
   Future<bool> initializeContainer(DockerContainerNginx dockerContainer) async {
     if (isEmptyString(config)) return true;
 
-    var putOK = await dockerContainer.putFile(configPath, config, sudo: true);
+    var putOK =
+        await dockerContainer.putFileContent(configPath, config, sudo: true);
     if (!putOK) {
       _LOG.severe(
           "Can't put int container `${dockerContainer.name}` config file at: $configPath");

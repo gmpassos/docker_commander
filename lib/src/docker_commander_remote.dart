@@ -91,6 +91,43 @@ class DockerHostRemote extends DockerHost {
   }
 
   @override
+  Future<ContainerInfos> createContainer(String containerName, String imageName,
+      {String version,
+      List<String> ports,
+      String network,
+      String hostname,
+      Map<String, String> environment,
+      Map<String, String> volumes,
+      bool cleanContainer = true}) async {
+    cleanContainer ??= true;
+
+    ports = DockerHost.normalizeMappedPorts(ports);
+
+    var response = await _httpClient.getJSON('create', parameters: {
+      'image': imageName,
+      'version': version,
+      'name': containerName,
+      'ports': ports?.join(','),
+      'network': network,
+      'hostname': hostname,
+      'environment': encodeQueryString(environment),
+      'volumes': encodeQueryString(volumes),
+      'cleanContainer': '$cleanContainer',
+    }) as Map;
+
+    containerName = response['containerName'] as String;
+    var id = response['id'] as String;
+    var image = response['image'] as String;
+    var portsList = response['ports'] as List;
+    network = response['network'] as String;
+    hostname = response['hostname'] as String;
+
+    ports = portsList != null ? portsList.cast<String>().toList() : null;
+
+    return ContainerInfos(containerName, id, image, ports, network, hostname);
+  }
+
+  @override
   Future<DockerRunner> run(
     String imageName, {
     String version,
@@ -100,6 +137,7 @@ class DockerHostRemote extends DockerHost {
     String network,
     String hostname,
     Map<String, String> environment,
+    Map<String, String> volumes,
     bool cleanContainer = true,
     bool outputAsLines = true,
     int outputLimit,
@@ -125,13 +163,14 @@ class DockerHostRemote extends DockerHost {
       'network': network,
       'hostname': hostname,
       'environment': encodeQueryString(environment),
+      'volumes': encodeQueryString(volumes),
       'cleanContainer': '$cleanContainer',
       'outputAsLines': '$outputAsLines',
       'outputLimit': '$outputLimit',
     }) as Map;
 
     var instanceID = response['instanceID'] as int;
-    containerName = response['name'] as String;
+    containerName = response['containerName'] as String;
     var id = response['id'] as String;
 
     outputReadyType ??= DockerHost.resolveOutputReadyType(
@@ -218,7 +257,7 @@ class DockerHostRemote extends DockerHost {
     }) as Map;
 
     var instanceID = response['instanceID'] as int;
-    containerName = response['name'] as String;
+    containerName = response['containerName'] as String;
 
     outputReadyType ??= DockerHost.resolveOutputReadyType(
         stdoutReadyFunction, stderrReadyFunction);
@@ -346,7 +385,7 @@ class DockerHostRemote extends DockerHost {
 
   @override
   Future<bool> stopByName(String name, {Duration timeout}) async {
-    var ok = await _httpClient.getJSON('runner_stop', parameters: {
+    var ok = await _httpClient.getJSON('stop', parameters: {
       'name': '$name',
       if (timeout != null) 'timeout': '${timeout.inSeconds}',
     }) as bool;
