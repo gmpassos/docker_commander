@@ -82,6 +82,15 @@ void main() {
 
       expect(apacheContent, contains('<html>'));
 
+      var apacheLogs = await service.catLogs(
+          waitDataMatcher: 'GET /', waitDataTimeout: Duration(seconds: 1));
+
+      _LOG.info(
+          '------------------------------------------------------------ Apache logs:');
+      _LOG.info(apacheLogs);
+      expect(apacheLogs, contains('GET /'));
+      _LOG.info('------------------------------------------------------------');
+
       var removed = await service.remove();
       expect(removed, isTrue);
 

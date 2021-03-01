@@ -277,6 +277,16 @@ class DockerCommander extends DockerCMDExecutor {
   String toString() {
     return 'DockerCommander{dockerHost: $dockerHost, initialized: $isInitialized. lastDaemonCheck: $lastDaemonCheck}';
   }
+
+  /// Creates a temporary file.
+  @override
+  Future<String> createTempFile(String content) =>
+      dockerHost.createTempFile(content);
+
+  /// Deletes a temporary [filePath].
+  @override
+  Future<bool> deleteTempFile(String filePath) =>
+      dockerHost.deleteTempFile(filePath);
 }
 
 typedef DockerContainerInstantiator = DockerContainer Function(
@@ -396,17 +406,31 @@ class DockerContainer {
   Future<DockerProcess> execShell(String script, {bool sudo = false}) async =>
       DockerCMD.execShell(runner.dockerHost, name, script, sudo: sudo);
 
-  /// Save the file [filePath] with [content], inside [containerName].
+  /// Save the file [filePath] with [content], inside this container.
   Future<bool> putFileContent(String filePath, String content,
           {bool sudo = false, bool append = false}) async =>
       DockerCMD.putFileContent(runner.dockerHost, name, filePath, content,
           sudo: sudo, append: append);
 
-  /// Append to the file [filePath] with [content], inside [containerName].
+  /// Append to the file [filePath] with [content], inside this container.
   Future<bool> appendFileContent(String filePath, String content,
           {bool sudo = false}) async =>
       DockerCMD.appendFileContent(runner.dockerHost, name, filePath, content,
           sudo: sudo);
+
+  /// Copy a host file, at [hostFilePath], inside this container,
+  /// with internal file path [containerFilePath].
+  Future<bool> copyFileToContainer(
+          String hostFilePath, String containerFilePath) =>
+      DockerCMD.copyFileToContainer(
+          runner.dockerHost, name, hostFilePath, containerFilePath);
+
+  /// Copy a file inside this container, with path [containerFilePath],
+  /// to the host machine, at [hostFilePath].
+  Future<bool> copyFileFromContainer(
+          String containerFilePath, String hostFilePath) =>
+      DockerCMD.copyFileFromContainer(
+          runner.dockerHost, name, containerFilePath, hostFilePath);
 
   /// Stops this container.
   Future<bool> stop({Duration timeout}) => runner.stop(timeout: timeout);
@@ -436,4 +460,23 @@ class DockerContainer {
   String toString() {
     return 'DockerContainer{runner: $runner}';
   }
+
+  /// Opens this Container logs:
+  Future<DockerProcess> openLogs(String containerNameOrID) =>
+      runner.dockerHost.openContainerLogs(name);
+
+  /// Returns this Container logs as [String].
+  Future<String> catLogs({
+    bool stderr = false,
+    Pattern waitDataMatcher,
+    Duration waitDataTimeout,
+    bool waitExit = false,
+    int desiredExitCode,
+  }) =>
+      runner.dockerHost.catContainerLogs(name,
+          stderr: stderr,
+          waitDataMatcher: waitDataMatcher,
+          waitDataTimeout: waitDataTimeout,
+          waitExit: waitExit,
+          desiredExitCode: desiredExitCode);
 }

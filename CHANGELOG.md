@@ -1,3 +1,8 @@
+## 1.0.15
+
+- Added support to containers and services logs.
+- `DockerProcess`: now has a `dispose` method, to finish any stdout/stderr consumer/client.
+
 ## 1.0.14
 
 - Force usage of `cidfile` for better id resolution.

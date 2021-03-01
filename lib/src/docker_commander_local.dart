@@ -563,11 +563,42 @@ class DockerHostLocal extends DockerHost {
   @override
   Future<void> close() async {
     _clearTemporaryDirectory();
+    await _deleteTempFiles();
   }
 
   @override
   String toString() {
     return 'DockerHostLocal{dockerBinaryPath: $_dockerBinaryPath}';
+  }
+
+  final Set<String> _tempFiles = {};
+
+  Future<void> _deleteTempFiles() async {
+    var waitAll = Future.wait(
+        _tempFiles.map((path) => File(path)).map((f) => f.delete()));
+    await waitAll;
+  }
+
+  @override
+  Future<String> createTempFile(String content) async {
+    var file = _createTemporaryFile('temp');
+
+    if (content != null && content.isNotEmpty) {
+      await file.writeAsString(content, flush: true);
+    }
+
+    _tempFiles.add(file.path);
+    return file.path;
+  }
+
+  @override
+  Future<bool> deleteTempFile(String filePath) async {
+    if (_tempFiles.contains(filePath)) {
+      _tempFiles.remove(filePath);
+      await File(filePath).delete();
+      return true;
+    }
+    return false;
   }
 }
 
@@ -705,9 +736,17 @@ class DockerProcessLocal extends DockerProcess {
         anyOutputReadyCompleter,
       );
 
-      stdout
+      var listenSubscription = stdout
           .transform(systemEncoding.decoder)
           .listen((line) => outputStream.add(line));
+
+      outputStream.onDispose.listen((_) {
+        try {
+          listenSubscription.cancel();
+        }
+        // ignore: empty_catches
+        catch (ignore) {}
+      });
 
       return outputStream;
     } else {
@@ -719,7 +758,15 @@ class DockerProcessLocal extends DockerProcess {
         anyOutputReadyCompleter,
       );
 
-      stdout.listen((b) => outputStream.addAll(b));
+      var listenSubscription = stdout.listen((b) => outputStream.addAll(b));
+
+      outputStream.onDispose.listen((_) {
+        try {
+          listenSubscription.cancel();
+        }
+        // ignore: empty_catches
+        catch (ignore) {}
+      });
 
       return outputStream;
     }
@@ -736,6 +783,8 @@ class DockerProcessLocal extends DockerProcess {
         return this.stderr.waitReady();
       case OutputReadyType.ANY:
         return this.stdout.waitAnyOutputReady();
+      case OutputReadyType.STARTS_READY:
+        return true;
       default:
         return this.stdout.waitReady();
     }
@@ -750,6 +799,8 @@ class DockerProcessLocal extends DockerProcess {
         return this.stderr.isReady;
       case OutputReadyType.ANY:
         return this.stdout.isReady || this.stderr.isReady;
+      case OutputReadyType.STARTS_READY:
+        return true;
       default:
         return this.stdout.isReady;
     }
@@ -774,6 +825,7 @@ class DockerProcessLocal extends DockerProcess {
     if (_exitCode != null) return _exitCode;
     var code = await _exitCompleter.future;
     _exitCode ??= code;
+    Future.delayed(Duration(seconds: 30), () => dispose());
     return _exitCode;
   }
 }

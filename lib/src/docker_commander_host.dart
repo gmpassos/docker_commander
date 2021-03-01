@@ -73,6 +73,34 @@ class Service {
   String toString() {
     return 'ServiceInfos{containerName: $serviceName, id: $id; image: $image, ports: $ports, containerNetwork: $containerNetwork, containerHostname: $containerHostname}';
   }
+
+  /// Opens this Service logs.
+  Future<DockerProcess> openLogs(String serviceNameOrTask) =>
+      dockerHost.openServiceLogs(serviceNameOrTask);
+
+  /// Returns this Service logs as [String].
+  Future<String> catLogs({
+    String taskName,
+    int taskNumber,
+    bool stderr = false,
+    Pattern waitDataMatcher,
+    Duration waitDataTimeout,
+    bool waitExit = false,
+    int desiredExitCode,
+  }) {
+    var name = isNotEmptyString(taskName) ? taskName : serviceName;
+
+    if (taskNumber != null && taskNumber > 0) {
+      name = '$serviceName.$taskNumber';
+    }
+
+    return dockerHost.catServiceLogs(name,
+        stderr: stderr,
+        waitDataMatcher: waitDataMatcher,
+        waitDataTimeout: waitDataTimeout,
+        waitExit: waitExit,
+        desiredExitCode: desiredExitCode);
+  }
 }
 
 /// Service Task infos.
@@ -344,6 +372,46 @@ abstract class DockerHost extends DockerCMDExecutor {
         containerInfos.containerHostname);
   }
 
+  /// Opens a Container logs, by [containerNameOrID].
+  Future<DockerProcess> openContainerLogs(String containerNameOrID) =>
+      DockerCMD.openContainerLogs(this, containerNameOrID);
+
+  /// Opens a Service logs, by [serviceNameOrTask].
+  Future<DockerProcess> openServiceLogs(String serviceNameOrTask) =>
+      DockerCMD.openServiceLogs(this, serviceNameOrTask);
+
+  /// Returns the Container logs as [String].
+  Future<String> catContainerLogs(
+    String containerNameOrID, {
+    bool stderr = false,
+    Pattern waitDataMatcher,
+    Duration waitDataTimeout,
+    bool waitExit = false,
+    int desiredExitCode,
+  }) =>
+      DockerCMD.catContainerLogs(this, containerNameOrID,
+          stderr: stderr,
+          waitDataMatcher: waitDataMatcher,
+          waitDataTimeout: waitDataTimeout,
+          waitExit: waitExit,
+          desiredExitCode: desiredExitCode);
+
+  /// Returns a Service logs as [String].
+  Future<String> catServiceLogs(
+    String containerNameOrID, {
+    bool stderr = false,
+    Pattern waitDataMatcher,
+    Duration waitDataTimeout,
+    bool waitExit = false,
+    int desiredExitCode,
+  }) =>
+      DockerCMD.catServiceLogs(this, containerNameOrID,
+          stderr: stderr,
+          waitDataMatcher: waitDataMatcher,
+          waitDataTimeout: waitDataTimeout,
+          waitExit: waitExit,
+          desiredExitCode: desiredExitCode);
+
   /// Returns a [List<int>] of [DockerRunner] `instanceID`.
   List<int> getRunnersInstanceIDs();
 
@@ -497,6 +565,8 @@ abstract class DockerProcess {
         return stderr.waitReady();
       case OutputReadyType.ANY:
         return stdout.waitAnyOutputReady();
+      case OutputReadyType.STARTS_READY:
+        return true;
       default:
         return stdout.waitReady();
     }
@@ -511,6 +581,8 @@ abstract class DockerProcess {
         return stderr.isReady;
       case OutputReadyType.ANY:
         return stdout.isReady || stderr.isReady;
+      case OutputReadyType.STARTS_READY:
+        return true;
       default:
         return stdout.isReady;
     }
@@ -541,6 +613,11 @@ abstract class DockerProcess {
   Future<Output> waitStderr({int desiredExitCode}) async {
     var exitCode = await waitExit(desiredExitCode: desiredExitCode);
     return exitCode != null ? stderr : null;
+  }
+
+  void dispose() {
+    stdout.dispose();
+    stderr.dispose();
   }
 
   @override
@@ -601,6 +678,10 @@ class Output {
   /// Calls [dockerProcess.exitCode].
   int get exitCode => dockerProcess.exitCode;
 
+  void dispose() {
+    _outputStream.dispose();
+  }
+
   @override
   String toString() => asString;
 }
@@ -609,7 +690,7 @@ typedef OutputReadyFunction = bool Function(
     OutputStream outputStream, dynamic data);
 
 /// Indicates which output should be ready.
-enum OutputReadyType { STDOUT, STDERR, ANY }
+enum OutputReadyType { STDOUT, STDERR, ANY, STARTS_READY }
 
 /// Handles the output stream of a Docker container.
 class OutputStream<T> {
@@ -815,5 +896,16 @@ class OutputStream<T> {
     } else {
       return asString.split(RegExp(r'\r?\n'));
     }
+  }
+
+  EventStream<OutputStream<T>> onDispose = EventStream();
+
+  bool _disposed = false;
+
+  bool get isDisposed => _disposed;
+
+  void dispose() {
+    _disposed = true;
+    onDispose.add(this);
   }
 }

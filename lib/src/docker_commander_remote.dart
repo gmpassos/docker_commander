@@ -408,6 +408,16 @@ class DockerHostRemote extends DockerHost {
   String toString() {
     return 'DockerHostRemote{serverHost: $serverHost, serverPort: $serverPort, secure: $secure, username: $username}';
   }
+
+  @override
+  Future<String> createTempFile(String content) async {
+    return null;
+  }
+
+  @override
+  Future<bool> deleteTempFile(String filePath) async {
+    return false;
+  }
 }
 
 class DockerRunnerRemote extends DockerProcessRemote implements DockerRunner {
@@ -498,11 +508,15 @@ class DockerProcessRemote extends DockerProcess {
         anyOutputReadyCompleter,
       );
 
-      OutputClient(dockerHost, this, stderr, outputStream, (entries) {
+      var outputClient =
+          OutputClient(dockerHost, this, stderr, outputStream, (entries) {
         for (var e in entries) {
           outputStream.add(e);
         }
-      }).start();
+      });
+      outputClient.start();
+
+      outputStream.onDispose.listen((_) => outputClient.stop());
 
       return outputStream;
     } else {
@@ -514,9 +528,13 @@ class DockerProcessRemote extends DockerProcess {
         anyOutputReadyCompleter,
       );
 
-      OutputClient(dockerHost, this, stderr, outputStream, (entries) {
+      var outputClient =
+          OutputClient(dockerHost, this, stderr, outputStream, (entries) {
         outputStream.addAll(entries.cast());
-      }).start();
+      });
+      outputClient.start();
+
+      outputStream.onDispose.listen((_) => outputClient.stop());
 
       return outputStream;
     }
@@ -535,6 +553,8 @@ class DockerProcessRemote extends DockerProcess {
     _exitCode = exitCode;
     stdout.getOutputStream().markReady();
     stderr.getOutputStream().markReady();
+
+    Future.delayed(Duration(seconds: 60), () => dispose());
   }
 
   @override
@@ -660,5 +680,9 @@ class OutputClient {
     if (_started) return;
     _started = true;
     _syncLoop();
+  }
+
+  void stop() {
+    _running = false;
   }
 }

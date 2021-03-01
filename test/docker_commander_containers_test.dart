@@ -220,6 +220,15 @@ void main() {
 
       expect(nginxContent, equals(apacheContent));
 
+      var apacheLogs = await apacheContainer.catLogs(
+          waitDataMatcher: 'GET /', waitDataTimeout: Duration(seconds: 1));
+
+      _LOG.info(
+          '------------------------------------------------------------ Apache logs:');
+      _LOG.info(apacheLogs);
+      expect(apacheLogs, contains('GET /'));
+      _LOG.info('------------------------------------------------------------');
+
       _LOG.info('Stopping Nginx...');
       await nginxContainer.stop(timeout: Duration(seconds: 5));
 

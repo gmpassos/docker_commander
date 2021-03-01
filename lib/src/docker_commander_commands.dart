@@ -7,7 +7,15 @@ abstract class DockerCMDExecutor {
   bool isContainerRunnerRunning(String containerName);
 
   /// Executes a Docker [command] with [args]
-  Future<DockerProcess> command(String command, List<String> args);
+  Future<DockerProcess> command(
+    String command,
+    List<String> args, {
+    bool outputAsLines = true,
+    int outputLimit,
+    OutputReadyFunction stdoutReadyFunction,
+    OutputReadyFunction stderrReadyFunction,
+    OutputReadyType outputReadyType,
+  });
 
   /// Executes a [command] inside this container with [args]
   /// Only executes if [isContainerRunnerRunning] [containerName] returns true.
@@ -117,6 +125,12 @@ abstract class DockerCMDExecutor {
 
     return path.isNotEmpty ? path : def;
   }
+
+  /// Creates a temporary file.
+  Future<String> createTempFile(String content);
+
+  /// Deletes a temporary [filePath].
+  Future<bool> deleteTempFile(String filePath);
 }
 
 abstract class DockerCMD {
@@ -247,6 +261,18 @@ abstract class DockerCMD {
     return content;
   }
 
+  /// Call POSIX `whoami` command.
+  /// Calls [exec] with command `whoami` and returns current user.
+  static Future<String> execWhoami(
+      DockerCMDExecutor executor, String containerName) async {
+    var whoamiBin = await executor.execWhich(containerName, 'whoami',
+        def: '/usr/bin/whoami');
+    var user = await executor.execAndWaitStdoutAsString(
+        containerName, whoamiBin, [],
+        trim: true, desiredExitCode: 0);
+    return user;
+  }
+
   /// Executes a shell [script]. Tries to use `bash` or `sh`.
   /// Note that [script] should be inline, without line breaks (`\n`).
   static Future<DockerProcess> execShell(
@@ -270,9 +296,9 @@ abstract class DockerCMD {
     }
   }
 
-  /// Save the file [filePath] with [content], inside [containerName].
+  /// Save the file [containerFilePath] with [content], inside [containerName].
   static Future<bool> putFileContent(DockerCMDExecutor executor,
-      String containerName, String filePath, String content,
+      String containerName, String containerFilePath, String content,
       {bool sudo = false, bool append = false}) async {
     var base64Bin = await executor.execWhich(containerName, 'base64',
         def: '/usr/bin/base64');
@@ -282,7 +308,7 @@ abstract class DockerCMD {
     var teeParam = append ? '-a' : '';
 
     var script =
-        'echo "$base64" | $base64Bin --decode | tee $teeParam $filePath > /dev/null ';
+        'echo "$base64" | $base64Bin --decode | tee $teeParam $containerFilePath > /dev/null ';
 
     var shell = await execShell(executor, containerName, script);
 
@@ -296,6 +322,25 @@ abstract class DockerCMD {
       {bool sudo = false}) async {
     return putFileContent(executor, containerName, filePath, content,
         sudo: sudo, append: true);
+  }
+
+  /// Uses Docker `cp` to copy [content] to [containerFilePath] inside [containerName].
+  ///
+  /// See also [putFileContent], that can perform the operation using
+  /// container user and `sudo`.
+  static Future<bool> copyFileContentToContainer(
+      DockerCMDExecutor executor,
+      String containerName,
+      String content,
+      bool append,
+      String containerFilePath) async {
+    var tempFilePath = await executor.createTempFile(content);
+    if (tempFilePath == null) return null;
+    var ok = await copyFileToContainer(
+        executor, containerName, tempFilePath, containerFilePath);
+    await executor.deleteTempFile(tempFilePath);
+
+    return ok;
   }
 
   /// Copy a host file, at [hostFilePath], inside a container,
@@ -318,8 +363,8 @@ abstract class DockerCMD {
   /// to the host machine, at [hostFilePath].
   static Future<bool> copyFileFromContainer(
       DockerCMDExecutor executor,
-      String containerFilePath,
       String containerName,
+      String containerFilePath,
       String hostFilePath) async {
     if (isEmptyString(containerName) ||
         isEmptyString(containerFilePath) ||
@@ -539,5 +584,85 @@ abstract class DockerCMD {
     var cmd = await executor.command('service', ['rm', serviceName]);
     var cmdOK = await cmd.waitExitAndConfirm(0);
     return cmdOK;
+  }
+
+  /// Opens a Container logs, by [containerNameOrID]:
+  static Future<DockerProcess> openContainerLogs(
+          DockerCMDExecutor executor, String containerNameOrID) =>
+      executor.command('logs', [containerNameOrID],
+          outputReadyType: OutputReadyType.STARTS_READY);
+
+  /// Opens a Service logs, by [serviceNameOrTask]:
+  static Future<DockerProcess> openServiceLogs(
+          DockerCMDExecutor executor, String serviceNameOrTask) =>
+      executor.command('service', ['logs', serviceNameOrTask],
+          outputReadyType: OutputReadyType.STARTS_READY);
+
+  /// Returns the Container logs as [String].
+  static Future<String> catContainerLogs(
+    DockerCMDExecutor executor,
+    String containerNameOrID, {
+    bool stderr = false,
+    Pattern waitDataMatcher,
+    Duration waitDataTimeout,
+    bool waitExit = false,
+    int desiredExitCode,
+  }) async {
+    var logs = await openContainerLogs(executor, containerNameOrID);
+    return await _waitLogs(waitExit, logs, desiredExitCode, stderr,
+        waitDataMatcher, waitDataTimeout);
+  }
+
+  /// Returns a Service logs as [String].
+  static Future<String> catServiceLogs(
+    DockerCMDExecutor executor,
+    String containerNameOrID, {
+    bool stderr = false,
+    Pattern waitDataMatcher,
+    Duration waitDataTimeout,
+    bool waitExit = false,
+    int desiredExitCode,
+  }) async {
+    var logs = await openServiceLogs(executor, containerNameOrID);
+    return await _waitLogs(waitExit, logs, desiredExitCode, stderr,
+        waitDataMatcher, waitDataTimeout);
+  }
+
+  static Future<String> _waitLogs(
+      bool waitExit,
+      DockerProcess logs,
+      int desiredExitCode,
+      bool stderr,
+      Pattern waitDataMatcher,
+      Duration waitDataTimeout) async {
+    if (waitExit ?? false) {
+      var waitExit = logs.waitExit(desiredExitCode: desiredExitCode);
+      if (waitExit == null) return null;
+    }
+
+    var stdout = (stderr ?? false) ? logs.stderr : logs.stdout;
+
+    try {
+      if (waitDataMatcher != null) {
+        waitDataTimeout ??= Duration(seconds: 15);
+        var dataOK = await stdout.waitForDataMatch(waitDataMatcher,
+            timeout: waitDataTimeout);
+        if (dataOK) {
+          return stdout.asString;
+        } else {
+          return null;
+        }
+      } else {
+        waitDataTimeout ??= Duration(milliseconds: 100);
+        var dataOK = await stdout.waitData(timeout: waitDataTimeout);
+        if (dataOK) {
+          return stdout.asString;
+        } else {
+          return null;
+        }
+      }
+    } finally {
+      logs.dispose();
+    }
   }
 }
