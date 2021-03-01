@@ -39,10 +39,21 @@ void main() {
           reason:
               'Only can run test if Docker is not in swarm node yet! Leave swarm mode before run tests: docker swarm leave --force');
 
-      var swarmOk = await dockerCommander.swarmInit();
-      expect(swarmOk, isTrue);
+      expect(await dockerCommander.getSwarmInfos(), isNull);
+
+      var swarmInfos = await dockerCommander.swarmInit();
+      expect(swarmInfos, isNotNull);
+      expect(swarmInfos.nodeID, isNotEmpty);
+      expect(swarmInfos.managerToken, isNotEmpty);
+      expect(swarmInfos.workerToken, isNotEmpty);
+      expect(swarmInfos.advertiseAddress, isNotEmpty);
+      expect(swarmInfos.managerToken == swarmInfos.workerToken, isFalse);
+
+      _LOG.info('SwarmInfos: $swarmInfos');
 
       myNodeID = await dockerCommander.swarmSelfNodeID();
+      expect(myNodeID, matches(RegExp(r'\w+')));
+      expect(myNodeID, equals(swarmInfos.nodeID));
 
       _LOG.info('My swarm node ID: $myNodeID');
       expect(myNodeID, matches(RegExp(r'\w+')));

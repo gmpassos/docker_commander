@@ -383,7 +383,7 @@ abstract class DockerCMD {
   }
 
   /// Initialize swarm mode.
-  static Future<bool> swarmInit(DockerCMDExecutor executor,
+  static Future<SwarmInfos> swarmInit(DockerCMDExecutor executor,
       {String advertiseAddress, String listenAddress}) async {
     var args = ['init'];
 
@@ -399,7 +399,65 @@ abstract class DockerCMD {
 
     var cmd = await executor.command('swarm', args);
     var ok = await cmd.waitExitAndConfirm(0);
-    return ok;
+    if (!ok) return null;
+
+    var stdout = cmd.stdout;
+    var dataOK = await stdout.waitForDataMatch(RegExp(r'-token'));
+    if (!dataOK) return null;
+
+    var output = stdout.asString;
+
+    var swarmInfosWorker = await _parseSwarmInfos(executor, output, true);
+    var swarmInfosManager = await _getSwarmJoinToken(executor, false);
+
+    return SwarmInfos(swarmInfosManager.nodeID, swarmInfosManager.managerToken,
+        swarmInfosWorker.workerToken, swarmInfosManager.advertiseAddress);
+  }
+
+  /// Returns a [SwarmInfos]. Only if in Swarm mode.
+  static Future<SwarmInfos> getSwarmInfos(DockerCMDExecutor executor) async {
+    var swarmInfosManager = await _getSwarmJoinToken(executor, false);
+    if (swarmInfosManager == null) return null;
+    var swarmInfosWorker = await _getSwarmJoinToken(executor, true);
+
+    return SwarmInfos(swarmInfosManager.nodeID, swarmInfosManager.managerToken,
+        swarmInfosWorker.workerToken, swarmInfosManager.advertiseAddress);
+  }
+
+  /// Returns the Swarm join token, for manager or [worker].
+  static Future<SwarmInfos> _getSwarmJoinToken(
+      DockerCMDExecutor executor, bool worker) async {
+    var type = worker ? 'worker' : 'manager';
+    var cmd = await executor.command('swarm', ['join-token', type]);
+    var ok = await cmd.waitExitAndConfirm(0);
+    if (!ok) return null;
+
+    var stdout = cmd.stdout;
+    var dataOK = await stdout.waitForDataMatch(RegExp(r'-token'));
+    if (!dataOK) return null;
+
+    var output = stdout.asString;
+
+    return await _parseSwarmInfos(executor, output, worker);
+  }
+
+  static Future<SwarmInfos> _parseSwarmInfos(
+      DockerCMDExecutor executor, String output, bool worker) async {
+    // Output example:
+    // docker swarm join --token SWMTKN-1-1ziutumyd8sw7tkpi698tygcpdezmm7nsr3maehkcijiermv1z-9ng8kp24g7zi168egu2xshfve 192.168.65.3:2377'
+
+    var token = RegExp(r'-token\s+(\S+)\s').allMatches(output).first.group(1);
+    var address = RegExp(r'\s([\w\.]{4,}:\d+)\s', multiLine: false)
+        .allMatches(output)
+        .first
+        .group(1);
+
+    var nodeID = await swarmSelfNodeID(executor);
+
+    var managerToken = worker ? null : token;
+    var workerToken = worker ? token : null;
+
+    return SwarmInfos(nodeID, managerToken, workerToken, address);
   }
 
   /// Leaves a swarm mode.
@@ -431,6 +489,9 @@ abstract class DockerCMD {
     var ids = output.split(RegExp(r'\s+'));
 
     var myID = ids.firstWhere((l) => l.contains(':true'), orElse: () => null);
+    if (myID == null) return null;
+
+    myID = myID.split(':true')[0];
     return myID;
   }
 

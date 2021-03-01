@@ -208,14 +208,28 @@ class DockerCommander extends DockerCMDExecutor {
   Future<String> getContainerIP(String name) async =>
       DockerCMD.getContainerIP(this, name);
 
-  /// Initialize swarm mode.
-  Future<bool> swarmInit({String advertiseAddress, String listenAddress}) =>
-      DockerCMD.swarmInit(this,
-          advertiseAddress: advertiseAddress, listenAddress: listenAddress);
+  SwarmInfos _swarmInfos;
+
+  /// Returns a [SwarmInfos]. Only if in Swarm mode.
+  Future<SwarmInfos> getSwarmInfos() async {
+    _swarmInfos ??= await DockerCMD.getSwarmInfos(this);
+    return _swarmInfos;
+  }
+
+  /// Initialize swarm mode. Returns the secret key to join the cluster.
+  Future<SwarmInfos> swarmInit(
+      {String advertiseAddress, String listenAddress}) async {
+    var swarmInfos = await DockerCMD.swarmInit(this,
+        advertiseAddress: advertiseAddress, listenAddress: listenAddress);
+    _swarmInfos = swarmInfos;
+    return swarmInfos;
+  }
 
   /// Leaves a swarm cluster.
-  Future<bool> swarmLeave({bool force = false}) =>
-      DockerCMD.swarmLeave(this, force: force);
+  Future<bool> swarmLeave({bool force = false}) {
+    _swarmInfos = null;
+    return DockerCMD.swarmLeave(this, force: force);
+  }
 
   /// Returns the node ID of the current Docker Daemon the swarm cluster.
   Future<String> swarmSelfNodeID() => DockerCMD.swarmSelfNodeID(this);

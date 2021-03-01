@@ -30,6 +30,22 @@ class ContainerInfos {
   }
 }
 
+/// Base class for Docker Swarm infos.
+class SwarmInfos {
+  final String nodeID;
+  final String managerToken;
+  final String workerToken;
+  final String advertiseAddress;
+
+  SwarmInfos(
+      this.nodeID, this.managerToken, this.workerToken, this.advertiseAddress);
+
+  @override
+  String toString() {
+    return 'SwarmInfos{nodeID: $nodeID, managerToken: $managerToken, workerToken: $workerToken, advertiseAddress: $advertiseAddress}';
+  }
+}
+
 /// Base class for a Docker Service.
 class Service {
   final DockerHost dockerHost;
