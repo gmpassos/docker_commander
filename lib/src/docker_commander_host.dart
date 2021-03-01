@@ -1,10 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:docker_commander/docker_commander.dart';
+import 'package:logging/logging.dart';
 import 'package:swiss_knife/swiss_knife.dart';
 
 import 'docker_commander_base.dart';
 import 'docker_commander_commands.dart';
+
+final _LOG = Logger('docker_commander/host');
 
 /// Basic infos of a Container.
 class ContainerInfos {
@@ -14,13 +18,77 @@ class ContainerInfos {
   final List<String> ports;
   final String containerNetwork;
   final String containerHostname;
+  List<String> args;
 
   ContainerInfos(this.containerName, this.id, this.image, this.ports,
-      this.containerNetwork, this.containerHostname);
+      this.containerNetwork, this.containerHostname,
+      [this.args]);
 
   @override
   String toString() {
     return 'ContainerInfos{containerName: $containerName, id: $id; image: $image, ports: $ports, containerNetwork: $containerNetwork, containerHostname: $containerHostname}';
+  }
+}
+
+/// Base class for a Docker Service.
+class Service {
+  final DockerHost dockerHost;
+
+  final String serviceName;
+  String id;
+  final String image;
+  final List<String> ports;
+  final String containerNetwork;
+  final String containerHostname;
+  List<String> args;
+
+  Service(this.dockerHost, this.serviceName, this.id, this.image, this.ports,
+      this.containerNetwork, this.containerHostname,
+      [this.args]);
+
+  /// Returns a list of [ServiceTaskInfos] of this service.
+  Future<List<ServiceTaskInfos>> listTasks() =>
+      dockerHost.listServiceTasks(serviceName);
+
+  /// Removes this service from Swarm cluster.
+  Future<bool> remove() => dockerHost.removeService(serviceName);
+
+  @override
+  String toString() {
+    return 'ServiceInfos{containerName: $serviceName, id: $id; image: $image, ports: $ports, containerNetwork: $containerNetwork, containerHostname: $containerHostname}';
+  }
+}
+
+/// Service Task infos.
+class ServiceTaskInfos {
+  final String id;
+  final String name;
+  final String serviceName;
+  final String image;
+  final String node;
+  final String desiredState;
+  final String currentState;
+  final String ports;
+  final String error;
+
+  ServiceTaskInfos(
+    this.id,
+    this.name,
+    this.serviceName,
+    this.image,
+    this.node,
+    this.desiredState,
+    this.currentState,
+    this.ports,
+    this.error,
+  );
+
+  bool get isCurrentlyRunning =>
+      (currentState ?? '').toLowerCase().contains('running');
+
+  @override
+  String toString() {
+    return 'ServiceTaskInfos{id: $id, name: $name, serviceName: $serviceName, image: $image, node: $node, desiredState: $desiredState, currentState: $currentState, ports: $ports, error: $error}';
   }
 }
 
@@ -80,16 +148,12 @@ abstract class DockerHost extends DockerCMDExecutor {
   });
 
   /// Removes a container by [containerNameOrID].
-  Future<bool> removeContainer(String containerNameOrID) async {
-    var process = await command('rm', [containerNameOrID]);
-    return process.waitExitAndConfirm(0);
-  }
+  Future<bool> removeContainer(String containerNameOrID) =>
+      DockerCMD.removeContainer(this, containerNameOrID);
 
   /// Starts a container by [containerNameOrID].
-  Future<bool> startContainer(String containerNameOrID) async {
-    var process = await command('start', [containerNameOrID]);
-    return process.waitExitAndConfirm(0);
-  }
+  Future<bool> startContainer(String containerNameOrID) =>
+      DockerCMD.startContainer(this, containerNameOrID);
 
   /// Runs a Docker containers with [image] and optional [version].
   Future<DockerRunner> run(
@@ -135,6 +199,135 @@ abstract class DockerHost extends DockerCMDExecutor {
     OutputReadyType outputReadyType,
   });
 
+  ContainerInfos buildContainerArgs(
+    String cmd,
+    String imageName,
+    String version,
+    String containerName,
+    List<String> ports,
+    String network,
+    String hostname,
+    Map<String, String> environment,
+    Map<String, String> volumes,
+    bool cleanContainer,
+  ) {
+    var image = DockerHost.resolveImage(imageName, version);
+
+    ports = DockerHost.normalizeMappedPorts(ports);
+
+    var args = <String>[
+      if (isNotEmptyString(cmd)) cmd,
+      '--name',
+      containerName,
+    ];
+
+    if (cleanContainer ?? true) {
+      args.add('--rm');
+    }
+
+    if (ports != null) {
+      for (var pair in ports) {
+        args.add('-p');
+        args.add(pair);
+      }
+    }
+
+    String containerNetwork;
+
+    if (isNotEmptyString(network, trim: true)) {
+      containerNetwork = network.trim();
+      args.add('--net');
+      args.add(containerNetwork);
+    }
+
+    String containerHostname;
+
+    if (isNotEmptyString(hostname, trim: true)) {
+      containerHostname = hostname.trim();
+      args.add('-h');
+      args.add(containerHostname);
+    }
+
+    volumes?.forEach((k, v) {
+      if (isNotEmptyString(k) && isNotEmptyString(k)) {
+        args.add('-v');
+        args.add('$k:$v');
+      }
+    });
+
+    environment?.forEach((k, v) {
+      if (isNotEmptyString(k)) {
+        args.add('-e');
+        args.add('$k=$v');
+      }
+    });
+
+    args.add(image);
+
+    return ContainerInfos(containerName, null, image, ports, containerNetwork,
+        containerHostname, args);
+  }
+
+  /// Creates a Docker service with [serviceName], [image] and optional [version].
+  /// Note that the Docker Daemon should be in Swarm mode.
+  Future<Service> createService(
+    String serviceName,
+    String imageName, {
+    String version,
+    int replicas,
+    List<String> ports,
+    String network,
+    String hostname,
+    Map<String, String> environment,
+    Map<String, String> volumes,
+  }) async {
+    if (isEmptyString(serviceName, trim: true)) {
+      return null;
+    }
+
+    var containerInfos = buildContainerArgs(
+      'create',
+      imageName,
+      version,
+      serviceName,
+      ports,
+      network,
+      hostname,
+      environment,
+      volumes,
+      false,
+    );
+
+    var cmdArgs = containerInfos.args;
+
+    cmdArgs.removeLast();
+
+    if (replicas != null && replicas > 1) {
+      cmdArgs.add('--replicas');
+      cmdArgs.add('$replicas');
+    }
+
+    cmdArgs.add(containerInfos.image);
+
+    _LOG.info('Service create[CMD]>\t${cmdArgs.join(' ')}');
+
+    var process = await command('service', cmdArgs);
+
+    var exitCodeOK = await process.waitExitAndConfirm(0);
+    if (!exitCodeOK) return null;
+
+    var id = await getServiceIDByName(containerInfos.containerName);
+
+    return Service(
+        this,
+        containerInfos.containerName,
+        id,
+        containerInfos.image,
+        containerInfos.ports,
+        containerInfos.containerNetwork,
+        containerInfos.containerHostname);
+  }
+
   /// Returns a [List<int>] of [DockerRunner] `instanceID`.
   List<int> getRunnersInstanceIDs();
 
@@ -173,7 +366,20 @@ abstract class DockerHost extends DockerCMDExecutor {
   Future<bool> checkDaemon();
 
   /// Returns a Docker container ID with [name].
-  Future<String> getContainerIDByName(String name);
+  Future<String> getContainerIDByName(String name) =>
+      DockerCMD.getContainerIDByName(this, name);
+
+  /// Returns a Docker service ID with [name].
+  Future<String> getServiceIDByName(String name) =>
+      DockerCMD.getServiceIDByName(this, name);
+
+  /// Returns a list of [ServiceTaskInfos] of a service by [serviceName].
+  Future<List<ServiceTaskInfos>> listServiceTasks(String name) =>
+      DockerCMD.listServiceTasks(this, name);
+
+  /// Removes a service from the Swarm cluster by [name].
+  Future<bool> removeService(String name) =>
+      DockerCMD.removeService(this, name);
 
   /// Resolves a Docker image, composed by [imageName] and [version].
   static String resolveImage(String imageName, [String version]) {

@@ -120,6 +120,39 @@ abstract class DockerCMDExecutor {
 }
 
 abstract class DockerCMD {
+  /// Returns the container ID by [name].
+  static Future<String> getContainerIDByName(
+      DockerCMDExecutor executor, String name) async {
+    var process = await executor.command('ps', ['-aqf', 'name=$name']);
+    var ok = await process.waitExitAndConfirm(0);
+    if (!ok) return null;
+
+    var stdout = process.stdout;
+    var dataOK = await stdout.waitForDataMatch(RegExp(r'\w+'),
+        timeout: Duration(seconds: 15));
+    if (!dataOK) return null;
+
+    var id = stdout.asString.trim();
+    return id;
+  }
+
+  /// Returns the container ID by [name].
+  static Future<String> getServiceIDByName(
+      DockerCMDExecutor executor, String name) async {
+    var process = await executor
+        .command('service', ['ls', '-f', 'name=$name', '--format', '{{.ID}}']);
+    var ok = await process.waitExitAndConfirm(0);
+    if (!ok) return null;
+
+    var stdout = process.stdout;
+    var dataOK = await stdout.waitForDataMatch(RegExp(r'\w+'),
+        timeout: Duration(seconds: 15));
+    if (!dataOK) return null;
+
+    var id = stdout.asString.trim();
+    return id;
+  }
+
   /// Returns the container IP by [name].
   static Future<String> getContainerIP(
       DockerCMDExecutor executor, String name) async {
@@ -145,10 +178,11 @@ abstract class DockerCMD {
 
     if (isEmptyString(ip, trim: true)) {
       var networks = networkSettings['Networks'] as Map;
-      ip = networks.values
-          .where((e) => isNotEmptyString(e['IPAddress']))
-          .map((e) => e['IPAddress'])
-          .first;
+
+      var network = networks.values.firstWhere(
+          (e) => isNotEmptyString(e['IPAddress']),
+          orElse: () => null);
+      ip = network != null ? network['IPAddress'] : null;
     }
 
     return ip;
@@ -332,5 +366,117 @@ abstract class DockerCMD {
     var process = await executor.command('network', ['rm', networkName]);
     var exitCode = await process.waitExit();
     return exitCode == 0;
+  }
+
+  /// Removes a container by [containerNameOrID].
+  static Future<bool> removeContainer(
+      DockerCMDExecutor executor, String containerNameOrID) async {
+    var process = await executor.command('rm', [containerNameOrID]);
+    return process.waitExitAndConfirm(0);
+  }
+
+  /// Starts a container by [containerNameOrID].
+  static Future<bool> startContainer(
+      DockerCMDExecutor executor, String containerNameOrID) async {
+    var process = await executor.command('start', [containerNameOrID]);
+    return process.waitExitAndConfirm(0);
+  }
+
+  /// Initialize swarm mode.
+  static Future<bool> swarmInit(DockerCMDExecutor executor,
+      {String advertiseAddress, String listenAddress}) async {
+    var args = ['init'];
+
+    if (isNotEmptyString(advertiseAddress)) {
+      args.add('--advertise-addr');
+      args.add(advertiseAddress);
+    }
+
+    if (isNotEmptyString(listenAddress)) {
+      args.add('--listen-addr');
+      args.add(listenAddress);
+    }
+
+    var cmd = await executor.command('swarm', args);
+    var ok = await cmd.waitExitAndConfirm(0);
+    return ok;
+  }
+
+  /// Leaves a swarm mode.
+  static Future<bool> swarmLeave(DockerCMDExecutor executor,
+      {bool force = false}) async {
+    var args = ['leave'];
+
+    if (force ?? false) {
+      args.add('--force');
+    }
+
+    var cmd = await executor.command('swarm', args);
+    return cmd.waitExitAndConfirm(0);
+  }
+
+  /// Returns the node ID of the current Docker Daemon the swarm cluster.
+  static Future<String> swarmSelfNodeID(DockerCMDExecutor executor) async {
+    var cmd =
+        await executor.command('node', ['ls', '--format', '{{.ID}}:{{.Self}}']);
+    var ok = await cmd.waitExitAndConfirm(0);
+    if (!ok) return null;
+
+    var stdout = cmd.stdout;
+    var dataOK = await stdout.waitForDataMatch(RegExp(r'\w+'),
+        timeout: Duration(seconds: 15));
+    if (!dataOK) return null;
+
+    var output = stdout.asString.trim();
+    var ids = output.split(RegExp(r'\s+'));
+
+    var myID = ids.firstWhere((l) => l.contains(':true'), orElse: () => null);
+    return myID;
+  }
+
+  /// Returns a list of [ServiceTaskInfos] of a service by [serviceName].
+  static Future<List<ServiceTaskInfos>> listServiceTasks(
+      DockerCMDExecutor executor, String serviceName) async {
+    var d = ';!-!;';
+    var cmd = await executor.command('service', [
+      'ps',
+      '--format',
+      '{{.ID}}$d{{.Name}}$d{{.Image}}$d{{.Node}}$d{{.DesiredState}}$d{{.CurrentState}}$d{{.Ports}}$d{{.Error}}$d',
+      serviceName
+    ]);
+    var cmdOK = await cmd.waitExitAndConfirm(0);
+    if (!cmdOK) return null;
+
+    var stdout = cmd.stdout;
+    var dataOK = await stdout.waitForDataMatch(d);
+    if (!dataOK) return null;
+
+    var lines = stdout.asString.trim().split(RegExp(r'[\r\n]+'));
+
+    var tasks = lines.map((l) {
+      var parts = l.split(d);
+
+      var id = parts[0];
+      var name = parts[1];
+      var image = parts[2];
+      var node = parts[3];
+      var desiredState = parts[4];
+      var currentState = parts[5];
+      var ports = parts[6];
+      var error = parts[7];
+
+      return ServiceTaskInfos(id, name, serviceName, image, node, desiredState,
+          currentState, ports, error);
+    }).toList();
+
+    return tasks;
+  }
+
+  /// Removes a service from the Swarm cluster by [serviceName].
+  static Future<bool> removeService(
+      DockerCMDExecutor executor, String serviceName) async {
+    var cmd = await executor.command('service', ['rm', serviceName]);
+    var cmdOK = await cmd.waitExitAndConfirm(0);
+    return cmdOK;
   }
 }

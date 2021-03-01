@@ -29,6 +29,7 @@ void main() async {
 
         return listenPort;
       } catch (e) {
+        usedPorts.add(listenPort);
         print(e);
       }
     }

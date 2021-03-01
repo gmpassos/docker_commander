@@ -208,6 +208,48 @@ class DockerCommander extends DockerCMDExecutor {
   Future<String> getContainerIP(String name) async =>
       DockerCMD.getContainerIP(this, name);
 
+  /// Initialize swarm mode.
+  Future<bool> swarmInit({String advertiseAddress, String listenAddress}) =>
+      DockerCMD.swarmInit(this,
+          advertiseAddress: advertiseAddress, listenAddress: listenAddress);
+
+  /// Leaves a swarm cluster.
+  Future<bool> swarmLeave({bool force = false}) =>
+      DockerCMD.swarmLeave(this, force: force);
+
+  /// Returns the node ID of the current Docker Daemon the swarm cluster.
+  Future<String> swarmSelfNodeID() => DockerCMD.swarmSelfNodeID(this);
+
+  /// Returns true if this Docker Daemon is in Swarm mode.
+  Future<bool> isInSwarmMode() async {
+    var myNodeID = await swarmSelfNodeID();
+    return isNotEmptyString(myNodeID, trim: true);
+  }
+
+  /// Creates a Docker service with [serviceName], [image] and optional [version].
+  /// Note that the Docker Daemon should be in Swarm mode.
+  Future<Service> createService(
+    String serviceName,
+    String imageName, {
+    String version,
+    int replicas,
+    List<String> ports,
+    String network,
+    String hostname,
+    Map<String, String> environment,
+    Map<String, String> volumes,
+  }) async {
+    await ensureInitialized();
+    return dockerHost.createService(serviceName, imageName,
+        version: version,
+        replicas: replicas,
+        ports: ports,
+        network: network,
+        hostname: hostname,
+        environment: environment,
+        volumes: volumes);
+  }
+
   /// Closes this instances, and internal [dockerHost].
   Future<void> close() async {
     try {
@@ -219,7 +261,7 @@ class DockerCommander extends DockerCMDExecutor {
 
   @override
   String toString() {
-    return 'DockerCommander{dockerHost: $dockerHost, lastDaemonCheck: $lastDaemonCheck}';
+    return 'DockerCommander{dockerHost: $dockerHost, initialized: $isInitialized. lastDaemonCheck: $lastDaemonCheck}';
   }
 }
 

@@ -1,6 +1,7 @@
 ## 1.0.14
 
 - Force usage of `cidfile` for better id resolution.
+- Add Swarm mode and Services support.
 
 ## 1.0.13
 

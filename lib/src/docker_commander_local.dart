@@ -11,7 +11,6 @@ final _LOG = Logger('docker_commander/io');
 
 class ContainerInfosLocal extends ContainerInfos {
   final File idFile;
-  final List<String> args;
 
   ContainerInfosLocal(
       String containerName,
@@ -20,9 +19,9 @@ class ContainerInfosLocal extends ContainerInfos {
       List<String> ports,
       String containerNetwork,
       String containerHostname,
-      this.args)
+      List<String> args)
       : super(containerName, null, image, ports, containerNetwork,
-            containerHostname);
+            containerHostname, args);
 }
 
 /// [DockerHost] Implementation for Local Docker machine host.
@@ -73,21 +72,7 @@ class DockerHostLocal extends DockerHost {
   }
 
   @override
-  Future<String> getContainerIDByName(String name) async {
-    var cmdArgs = <String>['ps', '-aqf', 'name=$name'];
-
-    _LOG.info(
-        'getContainerIDByName[CMD]>\t$dockerBinaryPath ${cmdArgs.join(' ')}');
-
-    var process =
-        Process.run(dockerBinaryPath, cmdArgs, stdoutEncoding: systemEncoding);
-
-    var result = await process;
-    var id = result.stdout.toString().trim();
-    return id;
-  }
-
-  ContainerInfosLocal _buildContainerArgs(
+  ContainerInfosLocal buildContainerArgs(
     String cmd,
     String imageName,
     String version,
@@ -97,29 +82,30 @@ class DockerHostLocal extends DockerHost {
     String hostname,
     Map<String, String> environment,
     Map<String, String> volumes,
-    bool cleanContainer,
-  ) {
-    var image = DockerHost.resolveImage(imageName, version);
+    bool cleanContainer, {
+    bool addCIDFile = false,
+  }) {
+    var containerInfos = super.buildContainerArgs(
+      cmd,
+      imageName,
+      version,
+      containerName,
+      ports,
+      network,
+      hostname,
+      environment,
+      volumes,
+      cleanContainer,
+    );
 
-    ports = DockerHost.normalizeMappedPorts(ports);
+    var args = containerInfos.args;
+    // Last parameter is the image.
+    // Remove to append more parameters, then add it in the end:
+    args.removeLast();
 
-    var cmdArgs = <String>[cmd, '--name', containerName];
-
-    if (ports != null) {
-      for (var pair in ports) {
-        cmdArgs.add('-p');
-        cmdArgs.add(pair);
-      }
-    }
-
-    String containerNetwork;
-
-    if (isNotEmptyString(network, trim: true)) {
-      containerNetwork = network.trim();
-      cmdArgs.add('--net');
-      cmdArgs.add(containerNetwork);
-
-      var networkHostsIPs = getNetworkRunnersHostnamesAndIPs(network);
+    if (containerInfos.containerNetwork != null) {
+      var networkHostsIPs =
+          getNetworkRunnersHostnamesAndIPs(containerInfos.containerNetwork);
 
       for (var networkContainerName in networkHostsIPs.keys) {
         if (networkContainerName == containerName) continue;
@@ -128,47 +114,30 @@ class DockerHostLocal extends DockerHost {
 
         for (var host in hostMaps.keys) {
           var ip = hostMaps[host];
-          cmdArgs.add('--add-host');
-          cmdArgs.add('$host:$ip');
+          args.add('--add-host');
+          args.add('$host:$ip');
         }
       }
     }
 
-    String containerHostname;
-
-    if (isNotEmptyString(hostname, trim: true)) {
-      containerHostname = hostname.trim();
-      cmdArgs.add('-h');
-      cmdArgs.add(containerHostname);
-    }
-
-    volumes?.forEach((k, v) {
-      if (isNotEmptyString(k) && isNotEmptyString(k)) {
-        cmdArgs.add('-v');
-        cmdArgs.add('$k:$v');
-      }
-    });
-
-    environment?.forEach((k, v) {
-      if (isNotEmptyString(k)) {
-        cmdArgs.add('-e');
-        cmdArgs.add('$k=$v');
-      }
-    });
-
     File idFile;
-    if (cleanContainer ?? true) {
-      cmdArgs.add('--rm');
+    if (addCIDFile) {
+      idFile = _createTemporaryFile('cidfile');
+      args.add('--cidfile');
+      args.add(idFile.path);
     }
 
-    idFile = _createTemporaryFile('cidfile');
-    cmdArgs.add('--cidfile');
-    cmdArgs.add(idFile.path);
+    args.add(containerInfos.image);
 
-    cmdArgs.add(image);
-
-    return ContainerInfosLocal(containerName, image, idFile, ports,
-        containerNetwork, containerHostname, cmdArgs);
+    return ContainerInfosLocal(
+      containerInfos.containerName,
+      containerInfos.image,
+      idFile,
+      containerInfos.ports,
+      containerInfos.containerNetwork,
+      containerInfos.containerHostname,
+      containerInfos.args,
+    );
   }
 
   @override
@@ -187,7 +156,7 @@ class DockerHostLocal extends DockerHost {
       return null;
     }
 
-    var containerInfos = _buildContainerArgs(
+    var containerInfos = buildContainerArgs(
       'create',
       imageName,
       version,
@@ -198,6 +167,7 @@ class DockerHostLocal extends DockerHost {
       environment,
       volumes,
       cleanContainer,
+      addCIDFile: true,
     );
 
     var cmdArgs = containerInfos.args;
@@ -286,7 +256,7 @@ class DockerHostLocal extends DockerHost {
       containerName = 'docker_commander-$session-$instanceID';
     }
 
-    var containerInfos = _buildContainerArgs(
+    var containerInfos = buildContainerArgs(
       'run',
       imageName,
       version,
@@ -297,6 +267,7 @@ class DockerHostLocal extends DockerHost {
       environment,
       volumes,
       cleanContainer,
+      addCIDFile: true,
     );
 
     var cmdArgs = containerInfos.args;
