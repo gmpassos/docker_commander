@@ -1,3 +1,7 @@
+## 1.0.18
+
+- README: Improve Docker Image usage
+
 ## 1.0.17
 
 - `docker_commander_server.dart`: better console output.

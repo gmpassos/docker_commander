@@ -44,7 +44,7 @@ You will pass this credential and the public mapped port (8099) to the `DockerHo
 Follow the server output:
 
 ```shell
-docker logs docker_commander_server
+docker logs docker_commander_server -f
 ```
 
 *NOTE:
