@@ -1,3 +1,8 @@
+## 1.0.17
+
+- `docker_commander_server.dart`: better console output.
+- Fixed `path` dependency.
+
 ## 1.0.16
 
 - Improve live mapping of hosts in the same network: avoid mapping of already mapped hosts. 

@@ -40,6 +40,8 @@ void showHelp() {
 }
 
 void main(List<String> args) async {
+  print('ARGS: $args');
+
   if (args.length < 2) {
     showHelp();
     return;
@@ -66,6 +68,8 @@ void main(List<String> args) async {
       : DEFAULT_SERVER_PORT;
 
   var authenticationTable = AuthenticationTable({username: password});
+  print('authenticationTable');
+  print('- username $username');
 
   var hostServer = DockerHostServer(
     (user, pass) async => authenticationTable.checkPassword(user, pass),

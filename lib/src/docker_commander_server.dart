@@ -24,6 +24,11 @@ class AuthenticationTable {
     var pass = usernamesAndPasswords[username];
     return pass != null && pass == password;
   }
+
+  @override
+  String toString() {
+    return 'AuthenticationTable{users: ${usernamesAndPasswords.length}';
+  }
 }
 
 class Authentication {
