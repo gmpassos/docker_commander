@@ -35,17 +35,22 @@ docker pull gmpassos/docker_commander
 
 Run the `docker_commander` server image, mapping port `8099` and Docker Host Daemon socket file (`/var/run/docker.sock`).
 ```shell
-docker run --name docker_commander_server -it --rm -v /var/run/docker.sock:/var/run/docker.sock -p 8099:8099 gmpassos/docker_commander userx pass123
+docker run --name docker_commander_server -d -t --rm -v /var/run/docker.sock:/var/run/docker.sock -p 8099:8099 gmpassos/docker_commander userx pass123
 ```
 
 You need to provide an username and password (the parameters `userx`and `pass123` above) to control the access to this `docker_commander` server.
 You will pass this credential and the public mapped port (8099) to the `DockerHostRemote`, allowing it to connect to the server container.
 
-NOTE: To enable control of Docker Daemon from the `docker_commander` server container, you need
+Follow the server output:
+
+```shell
+docker logs docker_commander_server
+```
+
+*NOTE:
+To enable control of Docker Daemon from the `docker_commander` server container, you need
 to map the Docker Host Daemon socket file (`/var/run/docker.sock`). This won't require to run the
-container in a `--privileged` context or as root.
-
-
+container in a `--privileged` context or as root.*
 
 For more information:
 
