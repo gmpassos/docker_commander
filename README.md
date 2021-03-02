@@ -84,10 +84,11 @@ void main() async {
 
 #### Client
 
-Client side using `DockerHostRemote`:
+Client side using `DockerHostRemote`. Note that the code below
+can run in any platform, like JS (in a Web Browser) or any Flutter platform (Android, iOS, Web, Linux, macOS, Windows):
 
 ```dart
-import 'package:docker_commander/docker_commander_vm.dart';
+import 'package:docker_commander/docker_commander.dart';
 
 void main() async {
 

@@ -66,9 +66,19 @@ class DockerHostLocal extends DockerHost {
 
   @override
   Future<bool> checkDaemon() async {
-    var process = Process.run(dockerBinaryPath, <String>['ps']);
+    _LOG.info('Check Docker Daemon: $dockerBinaryPath info');
+
+    var process = Process.run(dockerBinaryPath, <String>['info']);
     var result = await process;
-    return result.exitCode == 0;
+
+    var ok = result.exitCode == 0;
+
+    if (!ok) {
+      _LOG.warning('Error checking Docker Daemon:');
+      _LOG.warning(result.stdout);
+    }
+
+    return ok;
   }
 
   @override
@@ -432,7 +442,7 @@ class DockerHostLocal extends DockerHost {
         instanceID,
         '',
         process,
-        outputAsLines,
+        outputAsLines ?? true,
         outputLimit,
         stdoutReadyFunction,
         stderrReadyFunction,
@@ -719,8 +729,8 @@ class DockerProcessLocal extends DockerProcess {
     if (_exitCode != null) return;
     _exitCode = exitCode;
     _exitCompleter.complete(exitCode);
-    this.stdout.getOutputStream().markReady();
-    this.stderr.getOutputStream().markReady();
+    this.stdout?.getOutputStream()?.markReady();
+    this.stderr?.getOutputStream()?.markReady();
   }
 
   OutputStream _buildOutputStream(

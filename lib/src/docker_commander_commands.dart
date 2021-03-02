@@ -234,17 +234,54 @@ abstract class DockerCMD {
   }
 
   static Future<bool> addContainerHostMapping(DockerCMDExecutor executor,
-      String containerName, Map<String, String> hostMapping) async {
-    var hostMap = '\n' +
-        hostMapping.entries.map((e) {
+      String containerName, Map<String, String> hostIPMapping) async {
+    if (isEmptyString(containerName) ||
+        hostIPMapping == null ||
+        hostIPMapping.isEmpty) {
+      return false;
+    }
+
+    var mappedIPHosts = await getContainerHostsMapped(executor, containerName);
+
+    hostIPMapping.removeWhere((host, ip) => mappedIPHosts.containsKey(ip));
+    if (hostIPMapping.isEmpty) return true;
+
+    var hostMap = '\n#### docker_commander host mapping:\n' +
+        hostIPMapping.entries.map((e) {
           var host = e.key;
           var ip = e.value;
-          return '$ip $host';
+          return '$ip\t$host';
         }).join('\n') +
-        '\n';
+        '\n####\n';
 
     return appendFileContent(executor, containerName, '/etc/hosts', hostMap,
         sudo: true);
+  }
+
+  /// Returns the current mapped IPs and hosts at `/etc/hosts`.
+  static Future<Map<String, List<String>>> getContainerHostsMapped(
+      DockerCMDExecutor executor, String containerName) async {
+    var hosts = await execCat(executor, containerName, '/etc/hosts');
+    var hostsMapped = parseHostsFile(hosts);
+    return hostsMapped;
+  }
+
+  /// parses a `/etc/hosts` file to IPs and mapped hosts.
+  static Map<String, List<String>> parseHostsFile(String hosts) {
+    if (isEmptyString(hosts, trim: true)) return <String, List<String>>{};
+
+    var entries = hosts
+        .split(RegExp(r'[\r\n]'))
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty && !e.startsWith('#'))
+        .map((e) => e.trim().replaceFirst(RegExp(r'#.*'), '').trim())
+        .where((e) => e.isNotEmpty)
+        .map((e) => e.split(RegExp(r'\s+')))
+        .where((e) => e.length > 1)
+        .map((e) => MapEntry(e[0], e.sublist(1)));
+
+    var hostsMapped = Map<String, List<String>>.fromEntries(entries);
+    return hostsMapped;
   }
 
   /// Call POSIX `cat` command.

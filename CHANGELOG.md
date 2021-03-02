@@ -1,3 +1,10 @@
+## 1.0.16
+
+- Improve live mapping of hosts in the same network: avoid mapping of already mapped hosts. 
+- Added executable `docker_commander_server`.
+- Added Dockerfile for Docker Hub integration and `docker_commander/server` image.
+- Fixed server response issue to encode UTF-8 characters.
+
 ## 1.0.15
 
 - Added support to containers and services logs.

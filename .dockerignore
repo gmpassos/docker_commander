@@ -1,0 +1,15 @@
+.dart_tool
+.idea
+.pub
+.vscode
+.DS_Store
+.github
+.git
+logs/
+test/
+build/
+.analysis-options
+.packages
+*.g.dart
+*.md
+*.iml

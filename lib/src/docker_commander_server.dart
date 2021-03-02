@@ -211,10 +211,9 @@ class DockerHostServer {
     if (response != null) {
       var json = encodeJSON(response);
 
-      request.response.headers
-          .add('Content-Type', 'application/json', preserveHeaderCase: true);
-      request.response.headers
-          .add('Content-Length', json.length, preserveHeaderCase: true);
+      request.response.headers.add(
+          'Content-Type', 'application/json; charset=utf-8',
+          preserveHeaderCase: true);
 
       request.response.write(json);
     }
@@ -678,6 +677,11 @@ class DockerHostServer {
       'removed': removed,
       'entries': entries,
     };
+  }
+
+  @override
+  String toString() {
+    return 'DockerHostServer{listenPort: $listenPort, public: $public, ipv6: $ipv6}';
   }
 }
 
