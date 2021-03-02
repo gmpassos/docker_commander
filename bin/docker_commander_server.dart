@@ -68,8 +68,8 @@ void main(List<String> args) async {
       : DEFAULT_SERVER_PORT;
 
   var authenticationTable = AuthenticationTable({username: password});
-  print('authenticationTable');
-  print('- username $username');
+  print(authenticationTable);
+  print('- Username: $username');
 
   var hostServer = DockerHostServer(
     (user, pass) async => authenticationTable.checkPassword(user, pass),
