@@ -2,6 +2,7 @@
 
 - `docker_commander_server.dart`: better console output.
 - Fixed `path` dependency.
+- README: Added Docker Image usage.
 
 ## 1.0.16
 

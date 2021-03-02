@@ -1,12 +1,18 @@
 # docker_commander
 
 [![pub package](https://img.shields.io/pub/v/docker_commander.svg?logo=dart&logoColor=00b9fc)](https://pub.dartlang.org/packages/docker_commander)
+
+[![Docker image size](https://img.shields.io/docker/image-size/gmpassos/docker_commander?label=docker%20image%20size)](https://hub.docker.com/r/gmpassos/docker_commander)
+[![Docker puuls](https://img.shields.io/docker/pulls/gmpassos/docker_commander)](https://hub.docker.com/r/gmpassos/docker_commander)
+[![Docker build](https://img.shields.io/docker/cloud/build/gmpassos/docker_commander)](https://hub.docker.com/r/gmpassos/docker_commander/builds)
+
 [![CI](https://img.shields.io/github/workflow/status/gmpassos/docker_commander/Dart%20CI/master?logo=github-actions&logoColor=white)](https://github.com/gmpassos/docker_commander/actions)
 [![GitHub Tag](https://img.shields.io/github/v/tag/gmpassos/docker_commander?logo=git&logoColor=white)](https://github.com/gmpassos/docker_commander/releases)
 [![New Commits](https://img.shields.io/github/commits-since/gmpassos/docker_commander/latest?logo=git&logoColor=white)](https://github.com/gmpassos/docker_commander/network)
 [![Last Commits](https://img.shields.io/github/last-commit/gmpassos/docker_commander?logo=git&logoColor=white)](https://github.com/gmpassos/docker_commander/commits/master)
 [![Pull Requests](https://img.shields.io/github/issues-pr/gmpassos/docker_commander?logo=github&logoColor=white)](https://github.com/gmpassos/docker_commander/pulls)
 [![Code size](https://img.shields.io/github/languages/code-size/gmpassos/docker_commander?logo=github&logoColor=white)](https://github.com/gmpassos/docker_commander)
+
 [![License](https://img.shields.io/github/license/gmpassos/docker_commander?logo=open-source-initiative&logoColor=green)](https://github.com/gmpassos/docker_commander/blob/master/LICENSE)
 
 [Docker][docker] manager to easily automate a Docker Daemon:
@@ -19,6 +25,33 @@
     - [NGINX][nginx]
 
 [docker]:https://www.docker.com/
+
+## Running `docker_commander` [Server Image][docker_commander_server_image]
+
+Pull the Docker image:
+```shell
+docker pull gmpassos/docker_commander
+```
+
+Run the `docker_commander` server image, mapping port `8099` and Docker Host Daemon socket file (`/var/run/docker.sock`).
+```shell
+docker run --name docker_commander_server -it --rm -v /var/run/docker.sock:/var/run/docker.sock -p 8099:8099 gmpassos/docker_commander userx pass123
+```
+
+You need to provide an username and password (the parameters `userx`and `pass123` above) to control the access to this `docker_commander` server.
+You will pass this credential and the public mapped port (8099) to the `DockerHostRemote`, allowing it to connect to the server container.
+
+NOTE: To enable control of Docker Daemon from the `docker_commander` server container, you need
+to map the Docker Host Daemon socket file (`/var/run/docker.sock`). This won't require to run the
+container in a `--privileged` context or as root.
+
+
+
+For more information:
+
+- See the [Docker HUB Repository of `docker_commander`][docker_commander_server_image]
+
+[docker_commander_server_image]:https://hub.docker.com/r/gmpassos/docker_commander
 
 ## Usage
 
