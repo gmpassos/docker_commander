@@ -186,20 +186,20 @@ class DockerHostServer {
 
   Future _processRequest(HttpRequest request) async {
     var operation = request.uri.pathSegments.last;
-    var parameters = request.uri.queryParameters;
+    var requestParameters = request.uri.queryParameters;
 
-    var contentType = request.headers.contentType;
-    var body = await _decodeBody(contentType, request);
+    var requestContentType = request.headers.contentType;
+    var requestBody = await _decodeBody(requestContentType, request);
 
     request.response.statusCode = HttpStatus.processing;
 
     dynamic response;
     try {
-      response = await _processOperation(
-          request, operation, parameters, contentType, body);
+      response = await _processOperation(request, operation, requestParameters,
+          requestContentType, requestBody);
     } catch (e, s) {
       _LOG.severe(
-          'Error processing request: $request > operation: $operation ; parameters: $parameters ; body: $body',
+          'Error processing request: $request > operation: $operation ; parameters: $requestParameters ; body: $requestBody',
           e,
           s);
     }
@@ -208,8 +208,12 @@ class DockerHostServer {
       request.response.statusCode = response != null ? 200 : 404;
     }
 
-    print(
-        '[SERVER]\tRESPONSE> responseStatus: ${request.response.statusCode} ; body: $response >> operation: $operation ; parameters: $parameters');
+    if (operation != 'stdout' && operation != 'stderr') {
+      var responseBody = _bodyToShortString(response);
+
+      print(
+          '[SERVER]\tRESPONSE> responseStatus: ${request.response.statusCode} ; body: ${responseBody.length < 10 ? responseBody : responseBody.length} >> operation: $operation ; parameters: $requestParameters');
+    }
 
     _setResponseCORS(request);
 
@@ -224,6 +228,25 @@ class DockerHostServer {
     }
 
     await request.response.close();
+  }
+
+  String _bodyToShortString(response) {
+    String responseBody;
+
+    if (response == null || response is int || response is bool) {
+      responseBody = '$response';
+    } else if (response is String) {
+      responseBody = response.length <= 10
+          ? response
+          : 'String#' + response.length.toString();
+    } else if (response is List) {
+      responseBody = 'List#' + response.length.toString();
+    } else if (response is Map) {
+      responseBody = 'Map#' + response.length.toString();
+    } else {
+      responseBody = responseBody.runtimeType.toString();
+    }
+    return responseBody;
   }
 
   final Map<String, int> _authenticationCount = {};
@@ -256,7 +279,7 @@ class DockerHostServer {
     _cleanAuthentications(now);
 
     var count = _authenticationCount.putIfAbsent(username, () => 0);
-    if (count > 5) return false;
+    if (count > 10) return false;
 
     _authenticationCount[username] = count + 1;
     _authenticationTime[username] = now;
@@ -315,8 +338,10 @@ class DockerHostServer {
       Map<String, String> parameters,
       ContentType contentType,
       String body) async {
-    _LOG.info(
-        '[SERVER]\tPROCESS OPERATION>\t operation: $operation ; parameters: $parameters ; body: $body');
+    if (operation != 'stdout' && operation != 'stderr') {
+      _LOG.info(
+          '[SERVER]\tPROCESS OPERATION>\t operation: $operation ; parameters: $parameters ; body: $body');
+    }
 
     if (operation == 'auth') {
       return _processAuth(request, parameters, parseJSON(body));
@@ -632,12 +657,15 @@ class DockerHostServer {
     if (_dockerHostLocal == null) return null;
 
     var instanceID = _getParameterAsInt(parameters, json, 'instanceID');
+    var timeoutMs = _getParameterAsInt(parameters, json, 'timeout');
 
     var runner = _dockerHostLocal.getProcessByInstanceID(instanceID);
     runner ??= _dockerHostLocal.getRunnerByInstanceID(instanceID);
     if (runner == null) return null;
 
-    var ok = await runner.waitExit();
+    var timeout = timeoutMs != null ? Duration(milliseconds: timeoutMs) : null;
+
+    var ok = await runner.waitExit(timeout: timeout);
     return ok;
   }
 
@@ -681,6 +709,7 @@ class DockerHostServer {
       'length': length,
       'removed': removed,
       'entries': entries,
+      'exit_code': process.exitCode,
     };
   }
 

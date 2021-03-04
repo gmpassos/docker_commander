@@ -3,8 +3,17 @@ import 'package:swiss_knife/swiss_knife.dart';
 import 'docker_commander_host.dart';
 
 abstract class DockerCMDExecutor {
-  /// Returns [true] if runner of [containerName] is running.
+  /// Returns [true] [containerName] has a [DockerRunner].
+  bool isContainerARunner(String containerName);
+
+  /// Returns [true] if [DockerRunner] of [containerName] is running.
   bool isContainerRunnerRunning(String containerName);
+
+  /// Returns if [containerName] is running (checks at Docker Daemon).
+  Future<bool> isContainerRunning(String containerName) async {
+    var runningContainers = await DockerCMD.psContainerNames(this);
+    return runningContainers.contains(containerName);
+  }
 
   /// Executes a Docker [command] with [args]
   Future<DockerProcess> command(

@@ -1,6 +1,10 @@
 ## 1.0.18
 
-- README: Improve Docker Image usage
+- Added executable `docker_commander_console`: a console terminal to control a `docker_commander_server`.
+- Fix `DockerHostRemote` output consumer.
+- README: Improve Docker Image usage.
+- swiss_knife: ^2.5.26
+- mercury_client: ^1.1.19
 
 ## 1.0.17
 

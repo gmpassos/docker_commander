@@ -230,8 +230,6 @@ class DockerHostRemote extends DockerHost {
     return ok;
   }
 
-  final Map<int, DockerProcessRemote> _processes = {};
-
   @override
   Future<DockerProcess> exec(
     String containerName,
@@ -339,24 +337,47 @@ class DockerHostRemote extends DockerHost {
 
   Future<OutputSync> processGetOutput(
       int instanceID, int realOffset, bool stderr) async {
-    var response = await _httpClient.getJSON(stderr ? 'stderr' : 'stdout',
-        parameters: {'instanceID': '$instanceID', 'realOffset': '$realOffset'});
-    if (response == null) return null;
+    var outputType = stderr ? 'stderr' : 'stdout';
+    var parameters = {'instanceID': '$instanceID', 'realOffset': '$realOffset'};
 
-    var running = parseBool(response['running'], false);
+    var responseJSON =
+        await _httpClient.getJSON(outputType, parameters: parameters);
+
+    if (responseJSON == null) return null;
+
+    var running = parseBool(responseJSON['running'], false);
 
     if (!running) {
       return OutputSync.notRunning();
     }
 
-    var length = parseInt(response['length']);
-    var removed = parseInt(response['removed']);
-    var entries = response['entries'] as List;
+    var length = parseInt(responseJSON['length']);
+    var removed = parseInt(responseJSON['removed']);
+    var entries = responseJSON['entries'] as List;
+    var exitCode = parseInt(responseJSON['exit_code']);
 
-    return OutputSync(length, removed, entries);
+    return OutputSync(length, removed, entries, exitCode);
+  }
+
+  static final Duration EXITED_PROCESS_EXPIRE_TIME =
+      Duration(minutes: 2, seconds: 15);
+
+  final Map<int, DockerProcessRemote> _processes = {};
+
+  void _notifyProcessExited(DockerProcessRemote dockerProcess) {
+    _cleanupExitedProcesses();
+  }
+
+  void _cleanupExitedProcesses() {
+    DockerHost.cleanupExitedProcessesImpl(
+        EXITED_PROCESS_EXPIRE_TIME, _processes);
   }
 
   final Map<int, DockerRunnerRemote> _runners = {};
+
+  @override
+  bool isContainerARunner(String containerName) =>
+      getRunnerByName(containerName) != null;
 
   @override
   bool isContainerRunnerRunning(String containerName) =>
@@ -398,9 +419,11 @@ class DockerHostRemote extends DockerHost {
     return ok;
   }
 
-  Future<int> processWaitExit(int instanceID) async {
-    var code = await _httpClient
-        .getJSON('wait_exit', parameters: {'instanceID': '$instanceID'}) as int;
+  Future<int> processWaitExit(int instanceID, [Duration timeout]) async {
+    var code = await _httpClient.getJSON('wait_exit', parameters: {
+      'instanceID': '$instanceID',
+      if (timeout != null) 'timeout': '${timeout.inMilliseconds}',
+    }) as int;
     return code;
   }
 
@@ -547,31 +570,43 @@ class DockerProcessRemote extends DockerProcess {
   bool get isRunning => _exitCode == null;
 
   int _exitCode;
+  DateTime _exitTime;
 
   void _setExitCode(int exitCode) {
     if (_exitCode != null) return;
+
     _exitCode = exitCode;
+    _exitTime = DateTime.now();
+
     stdout.getOutputStream().markReady();
     stderr.getOutputStream().markReady();
 
+    _LOG.info('EXIT_CODE[instanceID: $instanceID]: $exitCode');
     Future.delayed(Duration(seconds: 60), () => dispose());
+
+    dockerHost._notifyProcessExited(this);
   }
 
   @override
   int get exitCode => _exitCode;
 
   @override
-  Future<int> waitExit({int desiredExitCode}) async {
-    var exitCode = await _waitExitImpl();
+  DateTime get exitTime => _exitTime;
+
+  @override
+  Future<int> waitExit({int desiredExitCode, Duration timeout}) async {
+    var exitCode = await _waitExitImpl(timeout);
     if (desiredExitCode != null && exitCode != desiredExitCode) return null;
     return exitCode;
   }
 
-  Future<int> _waitExitImpl() async {
+  Future<int> _waitExitImpl(Duration timeout) async {
     if (_exitCode != null) return _exitCode;
 
-    var code = await dockerHost.processWaitExit(instanceID);
-    _setExitCode(code);
+    var code = await dockerHost.processWaitExit(instanceID, timeout);
+    if (code != null) {
+      _setExitCode(code);
+    }
 
     return _exitCode;
   }
@@ -586,13 +621,17 @@ class OutputSync {
 
   final List entries;
 
-  OutputSync(this.length, this.removed, this.entries) : running = true;
+  final int exitCode;
+
+  OutputSync(this.length, this.removed, this.entries, this.exitCode)
+      : running = true;
 
   OutputSync.notRunning()
       : running = false,
         length = null,
         removed = null,
-        entries = null;
+        entries = null,
+        exitCode = null;
 }
 
 class OutputClient {
@@ -638,6 +677,10 @@ class OutputClient {
       _running = false;
     }
 
+    if (outputSync.exitCode != null) {
+      process._setExitCode(outputSync.exitCode);
+    }
+
     var entries = outputSync.entries;
 
     if (entries != null) {
@@ -650,13 +693,27 @@ class OutputClient {
 
   void _syncLoop() async {
     var noDataCounter = 0;
+    var exitedCount = 0;
 
     while (_running) {
       var withData = await sync();
 
       if (!withData) {
         ++noDataCounter;
+
+        if (process.isFinished && noDataCounter > 3) {
+          exitedCount++;
+          if (exitedCount > 3) {
+            var exitElapsedTime = process.exitElapsedTime;
+            if (exitElapsedTime.inSeconds > 10) {
+              stop();
+              break;
+            }
+          }
+        }
+
         var sleep = _resolveNoDataSleep(noDataCounter);
+
         await Future.delayed(Duration(milliseconds: sleep), () {});
       } else {
         noDataCounter = 0;

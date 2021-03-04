@@ -27,7 +27,7 @@ void configureLogger() {
 void showHelp() {
   print(
       '-----------------------------------------------------------------------------');
-  print('| docker_commander/server - version ${DockerCommander.VERSION}');
+  print('| docker_commander_server - version ${DockerCommander.VERSION}');
   print(
       '-----------------------------------------------------------------------------');
   print('');

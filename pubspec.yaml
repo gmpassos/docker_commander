@@ -7,9 +7,9 @@ environment:
   sdk: '>=2.10.0 <3.0.0'
 
 dependencies:
-  swiss_knife: ^2.5.25
+  swiss_knife: ^2.5.26
     #path: ../swiss_knife
-  mercury_client: ^1.1.18
+  mercury_client: ^1.1.19
     #path: ../mercury_client
   logging: ^0.11.4
 
@@ -21,5 +21,6 @@ dev_dependencies:
 
 executables:
   docker_commander_server:
+  docker_commander_console:
 
 

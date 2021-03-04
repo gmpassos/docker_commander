@@ -340,8 +340,6 @@ class DockerHostLocal extends DockerHost {
     }
   }
 
-  final Map<int, DockerProcess> _processes = {};
-
   @override
   Future<DockerProcess> exec(
     String containerName,
@@ -353,7 +351,12 @@ class DockerHostLocal extends DockerHost {
     OutputReadyFunction stderrReadyFunction,
     OutputReadyType outputReadyType,
   }) async {
-    if (!isContainerRunnerRunning(containerName)) return null;
+    if (isContainerARunner(containerName)) {
+      if (!isContainerRunnerRunning(containerName)) return null;
+    } else {
+      var running = await isContainerRunning(containerName);
+      if (!running) return null;
+    }
 
     var instanceID = DockerProcess.incrementInstanceID();
 
@@ -471,7 +474,25 @@ class DockerHostLocal extends DockerHost {
     return result.exitCode == 0;
   }
 
+  static final Duration EXITED_PROCESS_EXPIRE_TIME =
+      Duration(minutes: 1, seconds: 15);
+
+  final Map<int, DockerProcessLocal> _processes = {};
+
+  void _notifyProcessExited(DockerProcessLocal dockerProcess) {
+    _cleanupExitedProcesses();
+  }
+
+  void _cleanupExitedProcesses() {
+    DockerHost.cleanupExitedProcessesImpl(
+        EXITED_PROCESS_EXPIRE_TIME, _processes);
+  }
+
   final Map<int, DockerRunnerLocal> _runners = {};
+
+  @override
+  bool isContainerARunner(String containerName) =>
+      getRunnerByName(containerName) != null;
 
   @override
   bool isContainerRunnerRunning(String containerName) =>
@@ -650,9 +671,6 @@ class DockerRunnerLocal extends DockerProcessLocal implements DockerRunner {
             stderrReadyFunction,
             outputReadyType);
 
-  @override
-  DockerHostLocal get dockerHost => super.dockerHost as DockerHostLocal;
-
   String _id;
 
   @override
@@ -708,6 +726,9 @@ class DockerProcessLocal extends DockerProcess {
       this._outputReadyType)
       : super(dockerHost, instanceID, containerName);
 
+  @override
+  DockerHostLocal get dockerHost => super.dockerHost;
+
   final Completer<int> _exitCompleter = Completer();
 
   Future<bool> initialize() async {
@@ -727,10 +748,20 @@ class DockerProcessLocal extends DockerProcess {
 
   void _setExitCode(int exitCode) {
     if (_exitCode != null) return;
+    _LOG.info('EXIT_CODE[instanceID: $instanceID]: $exitCode');
+
     _exitCode = exitCode;
+    _exitTime = DateTime.now();
+
     _exitCompleter.complete(exitCode);
+
     this.stdout?.getOutputStream()?.markReady();
     this.stderr?.getOutputStream()?.markReady();
+
+    // Schedule dispose:
+    Future.delayed(Duration(seconds: 30), () => dispose());
+
+    dockerHost._notifyProcessExited(this);
   }
 
   OutputStream _buildOutputStream(
@@ -748,7 +779,7 @@ class DockerProcessLocal extends DockerProcess {
 
       var listenSubscription = stdout
           .transform(systemEncoding.decoder)
-          .listen((line) => outputStream.add(line));
+          .listen((s) => outputStream.add(s));
 
       outputStream.onDispose.listen((_) {
         try {
@@ -820,22 +851,33 @@ class DockerProcessLocal extends DockerProcess {
   bool get isRunning => _exitCode == null;
 
   int _exitCode;
+  DateTime _exitTime;
 
   @override
   int get exitCode => _exitCode;
 
   @override
-  Future<int> waitExit({int desiredExitCode}) async {
-    var exitCode = await _waitExitImpl();
+  DateTime get exitTime => _exitTime;
+
+  @override
+  Future<int> waitExit({int desiredExitCode, Duration timeout}) async {
+    var exitCode = await _waitExitImpl(timeout);
     if (desiredExitCode != null && exitCode != desiredExitCode) return null;
     return exitCode;
   }
 
-  Future<int> _waitExitImpl() async {
+  Future<int> _waitExitImpl(Duration timeout) async {
     if (_exitCode != null) return _exitCode;
-    var code = await _exitCompleter.future;
-    _exitCode ??= code;
-    Future.delayed(Duration(seconds: 30), () => dispose());
+
+    int code;
+    if (timeout != null) {
+      code =
+          await _exitCompleter.future.timeout(timeout, onTimeout: () => null);
+    } else {
+      code = await _exitCompleter.future;
+    }
+
+    assert(code == _exitCode);
     return _exitCode;
   }
 }

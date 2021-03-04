@@ -465,6 +465,28 @@ abstract class DockerHost extends DockerCMDExecutor {
   Future<bool> removeService(String name) =>
       DockerCMD.removeService(this, name);
 
+  static void cleanupExitedProcessesImpl(
+      Duration exitedProcessExpireTime, Map<int, DockerProcess> _processes) {
+    var expireTime = exitedProcessExpireTime.inMilliseconds;
+    var now = DateTime.now().millisecondsSinceEpoch;
+
+    for (var instanceID in _processes.keys.toList()) {
+      var process = _processes[instanceID];
+      assert(process.instanceID == instanceID);
+
+      var exitTime = process.exitTime;
+      if (exitTime == null) continue;
+
+      assert(process.exitCode != null);
+
+      var exitElapsedTime = now - exitTime.millisecondsSinceEpoch;
+
+      if (exitElapsedTime > expireTime) {
+        _processes.remove(instanceID);
+      }
+    }
+  }
+
   /// Resolves a Docker image, composed by [imageName] and [version].
   static String resolveImage(String imageName, [String version]) {
     var image = imageName.trim();
@@ -594,8 +616,23 @@ abstract class DockerProcess {
   /// The exist code, returned by [waitExit], or null if still running.
   int get exitCode;
 
+  /// Returns the time of exit. Computed when [exitCode] is set.
+  DateTime get exitTime;
+
+  /// If [exitCode] is defined, returns the elapsed time from [exitTime].
+  Duration get exitElapsedTime {
+    var exitTime = this.exitTime;
+    if (exitTime == null) return null;
+    var elapsedTime =
+        DateTime.now().millisecondsSinceEpoch - exitTime.millisecondsSinceEpoch;
+    return Duration(milliseconds: elapsedTime);
+  }
+
+  /// Returns [true] if [exitCode] is defined (process exited).
+  bool get isFinished => exitCode != null;
+
   /// Waits this container to naturally exit.
-  Future<int> waitExit({int desiredExitCode});
+  Future<int> waitExit({int desiredExitCode, Duration timeout});
 
   /// Waits this container to naturally exit.
   Future<bool> waitExitAndConfirm(int desiredExitCode) async {
@@ -643,11 +680,20 @@ class Output {
   Future<bool> waitForDataMatch(Pattern dataMatcher, {Duration timeout}) =>
       _outputStream.waitForDataMatch(dataMatcher, timeout: timeout);
 
+  /// On data event listener.
+  EventStream<dynamic> get onData => _outputStream.onData;
+
   /// Returns all the output as bytes.
   List<int> get asBytes => _outputStream.asBytes;
 
   /// Returns all the output as [String].
   String get asString => _outputStream.asString;
+
+  /// Sames as [asString], but with optional parameters [entriesRealOffset] and [contentRealOffset].
+  String asStringFrom({int entriesRealOffset, int contentRealOffset}) =>
+      _outputStream.asStringFrom(
+          entriesRealOffset: entriesRealOffset,
+          contentRealOffset: contentRealOffset);
 
   /// Returns all the output as lines (List<String>).
   List<String> get asLines => _outputStream.asLines;
@@ -665,8 +711,17 @@ class Output {
   /// Current length of [_data] buffer.
   int get entriesLength => _outputStream.entriesLength;
 
-  /// Number of removed entries, due [_limit].
+  /// Number of removed entries, due [limit].
   int get entriesRemoved => _outputStream.entriesRemoved;
+
+  /// Size of removed content, due [limit].
+  int get contentRemoved => _outputStream.contentRemoved;
+
+  /// Returns the size of the buffered content.
+  int get bufferedContentSize => _outputStream.bufferedContentSize;
+
+  /// Limit of buffered entries.
+  int get limit => _outputStream.limit;
 
   /// Returns a [List] of entries, from [offset] or [realOffset].
   List getEntries({int offset, int realOffset}) =>
@@ -695,7 +750,7 @@ enum OutputReadyType { STDOUT, STDERR, ANY, STARTS_READY }
 /// Handles the output stream of a Docker container.
 class OutputStream<T> {
   final Encoding _encoding;
-  final bool lines;
+  final bool stringData;
 
   /// The limit of entries.
   int _limit;
@@ -706,7 +761,7 @@ class OutputStream<T> {
 
   final Completer<bool> anyOutputReadyCompleter;
 
-  OutputStream(this._encoding, this.lines, this._limit,
+  OutputStream(this._encoding, this.stringData, this._limit,
       this.outputReadyFunction, this.anyOutputReadyCompleter);
 
   bool _ready = false;
@@ -750,12 +805,22 @@ class OutputStream<T> {
   final List<T> _data = <T>[];
 
   int _dataRemoved = 0;
+  int _contentRemoved = 0;
 
   /// Current length of [_data] buffer.
   int get entriesLength => _data.length;
 
   /// Number of removed entries, due [_limit].
   int get entriesRemoved => _dataRemoved;
+
+  /// Size of removed content, due [_limit].
+  ///
+  /// - If is [stringData], [_data] will consider removed length of String entries.
+  /// - If is NOT [stringData], [_data] will return the same value as [entriesRemoved].
+  int get contentRemoved => _contentRemoved;
+
+  /// Returns the size of the buffered content.
+  int get bufferedContentSize => _computeDataContentSize(_data);
 
   /// Returns a [List] of entries, from [offset] or [realOffset].
   List<T> getEntries({int offset, int realOffset}) {
@@ -780,14 +845,9 @@ class OutputStream<T> {
       markReady();
     }
 
-    if (_limit > 0) {
-      while (_data.length > _limit) {
-        _data.removeAt(0);
-        ++_dataRemoved;
-      }
-    }
+    _checkDataLimit();
 
-    _notifyWaitingData();
+    _notifyWaitingData(entry);
   }
 
   /// Adds all [entries] to the [_data] buffer.
@@ -798,20 +858,49 @@ class OutputStream<T> {
       markReady();
     }
 
+    _checkDataLimit();
+
+    _notifyWaitingData(entries);
+  }
+
+  void _checkDataLimit() {
     if (_limit > 0) {
-      var rm = _data.length - _limit;
-      if (rm > 0) {
-        _data.removeRange(0, rm);
-        _dataRemoved += rm;
+      if (stringData) {
+        while (_data.length > _limit) {
+          var content = _data.removeAt(0);
+          ++_dataRemoved;
+          _contentRemoved += (content as String).length;
+        }
+      } else {
+        while (_data.length > _limit) {
+          _data.removeAt(0);
+          ++_dataRemoved;
+          ++_contentRemoved;
+        }
       }
     }
-
-    _notifyWaitingData();
   }
+
+  int _computeDataContentSize(List<T> data) {
+    if (stringData) {
+      var total = 0;
+      for (var s in data.cast<String>()) {
+        total += s.length;
+      }
+      return total;
+    } else {
+      return data.length;
+    }
+  }
+
+  /// On data event listener.
+  final EventStream<dynamic> onData = EventStream();
 
   final List<Completer<bool>> _waitingData = [];
 
-  void _notifyWaitingData() {
+  void _notifyWaitingData(dynamic data) {
+    onData.add(data);
+
     if (_waitingData.isEmpty) return;
 
     for (var completer in _waitingData) {
@@ -825,6 +914,9 @@ class OutputStream<T> {
 
   /// Waits with a [timeout] for new data.
   Future<bool> waitData({Duration timeout}) {
+    // If disposed, new data won't arrive:
+    if (isDisposed) return Future.value(false);
+
     timeout ??= Duration(seconds: 1);
 
     var completer = Completer<bool>();
@@ -873,7 +965,7 @@ class OutputStream<T> {
 
   /// Converts and returns [_data] entries as bytes.
   List<int> get asBytes {
-    if (lines) {
+    if (stringData) {
       return utf8.encode(asString);
     } else {
       return List.unmodifiable(_data as List<int>);
@@ -881,22 +973,67 @@ class OutputStream<T> {
   }
 
   /// Converts and returns [_data] entries as [String].
-  String get asString {
-    if (lines) {
-      return _data.join('\n');
+  String get asString => _dataToString(_data);
+
+  String _dataToString(List<T> data) {
+    if (stringData) {
+      return data.join();
     } else {
-      return _encoding.decode(_data as List<int>);
+      return _encoding.decode(data as List<int>);
     }
   }
 
-  /// Converts and returns [_data] entries as lines [List<String>].
-  List<String> get asLines {
-    if (lines) {
-      return List.unmodifiable(_data as List<String>);
-    } else {
-      return asString.split(RegExp(r'\r?\n'));
+  /// Same as [asString], but resolves [entriesRealOffset] and [contentRealOffset].
+  ///
+  /// [entriesRealOffset] is an offset of all past entries (will considere [entriesRemoved]).
+  /// [contentRealOffset]
+  String asStringFrom({int entriesRealOffset, int contentRealOffset}) {
+    if ((entriesRealOffset == null || entriesRealOffset < 0) &&
+        (contentRealOffset == null || contentRealOffset < 0)) {
+      return asString;
     }
+
+    var contentOffset = 0;
+    if (contentRealOffset != null && contentRealOffset >= 0) {
+      contentOffset = contentRealOffset - _contentRemoved;
+    }
+
+    String s;
+    if (entriesRealOffset != null && entriesRealOffset >= 0) {
+      var entriesOffset = entriesRealOffset - entriesRemoved;
+
+      if (entriesOffset <= 0) {
+        s = asString;
+        if (contentOffset > 0) {
+          s = s.substring(Math.min(contentOffset, s.length));
+        }
+      } else if (entriesOffset >= _data.length) {
+        s = '';
+      } else {
+        var data1 = _data.sublist(0, entriesOffset);
+        var prevContentSize = _computeDataContentSize(data1);
+        contentOffset = Math.max(0, contentOffset - prevContentSize);
+
+        var data2 = _data.sublist(entriesOffset);
+        s = _dataToString(data2);
+
+        if (contentOffset > 0) {
+          s = s.substring(Math.min(contentOffset, s.length));
+        }
+      }
+    } else {
+      s = asString;
+
+      if (contentOffset > 0) {
+        s = s.substring(Math.min(contentOffset, s.length));
+      }
+    }
+
+    return s;
   }
+
+  /// Converts and returns [_data] entries as lines [List<String>].
+  List<String> get asLines => asString.split(RegExp(r'\r?\n'));
 
   EventStream<OutputStream<T>> onDispose = EventStream();
 
@@ -905,6 +1042,7 @@ class OutputStream<T> {
   bool get isDisposed => _disposed;
 
   void dispose() {
+    if (_disposed) return;
     _disposed = true;
     onDispose.add(this);
   }

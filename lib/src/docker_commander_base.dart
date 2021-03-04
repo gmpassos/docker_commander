@@ -5,7 +5,7 @@ import 'docker_commander_host.dart';
 
 /// The Docker manager.
 class DockerCommander extends DockerCMDExecutor {
-  static final String VERSION = '1.0.16';
+  static final String VERSION = '1.0.18';
 
   /// Docker machine host.
   final DockerHost dockerHost;
@@ -21,9 +21,9 @@ class DockerCommander extends DockerCMDExecutor {
   Future<bool> initialize() async {
     if (_initialized > 0) return _initialized == 1;
     var hostOk = await dockerHost.initialize();
-    var ok = hostOk;
-    _initialized = ok ? 1 : 2;
-    return ok;
+    hostOk ??= false;
+    _initialized = hostOk ? 1 : 2;
+    return hostOk;
   }
 
   /// Returns [true] if is initialized, even if is initialized with errors.
@@ -142,6 +142,10 @@ class DockerCommander extends DockerCMDExecutor {
 
     return dockerContainer;
   }
+
+  @override
+  bool isContainerARunner(String containerName) =>
+      dockerHost.isContainerARunner(containerName);
 
   @override
   bool isContainerRunnerRunning(String containerName) =>
