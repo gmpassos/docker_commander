@@ -45,7 +45,7 @@ class DockerCommander extends DockerCMDExecutor {
   DateTime get lastDaemonCheck => _lastDaemonCheck;
 
   /// Checks if Docker daemon is accessible.
-  void checkDaemon() async {
+  Future<void> checkDaemon() async {
     await ensureInitialized();
 
     if (!(await isDaemonRunning())) {

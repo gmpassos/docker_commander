@@ -74,16 +74,16 @@ class DockerHostServer {
   bool get isStarted => _started != null ? _started.isCompleted : false;
 
   Future<void> startAndWait() async {
-    start();
+    await start();
     await waitStart();
   }
 
-  void waitStart() async {
+  Future<void> waitStart() async {
     if (isStarted) return;
     await _started.future;
   }
 
-  void start() async {
+  Future<void> start() async {
     if (_started != null) return;
 
     _LOG.info('[SERVER]\tSTARTING...');

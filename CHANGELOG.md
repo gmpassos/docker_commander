@@ -3,6 +3,7 @@
 - Added executable `docker_commander_console`: a console terminal to control a `docker_commander_server`.
 - Fix `DockerHostRemote` output consumer.
 - README: Improve Docker Image usage.
+- Dart 2.12.0+ compliant: `dartfmt` and `dartanalyzer`.
 - swiss_knife: ^2.5.26
 - mercury_client: ^1.1.19
 

@@ -324,7 +324,7 @@ class DockerHostLocal extends DockerHost {
     return runner;
   }
 
-  void _configureContainerNetwork(
+  Future<void> _configureContainerNetwork(
       String network, DockerRunnerLocal runner) async {
     if (isEmptyString(network)) return;
     var runnersHostsAndIPs = getNetworkRunnersHostnamesAndIPs(network);
