@@ -1,3 +1,7 @@
+## 1.0.19
+
+- Dart 2.12.0+ compliant: change DockerFile to use `dart run` instead of `dart pub run`.
+
 ## 1.0.18
 
 - Added executable `docker_commander_console`: a console terminal to control a `docker_commander_server`.

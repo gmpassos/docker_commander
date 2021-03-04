@@ -49,6 +49,8 @@ void main(List<String> args) async {
 
   configureLogger();
 
+  args = args.toList();
+
   var public = args.contains('--public');
   var ipv6 = args.contains('--ipv6');
 

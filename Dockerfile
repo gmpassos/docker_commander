@@ -31,11 +31,11 @@ EXPOSE 8099/tcp
 WORKDIR /app
 
 ADD pubspec.* /app/
-RUN pub get
+RUN dart pub get
 ADD . /app
-RUN pub get --offline
+RUN dart pub get --offline
 
-ENTRYPOINT ["/usr/bin/dart", "pub", "run", "bin/docker_commander_server.dart", "--public"]
+ENTRYPOINT ["/usr/bin/dart", "run", "bin/docker_commander_server.dart", "--public"]
 
 ## USAGE:
 ## docker run -it --rm -v /var/run/docker.sock:/var/run/docker.sock -p 8099:8099 docker_commander/server userx 123456
