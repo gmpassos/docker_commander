@@ -25,12 +25,12 @@ void main(List<String> args) async {
 
   if (console ?? false) {
     print('CONSOLE MODE:');
-    await docker_commander_console.main(args);
+    docker_commander_console.main(args);
   } else if (server ?? false) {
     print('SERVER MODE:');
-    await docker_commander_server.main(args);
+    docker_commander_server.main(args);
   } else {
     print('DEFAULT MODE: SERVER');
-    await docker_commander_server.main(args);
+    docker_commander_server.main(args);
   }
 }
