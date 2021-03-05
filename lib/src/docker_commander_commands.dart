@@ -448,7 +448,9 @@ abstract class DockerCMD {
     ]);
     var exitCode = await process.waitExit();
     if (exitCode != 0) return null;
-    var output = process.stdout.asString;
+    var stdout = process.stdout;
+    await stdout.waitForDataMatch(RegExp(r'\w'), timeout: Duration(seconds: 1));
+    var output = stdout.asString;
     var names =
         output.replaceAll(RegExp(r'\s+'), ' ').trim().split(RegExp(r'\s+'));
     return names;
@@ -470,7 +472,6 @@ abstract class DockerCMD {
       DockerCMDExecutor executor, String networkName) async {
     if (isEmptyString(networkName, trim: true)) return null;
     networkName = networkName.trim();
-
     var process = await executor.command('network', ['rm', networkName]);
     var exitCode = await process.waitExit();
     return exitCode == 0;

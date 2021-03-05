@@ -644,6 +644,11 @@ class OutputSync {
         removed = null,
         entries = null,
         exitCode = null;
+
+  @override
+  String toString() {
+    return 'OutputSync{running: $running, length: $length, removed: $removed, entries: $entries, exitCode: $exitCode}';
+  }
 }
 
 class OutputClient {

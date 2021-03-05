@@ -1,3 +1,7 @@
+## 1.0.21
+
+- Improve `console` `log` command output.
+
 ## 1.0.20
 
 - Improve console `stdout/stderr` output.

@@ -391,6 +391,12 @@ class DockerCommanderConsole {
 
           var listener = output.onData.listen((d) {
             if (anyDataReceived.isCompleted) {
+              if (waitingData.isNotEmpty) {
+                for (var d in waitingData) {
+                  _printData(d, allowPrintAsOutput, 'printData2');
+                }
+                waitingData.clear();
+              }
               _printData(d, allowPrintAsOutput, 'listener');
             } else {
               waitingData.add('$d');
@@ -431,6 +437,7 @@ class DockerCommanderConsole {
             for (var d in waitingData) {
               _printData(d, allowPrintAsOutput, 'printData2');
             }
+            waitingData.clear();
 
             while (true) {
               await _askParameter('', '[STOP $outputName CONSUMER]');
