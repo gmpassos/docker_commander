@@ -258,6 +258,8 @@ class DockerHostRemote extends DockerHost {
       'outputLimit': '$outputLimit',
     }) as Map;
 
+    if (response == null) return null;
+
     var instanceID = response['instanceID'] as int;
     containerName = response['containerName'] as String;
 

@@ -1,3 +1,8 @@
+## 1.0.20
+
+- `Dockerfile`: `--server` and `--console` modes.
+- `README.md`: improved Docker image usage.
+
 ## 1.0.19
 
 - Improve console commands.

@@ -1,6 +1,6 @@
 name: docker_commander
 description: A Docker manager for local and remote host machines. Works with personalized containers and pre-configured popular containers, like PostgreSQL, Apache HTTPD and NGINX.
-version: 1.0.19
+version: 1.0.20
 homepage: https://github.com/gmpassos/docker_commander
 
 environment:

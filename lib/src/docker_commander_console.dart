@@ -176,12 +176,16 @@ class DockerCommanderConsole {
 
           var containersNames = await dockerCommander.psContainerNames();
 
+          await _printToConsole('CONTAINERS: $containersNames');
+
           DockerProcess process;
-          if (containersNames.contains(name)) {
+          if (containersNames != null && containersNames.contains(name)) {
             process = await dockerCommander.openContainerLogs(name);
           } else {
             var servicesNames = await dockerCommander.listServicesNames();
-            if (servicesNames.contains(name)) {
+            await _printToConsole('SERVICES: $servicesNames');
+
+            if (servicesNames != null && servicesNames.contains(name)) {
               process = await dockerCommander.openServiceLogs(name);
             } else {
               return false;

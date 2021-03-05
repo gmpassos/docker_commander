@@ -43,6 +43,11 @@ void showHelp() {
   print('');
 }
 
+void _printLine() {
+  print(
+      '------------------------------------------------------------------------------');
+}
+
 Future<void> _printToConsole(String line, bool output) async {
   if (output ?? false) {
     print('>> $line');
@@ -94,17 +99,18 @@ Future<String> _readStdinLine() async {
 
 void main(List<String> args) async {
   print('[ARGS: $args]');
+  args = args.toList();
 
-  if (args.contains('--help') ||
-      args.contains('-help') ||
-      args.contains('-h')) {
+  var help =
+      args.contains('--help') || args.contains('-help') || args.contains('-h');
+
+  if (help) {
     showHelp();
     return;
   }
 
   configureLogger();
 
-  args = args.toList();
   args.removeWhere((a) => a.startsWith('--'));
 
   var username = args.isNotEmpty ? args[0] : await _ask('username');
@@ -130,6 +136,7 @@ void main(List<String> args) async {
 
   var console = DockerCommanderConsole(dockerCommander, _ask, _printToConsole);
 
+  _printLine();
   print(console);
 
   print('Initializing...');
@@ -149,7 +156,8 @@ void main(List<String> args) async {
     exit(1);
   }
 
-  print('--------------------------------------------------------------------');
+  _printLine();
+
   while (true) {
     stdout.write('\n\$> ');
     var line = await _readStdinLine();
@@ -179,7 +187,8 @@ void main(List<String> args) async {
     }
   }
 
-  print('--------------------------------------------------------------------');
+  _printLine();
+
   print('By!');
   exit(0);
 }

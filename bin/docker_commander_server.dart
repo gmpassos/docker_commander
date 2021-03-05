@@ -5,6 +5,7 @@ import 'package:swiss_knife/swiss_knife.dart';
 const int DEFAULT_SERVER_PORT = 8099;
 
 bool _loggerConfigured = false;
+
 void configureLogger() {
   if (_loggerConfigured) return;
   _loggerConfigured = true;
@@ -33,28 +34,40 @@ void showHelp() {
   print('');
   print('USAGE:\n');
   print(
-      '  \$> docker_commander_server %username %password %port? --public --ipv6');
+      '  \$> docker_commander_server %username %password %port? --public/private? --ipv6?');
   print('');
   print('## Default Server port: $DEFAULT_SERVER_PORT');
   print('');
 }
 
 void main(List<String> args) async {
-  print('ARGS: $args');
+  print('[ARGS: $args]');
+  args = args.toList();
 
-  if (args.length < 2) {
+  var help =
+      args.contains('--help') || args.contains('-help') || args.contains('-h');
+
+  if (help) {
     showHelp();
     return;
   }
 
   configureLogger();
 
-  args = args.toList();
-
   var public = args.contains('--public');
+  var private = args.contains('--private');
   var ipv6 = args.contains('--ipv6');
 
+  if (private ?? false) {
+    public = false;
+  }
+
   args.removeWhere((a) => a.startsWith('--'));
+
+  if (args.length < 2) {
+    showHelp();
+    return;
+  }
 
   var username = args[0];
   var password = args[1];

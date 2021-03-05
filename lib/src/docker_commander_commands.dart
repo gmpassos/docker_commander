@@ -4,7 +4,7 @@ import 'docker_commander_host.dart';
 
 abstract class DockerCMDExecutor {
   /// The default timeout to wait data in STDOUT/STDERR outputs.
-  Duration get defaultOutputTime => Duration(seconds: 1);
+  Duration get defaultOutputTime => Duration(seconds: 2);
 
   /// Returns [true] [containerName] has a [DockerRunner].
   bool isContainerARunner(String containerName);

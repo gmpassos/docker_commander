@@ -26,20 +26,30 @@
 
 [docker]:https://www.docker.com/
 
-## Running `docker_commander` [Server Image][docker_commander_server_image]
+-------------------------------------------------------------------------------
+
+## Running `docker_commander` [image][docker_commander_server_image]
+
+A [Docker][docker] image of `docker_commander` is provided at [Docker HUB][docker_commander_server_image],
+allowing an easy and fast way to use `docker_commander` in any environment with Docker (even without Dart).
 
 Pull the Docker image:
+
 ```shell
 docker pull gmpassos/docker_commander
 ```
 
-Run the `docker_commander` server image, mapping port `8099` and Docker Host Daemon socket file (`/var/run/docker.sock`).
+### SERVER MODE:
+
+Run the `docker_commander` image in SERVER mode, mapping port `8099` and Docker Host Daemon socket file (`/var/run/docker.sock`).
+
 ```shell
-docker run --name docker_commander_server -d -t --rm -v /var/run/docker.sock:/var/run/docker.sock -p 8099:8099 gmpassos/docker_commander userx pass123
+docker run --name docker_commander_server -d -t --rm -v /var/run/docker.sock:/var/run/docker.sock -p 8099:8099 gmpassos/docker_commander --server userx pass123
 ```
 
 You need to provide an username and password (the parameters `userx`and `pass123` above) to control the access to this `docker_commander` server.
-You will pass this credential and the public mapped port (8099) to the `DockerHostRemote`, allowing it to connect to the server container.
+You will pass this credential, and the public mapped port (8099) to the `DockerHostRemote`, allowing it to connect to the server container.
+If you need to restrict address access, pass the parameter `--private`.
 
 Follow the server output:
 
@@ -52,13 +62,47 @@ To enable control of Docker Daemon from the `docker_commander` server container,
 to map the Docker Host Daemon socket file (`/var/run/docker.sock`). This won't require to run the
 container in a `--privileged` context or as root.*
 
-For more information:
+### CONSOLE MODE:
+
+Run the `docker_commander` image in CONSOLE mode, passing `--console`:
+
+```shell
+docker run -it --rm gmpassos/docker_commander --console userx your.server.host 8099
+```
+
+Console example:
+
+```text
+[ARGS: [userx, userx your.server.host, 8099]]
+
+Please, provide the password for user 'userx' at docker_commander server your.server.host:8099.
+password> pass123
+------------------------------------------------------------------------------
+DockerCommanderConsole{dockerCommander: DockerCommander{dockerHost: DockerHostRemote{serverHost: your.server.host, serverPort: 8099, secure: false, username: userx}, initialized: false. lastDaemonCheck: null}}
+Initializing...
+Initialization: true
+------------------------------------------------------------------------------
+
+$> ps
+------------------------------------------------------------------------------
+>> CONTAINER ID   IMAGE                       COMMAND                  CREATED             STATUS             PORTS                    NAMES
+>> 0f229773e36f   gmpassos/docker_commander   "/usr/bin/dart run b…"   About an hour ago   Up About an hour   0.0.0.0:8099->8099/tcp   docker_commander_server
+------------------------------------------------------------------------------
+EXIT_CODE: 0
+
+$> help
+...
+```
+
+### For more information:
 
 - See the [Docker HUB Repository of `docker_commander`][docker_commander_server_image]
 
 [docker_commander_server_image]:https://hub.docker.com/r/gmpassos/docker_commander
 
-## Usage
+-------------------------------------------------------------------------------
+
+## Dart Usage
 
 ### Local Docker
 
@@ -159,6 +203,8 @@ void main() async {
 
 ```
 
+-------------------------------------------------------------------------------
+
 ## PostgreSQLContainer
 
 A pre-configured [PostgreSQL][postgresql] Container:
@@ -204,6 +250,8 @@ void main() async {
 
 [postgresql]:https://www.postgresql.org/
 
+-------------------------------------------------------------------------------
+
 ## ApacheHttpdContainer
 
 A pre-configured container for the famous [Apache HTTPD][apache]:
@@ -243,6 +291,8 @@ void main() async {
 ```
 
 [apache]:https://httpd.apache.org/
+
+-------------------------------------------------------------------------------
 
 ## NginxContainer
 
@@ -298,6 +348,8 @@ void main() async {
 
 [nginx]:https://www.nginx.com/
 
+-------------------------------------------------------------------------------
+
 ## See Also
 
 See [package docker_commander_test][docker_commander_test], for unit test framework with [Docker][docker] containers.
@@ -322,4 +374,6 @@ Graciliano M. Passos: [gmpassos@GitHub][github_gmp].
 
 ## License
 
-Dart free & open-source [license](https://github.com/dart-lang/stagehand/blob/master/LICENSE).
+[Apache License - Version 2.0][apache_license]
+
+[apache_license]: https://www.apache.org/licenses/LICENSE-2.0.txt
