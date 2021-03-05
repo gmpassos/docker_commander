@@ -1,3 +1,7 @@
+## 1.0.22
+
+- Fix version self reference.
+
 ## 1.0.21
 
 - Improve `console` `log` command output.
