@@ -24,17 +24,27 @@ class DockerCommanderConsole {
   Future<void> showHelp() async {
     await _printLineToConsole();
     await _printToConsole('HELP:');
-    await _printToConsole('  - ps');
-    await _printToConsole('  - cmd %command %args*');
+    await _printToConsole('');
+    await _printToConsole(
+        '  - ps                     # List Docker containers.');
+    await _printToConsole(
+        '  - cmd %command %args*    # Executes a Docker command.');
+    await _printToConsole('');
     await _printToConsole(
         '  - create-container %containerName %imageName %version %replicas %ports %volumes %hostname %network %environment --cleanContainer');
-    await _printToConsole('  - start %containerName');
     await _printToConsole(
         '  - create-service %serviceName %imageName %version %replicas %ports %volumes %hostname %network %environment');
+    await _printToConsole('');
+    await _printToConsole(
+        '  - start %containerName   # Starts a Docker container.');
     await _printToConsole('  - exec %containerName %binaryName %args*');
     await _printToConsole('  - exec-which %containerName %binaryName');
+    await _printToConsole('');
     await _printToConsole('  - logs %containerOrServiceName');
-    await _printToConsole('  - close');
+    await _printToConsole(
+        '  - close                  # Closes docker_commander server.');
+    await _printToConsole('  - exit                   # Exits console.');
+    await _printToConsole('');
     await _printLineToConsole();
   }
 

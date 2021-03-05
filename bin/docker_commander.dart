@@ -1,7 +1,8 @@
 import 'package:docker_commander/docker_commander_vm.dart';
-
-import 'docker_commander_console.dart' as docker_commander_console;
-import 'docker_commander_server.dart' as docker_commander_server;
+import 'package:docker_commander/src/executables/docker_commander_console.dart'
+    as docker_commander_console;
+import 'package:docker_commander/src/executables/docker_commander_server.dart'
+    as docker_commander_server;
 
 void showHelp() {
   print(
@@ -24,13 +25,13 @@ void main(List<String> args) async {
   var server = args.contains('--server');
 
   if (console ?? false) {
-    print('CONSOLE MODE:');
+    print('<CONSOLE MODE>');
     docker_commander_console.main(args);
   } else if (server ?? false) {
-    print('SERVER MODE:');
+    print('<SERVER MODE>');
     docker_commander_server.main(args);
   } else {
-    print('DEFAULT MODE: SERVER');
+    print('<DEFAULT MODE: SERVER>');
     docker_commander_server.main(args);
   }
 }

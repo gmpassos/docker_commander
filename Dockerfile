@@ -35,7 +35,7 @@ RUN dart pub get
 ADD . /app
 RUN dart pub get --offline
 
-ENTRYPOINT ["/usr/bin/dart", "run", "bin/docker_commander_server.dart", "--public"]
+ENTRYPOINT ["/usr/bin/dart", "run", "bin/docker_commander.dart", "--public"]
 
 ## USAGE:
 ## docker run -it --rm -v /var/run/docker.sock:/var/run/docker.sock -p 8099:8099 docker_commander/server userx 123456
