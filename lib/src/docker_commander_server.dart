@@ -27,7 +27,7 @@ class AuthenticationTable {
 
   @override
   String toString() {
-    return 'AuthenticationTable{users: ${usernamesAndPasswords.length}';
+    return 'AuthenticationTable{users: ${usernamesAndPasswords.length}}';
   }
 }
 
@@ -64,6 +64,84 @@ class DockerHostServer {
       Duration authenticationTokenTimeout})
       : authenticationTokenTimeout =
             authenticationTokenTimeout ?? Duration(hours: 1);
+
+  static const Set<String> WEAK_USERNAMES = {
+    'user',
+    'userx',
+    'usery',
+    'username',
+    'usernamex',
+    'usernamey',
+    'foo',
+    'bar',
+    'baz',
+    'me',
+  };
+
+  static const Set<String> WEAK_PASSWORDS = {
+    '',
+    '1',
+    '12',
+    '123',
+    '1234',
+    '12345',
+    '123456',
+    '1234567',
+    '12345678',
+    '123456789',
+    '1234567890',
+    'a',
+    'ab',
+    'abc',
+    'abcd',
+    'abcde',
+    'abcdef',
+    'abcdefg',
+    'abcdefgh',
+    'abcdefghi',
+    'abcdefghij',
+    'abcdefghijk',
+    'pass',
+    'password',
+    'pass123',
+    'pass123456',
+    'abc123',
+    '123abc',
+  };
+
+  Future<bool> checkAuthenticationBasicSecurity() async {
+    if (_authenticationGrantor == null) {
+      throw StateError('Null authenticationGrantor');
+    }
+
+    var usernames =
+        WEAK_USERNAMES.expand((e) => [e, e.toLowerCase(), e.toUpperCase()]);
+    var passwords =
+        WEAK_PASSWORDS.expand((e) => [e, e.toLowerCase(), e.toUpperCase()]);
+
+    var all = <String>{...usernames, ...passwords};
+
+    var weak = false;
+
+    USERNAMES_LOOP:
+    for (var user in all) {
+      for (var pass in all) {
+        var grant = await _authenticationGrantor(user, pass);
+
+        if (grant ?? false) {
+          weak = true;
+          break USERNAMES_LOOP;
+        }
+      }
+    }
+
+    if (weak) {
+      _LOG.warning(
+          'AUTHENTICATOR GRANTOR ACCEPTING WEAK CREDENTIALS!!! DO NOT DEPLOY THIS IN PRODUCTION OR PUBLIC NETWORKS!!!');
+    }
+
+    return !weak;
+  }
 
   DockerHostLocal _dockerHostLocal;
 

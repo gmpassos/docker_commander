@@ -127,7 +127,7 @@ void main(List<String> args) async {
       : DEFAULT_SERVER_PORT;
 
   var password = await _ask('password',
-      'Please, provide the password for user \'$username\' at docker_commander server $serverHost:$serverPort.');
+      '[docker_commander server: $serverHost:$serverPort]\nPlease, provide the password for the user \'$username\':');
 
   var dockerHostRemote = DockerHostRemote(serverHost, serverPort,
       username: username, password: password);

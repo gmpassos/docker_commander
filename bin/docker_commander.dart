@@ -13,7 +13,7 @@ void showHelp() {
   print('');
   print('SERVER MODE:\n');
   print(
-      '  \$> docker_commander --server %username %password %port? --public/private? --ipv6?');
+      '  \$> docker_commander --server %username %password %port? --public/private? --ipv6? --production?');
   print('');
   print('CONSOLE MODE:');
   print('  \$> docker_commander --console %username %serverHost %serverPort');

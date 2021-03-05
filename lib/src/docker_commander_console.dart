@@ -53,8 +53,6 @@ class DockerCommanderConsole {
   Future<bool> executeConsoleCMD(ConsoleCMD cmd) async {
     if (cmd == null) return false;
 
-    await _printToConsole('$cmd');
-
     switch (cmd.cmd) {
       case 'help':
         {
@@ -347,8 +345,6 @@ class DockerCommanderConsole {
           }, {
             'command'
           }, cmd.askAllProperties);
-
-          print(parameters);
 
           var exec = await dockerCommander.command(
               parameters['command'], cmd.argsSub(1));

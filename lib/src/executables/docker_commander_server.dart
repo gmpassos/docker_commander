@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:docker_commander/docker_commander_vm.dart';
 import 'package:logging/logging.dart';
 import 'package:swiss_knife/swiss_knife.dart';
@@ -57,6 +59,7 @@ void main(List<String> args) async {
   var public = args.contains('--public');
   var private = args.contains('--private');
   var ipv6 = args.contains('--ipv6');
+  var production = args.contains('--production');
 
   if (private ?? false) {
     public = false;
@@ -83,8 +86,8 @@ void main(List<String> args) async {
       : DEFAULT_SERVER_PORT;
 
   var authenticationTable = AuthenticationTable({username: password});
-  print(authenticationTable);
-  print('- Username: $username');
+  print('\n$authenticationTable');
+  print('- Username: $username\n');
 
   var hostServer = DockerHostServer(
     (user, pass) async => authenticationTable.checkPassword(user, pass),
@@ -93,7 +96,16 @@ void main(List<String> args) async {
     ipv6: ipv6,
   );
 
+  print('$hostServer\n');
+
+  var checkSecurityOK = await hostServer.checkAuthenticationBasicSecurity();
+
+  if (!checkSecurityOK && production) {
+    print('** Server with weak credentials! Aborting server startup!');
+    exit(1);
+  }
+
   await hostServer.startAndWait();
 
-  print('RUNNING $hostServer');
+  print('\nRUNNING SERVER AT PORT: ${hostServer.listenPort}');
 }

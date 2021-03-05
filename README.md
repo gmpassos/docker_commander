@@ -73,9 +73,11 @@ docker run -it --rm gmpassos/docker_commander --console userx your.server.host 8
 Console example:
 
 ```text
-[ARGS: [userx, userx your.server.host, 8099]]
+<CONSOLE MODE>
+ARGS: [--console, userx, your.server.host, 8099]
 
-Please, provide the password for user 'userx' at docker_commander server your.server.host:8099.
+[docker_commander server: your.server.host:8099]
+Please, provide the password for user 'userx':
 password> pass123
 ------------------------------------------------------------------------------
 DockerCommanderConsole{dockerCommander: DockerCommander{dockerHost: DockerHostRemote{serverHost: your.server.host, serverPort: 8099, secure: false, username: userx}, initialized: false. lastDaemonCheck: null}}

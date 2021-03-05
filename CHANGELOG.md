@@ -1,3 +1,7 @@
+## 1.0.23
+
+- Added `DockerHostServer.checkAuthenticationBasicSecurity`.
+
 ## 1.0.22
 
 - Fix version self reference.
