@@ -3,6 +3,9 @@ import 'package:swiss_knife/swiss_knife.dart';
 import 'docker_commander_host.dart';
 
 abstract class DockerCMDExecutor {
+  /// The default timeout to wait data in STDOUT/STDERR outputs.
+  Duration get defaultOutputTime => Duration(seconds: 1);
+
   /// Returns [true] [containerName] has a [DockerRunner].
   bool isContainerARunner(String containerName);
 
@@ -108,6 +111,8 @@ abstract class DockerCMDExecutor {
   /// Caches response than returns the executable path for [commandName].
   Future<String> execWhich(String containerName, String commandName,
       {bool ignoreCache, String def}) async {
+    if (isEmptyString(containerName) || isEmptyString(commandName)) return null;
+
     ignoreCache ??= false;
 
     if (isEmptyString(commandName, trim: true)) return null;
@@ -146,13 +151,15 @@ abstract class DockerCMD {
   /// Returns the container ID by [name].
   static Future<String> getContainerIDByName(
       DockerCMDExecutor executor, String name) async {
+    if (isEmptyString(name)) return null;
+
     var process = await executor.command('ps', ['-aqf', 'name=$name']);
     var ok = await process.waitExitAndConfirm(0);
     if (!ok) return null;
 
     var stdout = process.stdout;
     var dataOK = await stdout.waitForDataMatch(RegExp(r'\w+'),
-        timeout: Duration(seconds: 15));
+        timeout: executor.defaultOutputTime);
     if (!dataOK) return null;
 
     var id = stdout.asString.trim();
@@ -162,6 +169,8 @@ abstract class DockerCMD {
   /// Returns the container ID by [name].
   static Future<String> getServiceIDByName(
       DockerCMDExecutor executor, String name) async {
+    if (isEmptyString(name)) return null;
+
     var process = await executor
         .command('service', ['ls', '-f', 'name=$name', '--format', '{{.ID}}']);
     var ok = await process.waitExitAndConfirm(0);
@@ -169,7 +178,7 @@ abstract class DockerCMD {
 
     var stdout = process.stdout;
     var dataOK = await stdout.waitForDataMatch(RegExp(r'\w+'),
-        timeout: Duration(seconds: 15));
+        timeout: executor.defaultOutputTime);
     if (!dataOK) return null;
 
     var id = stdout.asString.trim();
@@ -179,6 +188,8 @@ abstract class DockerCMD {
   /// Returns the container IP by [name].
   static Future<String> getContainerIP(
       DockerCMDExecutor executor, String name) async {
+    if (isEmptyString(name)) return null;
+
     var process = await executor.command('container', ['inspect', name]);
     var exitOK = await process.waitExitAndConfirm(0);
     if (!exitOK) return null;
@@ -324,6 +335,10 @@ abstract class DockerCMD {
   static Future<DockerProcess> execShell(
       DockerCMDExecutor executor, String containerName, String script,
       {bool sudo = false}) async {
+    if (isEmptyString(containerName) || isEmptyString(script, trim: true)) {
+      return null;
+    }
+
     var bin = await executor.execWhich(containerName, 'bash');
 
     if (isEmptyString(bin)) {
@@ -346,6 +361,8 @@ abstract class DockerCMD {
   static Future<bool> putFileContent(DockerCMDExecutor executor,
       String containerName, String containerFilePath, String content,
       {bool sudo = false, bool append = false}) async {
+    if (isEmptyString(containerName)) return false;
+
     var base64Bin = await executor.execWhich(containerName, 'base64',
         def: '/usr/bin/base64');
 
@@ -462,6 +479,7 @@ abstract class DockerCMD {
   /// Removes a container by [containerNameOrID].
   static Future<bool> removeContainer(
       DockerCMDExecutor executor, String containerNameOrID) async {
+    if (isEmptyString(containerNameOrID)) return false;
     var process = await executor.command('rm', [containerNameOrID]);
     return process.waitExitAndConfirm(0);
   }
@@ -469,6 +487,7 @@ abstract class DockerCMD {
   /// Starts a container by [containerNameOrID].
   static Future<bool> startContainer(
       DockerCMDExecutor executor, String containerNameOrID) async {
+    if (isEmptyString(containerNameOrID)) return false;
     var process = await executor.command('start', [containerNameOrID]);
     return process.waitExitAndConfirm(0);
   }
@@ -573,7 +592,7 @@ abstract class DockerCMD {
 
     var stdout = cmd.stdout;
     var dataOK = await stdout.waitForDataMatch(RegExp(r'\w+'),
-        timeout: Duration(seconds: 15));
+        timeout: executor.defaultOutputTime);
     if (!dataOK) return null;
 
     var output = stdout.asString.trim();
@@ -584,6 +603,28 @@ abstract class DockerCMD {
 
     myID = myID.split(':true')[0];
     return myID;
+  }
+
+  /// Returns a list of services names.
+  static Future<List<String>> listServicesNames(
+      DockerCMDExecutor executor) async {
+    var cmd =
+        await executor.command('service', ['ls', '--format', '{{.Name}}']);
+    var cmdOK = await cmd.waitExitAndConfirm(0);
+    if (!cmdOK) return null;
+
+    var stdout = cmd.stdout;
+    var dataOK = await stdout.waitForDataMatch(RegExp(r'\w'),
+        timeout: executor.defaultOutputTime);
+    if (!dataOK) return null;
+
+    var lines = stdout.asString
+        .trim()
+        .split(RegExp(r'[\r\n]+'))
+        .where((s) => s != null && s.isNotEmpty)
+        .toList();
+
+    return lines;
   }
 
   /// Returns a list of [ServiceTaskInfos] of a service by [serviceName].
@@ -600,7 +641,8 @@ abstract class DockerCMD {
     if (!cmdOK) return null;
 
     var stdout = cmd.stdout;
-    var dataOK = await stdout.waitForDataMatch(d);
+    var dataOK =
+        await stdout.waitForDataMatch(d, timeout: executor.defaultOutputTime);
     if (!dataOK) return null;
 
     var lines = stdout.asString.trim().split(RegExp(r'[\r\n]+'));

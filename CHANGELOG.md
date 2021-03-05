@@ -1,5 +1,6 @@
 ## 1.0.19
 
+- Improve console commands.
 - Dart 2.12.0+ compliant: change DockerFile to use `dart run` instead of `dart pub run`.
 
 ## 1.0.18

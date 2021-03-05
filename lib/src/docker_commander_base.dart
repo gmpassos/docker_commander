@@ -5,7 +5,7 @@ import 'docker_commander_host.dart';
 
 /// The Docker manager.
 class DockerCommander extends DockerCMDExecutor {
-  static final String VERSION = '1.0.18';
+  static final String VERSION = '1.0.19';
 
   /// Docker machine host.
   final DockerHost dockerHost;
@@ -191,9 +191,24 @@ class DockerCommander extends DockerCMDExecutor {
   }
 
   /// Executes Docker command `docker ps --format "{{.Names}}"`
-  Future<List<String>> psContainerNames({bool all = true}) async {
-    return DockerCMD.psContainerNames(this, all: all);
-  }
+  Future<List<String>> psContainerNames({bool all = true}) async =>
+      DockerCMD.psContainerNames(this, all: all);
+
+  /// Returns a list of services names.
+  Future<List<String>> listServicesNames() async =>
+      DockerCMD.listServicesNames(this);
+
+  /// Returns a list of [ServiceTaskInfos] of a service by [serviceName].
+  Future<List<ServiceTaskInfos>> listServiceTasks(String serviceName) async =>
+      DockerCMD.listServiceTasks(this, serviceName);
+
+  /// Opens a Container logs, by [containerNameOrID].
+  Future<DockerProcess> openContainerLogs(String containerNameOrID) =>
+      dockerHost.openContainerLogs(containerNameOrID);
+
+  /// Opens a Service logs, by [serviceNameOrTask].
+  Future<DockerProcess> openServiceLogs(String serviceNameOrTask) =>
+      dockerHost.openServiceLogs(serviceNameOrTask);
 
   int _networkCounter = 0;
 

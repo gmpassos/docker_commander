@@ -21,12 +21,34 @@ class DockerCommanderConsole {
     return executeConsoleCMD(cmd);
   }
 
+  Future<void> showHelp() async {
+    await _printLineToConsole();
+    await _printToConsole('HELP:');
+    await _printToConsole('  - ps');
+    await _printToConsole('  - cmd %command %args*');
+    await _printToConsole(
+        '  - create-container %containerName %imageName %version %replicas %ports %volumes %hostname %network %environment --cleanContainer');
+    await _printToConsole('  - start %containerName');
+    await _printToConsole(
+        '  - create-service %serviceName %imageName %version %replicas %ports %volumes %hostname %network %environment');
+    await _printToConsole('  - exec %containerName %binaryName %args*');
+    await _printToConsole('  - exec-which %containerName %binaryName');
+    await _printToConsole('  - logs %containerOrServiceName');
+    await _printToConsole('  - close');
+    await _printLineToConsole();
+  }
+
   Future<bool> executeConsoleCMD(ConsoleCMD cmd) async {
     if (cmd == null) return false;
 
     await _printToConsole('$cmd');
 
     switch (cmd.cmd) {
+      case 'help':
+        {
+          await showHelp();
+          return true;
+        }
       case 'initialize':
         {
           return dockerCommander.initialize();
@@ -41,31 +63,179 @@ class DockerCommanderConsole {
           await dockerCommander.close();
           return true;
         }
+      case 'ps':
+        {
+          var exec = await dockerCommander.command('ps', ['-a']);
+          return await _processReturn(cmd, exec);
+        }
+      case 'createcontainer':
+        {
+          var parameters = await _requireParameters({
+            'containerName': cmd.get(0, 'containerName', 'container'),
+            'imageName': cmd.get(1, 'imageName', 'image'),
+            'version': cmd.get(2, 'version', 'ver'),
+            'ports': cmd.get(3, 'ports', 'port'),
+            'volumes': cmd.get(4, 'volumes'),
+            'hostname': cmd.get(5, 'hostname', 'host'),
+            'network': cmd.get(6, 'network'),
+            'environment': cmd.get(7, 'environment', 'env'),
+            'cleanContainer': cmd.getProperty('cleanContainer'),
+          }, {
+            'containerName',
+            'imageName',
+          }, cmd.askAllProperties);
+
+          var containerInfos = await dockerCommander.createContainer(
+            parameters['containerName'],
+            parameters['imageName'],
+            version: parameters['version'],
+            ports: parseStringFromInlineList(parameters['ports']),
+            volumes: parseFromInlineMap(
+                parameters['volumes'], RegExp(r'[;|]'), RegExp(r'[:=]')),
+            hostname: parameters['hostname'],
+            network: parameters['network'],
+            environment: parseFromInlineMap(
+                parameters['volumes'], RegExp(r'[|]'), RegExp(r'[:=]')),
+            cleanContainer: parseBool(parameters['cleanContainer']),
+          );
+
+          if (containerInfos != null) {
+            await _printToConsole('CREATED CONTAINER> $containerInfos');
+            return true;
+          }
+
+          return false;
+        }
+      case 'createservice':
+        {
+          var parameters = await _requireParameters({
+            'serviceName': cmd.get(0, 'serviceName', 'service'),
+            'imageName': cmd.get(1, 'imageName', 'image'),
+            'version': cmd.get(2, 'version', 'ver'),
+            'replicas': cmd.get(3, 'replicas'),
+            'ports': cmd.get(4, 'ports', 'port'),
+            'volumes': cmd.get(5, 'volumes'),
+            'hostname': cmd.get(6, 'hostname', 'host'),
+            'network': cmd.get(7, 'network'),
+            'environment': cmd.get(8, 'environment', 'env'),
+          }, {
+            'containerName',
+            'imageName',
+          }, cmd.askAllProperties);
+
+          var service = await dockerCommander.createService(
+            parameters['serviceName'],
+            parameters['imageName'],
+            version: parameters['version'],
+            replicas: parseInt(parameters['replicas']),
+            ports: parseStringFromInlineList(parameters['ports']),
+            volumes: parseFromInlineMap(
+                parameters['volumes'], RegExp(r'[;|]'), RegExp(r'[:=]')),
+            hostname: parameters['hostname'],
+            network: parameters['network'],
+            environment: parseFromInlineMap(
+                parameters['volumes'], RegExp(r'[|]'), RegExp(r'[:=]')),
+          );
+
+          if (service != null) {
+            await _printToConsole('CREATED SERVICE> $service');
+            return true;
+          }
+
+          return false;
+        }
+      case 'start':
+        {
+          var parameters = await _requireParameters({
+            'containerName': cmd.get(0, 'containerOrServiceName',
+                'containerName', 'container', 'serviceName', 'service'),
+            'return': cmd.getProperty('return') ?? 'stdout',
+          }, {
+            'containerName',
+          }, cmd.askAllProperties);
+
+          var ok =
+              await dockerCommander.startContainer(parameters['containerName']);
+
+          await _printToConsole('START CONTAINER: $ok');
+
+          return ok;
+        }
+      case 'log':
+      case 'logs':
+        {
+          var parameters = await _requireParameters({
+            'name': cmd.get(0, 'containerOrServiceName', 'containerName',
+                'container', 'serviceName', 'service'),
+            'return': cmd.getProperty('return') ?? 'stdout',
+          }, {
+            'containerName',
+          }, cmd.askAllProperties);
+
+          var name = parameters['name'];
+
+          var containersNames = await dockerCommander.psContainerNames();
+
+          DockerProcess process;
+          if (containersNames.contains(name)) {
+            process = await dockerCommander.openContainerLogs(name);
+          } else {
+            var servicesNames = await dockerCommander.listServicesNames();
+            if (servicesNames.contains(name)) {
+              process = await dockerCommander.openServiceLogs(name);
+            } else {
+              return false;
+            }
+          }
+
+          return await _processReturn(cmd, process);
+        }
+      case 'execwhich':
+        {
+          var parameters = await _requireParameters({
+            'containerName': cmd.get(0, 'containerName', 'container'),
+            'binary': cmd.get(1, 'binaryName', 'binary'),
+            'return': 'stdout',
+          }, {
+            'containerName',
+            'binary',
+          }, cmd.askAllProperties);
+
+          var exec = await dockerCommander.execWhich(
+              parameters['containerName'], parameters['binary']);
+
+          await _printToConsole(exec);
+
+          return true;
+        }
       case 'exec':
         {
           var parameters = await _requireParameters({
-            'containerName': cmd.get(0, 'containerName'),
-            'command': cmd.get(1, 'command'),
+            'containerName': cmd.get(0, 'containerName', 'container'),
+            'command': cmd.get(1, 'command', 'cmd'),
             'return': cmd.getProperty('return') ?? 'stdout',
           }, {
             'containerName',
             'command'
-          });
+          }, cmd.askAllProperties);
 
           var exec = await dockerCommander.exec(parameters['containerName'],
               parameters['command'], cmd.argsSub(2));
           return await _processReturn(cmd, exec);
         }
+      case 'docker':
       case 'cmd':
       case 'command':
         {
           var parameters = await _requireParameters({
-            'command': cmd.get(0, 'command'),
+            'command': cmd.get(0, 'command', 'cmd'),
             'return': cmd.getProperty('return') ?? 'stdout',
           }, {
             'containerName',
             'command'
-          });
+          }, cmd.askAllProperties);
+
+          print(parameters);
 
           var exec = await dockerCommander.command(
               parameters['command'], cmd.argsSub(1));
@@ -77,7 +247,12 @@ class DockerCommanderConsole {
     }
   }
 
-  Future<bool> _processReturn(ConsoleCMD cmd, DockerProcess process) async {
+  Future<bool> _processReturn(ConsoleCMD cmd, DockerProcess process,
+      [bool allowPrintAsOutput = true]) async {
+    if (process == null) {
+      return false;
+    }
+
     switch (cmd.returnType) {
       case ConsoleCMDReturnType.STDERR:
       case ConsoleCMDReturnType.STDOUT:
@@ -95,13 +270,13 @@ class DockerCommanderConsole {
           var printData0 = output.asString;
           var printData0_entriesRemoved = output.entriesRemoved;
           var printData0_contentRemoved = output.contentRemoved;
-          _printData(printData0, 'printData0:');
+          _printData(printData0, allowPrintAsOutput, 'printData0');
 
           var anyDataReceived = Completer<int>();
 
           var listener = output.onData.listen((d) {
             if (anyDataReceived.isCompleted) {
-              _printData(d, 'listener:');
+              _printData(d, allowPrintAsOutput, 'listener');
             } else {
               anyDataReceived.complete(-1);
             }
@@ -130,7 +305,7 @@ class DockerCommanderConsole {
                     printData0_contentRemoved + printData0.length);
 
             if (printData1.isNotEmpty) {
-              _printData(printData1, 'printData1:');
+              _printData(printData1, allowPrintAsOutput, 'printData1');
             }
           } else {
             if (!anyDataReceived.isCompleted) {
@@ -147,6 +322,11 @@ class DockerCommanderConsole {
           process.dispose();
 
           await _printLineToConsole();
+
+          var exitCode = process.exitCode;
+          if (exitCode != null) {
+            await _printToConsole('EXIT_CODE: $exitCode');
+          }
 
           return true;
         }
@@ -175,7 +355,7 @@ class DockerCommanderConsole {
 
   int _printID = 0;
 
-  void _printData(data, [String from]) {
+  void _printData(data, bool allowPrintAsOutput, [String from]) {
     var lines;
 
     if (data is List<String>) {
@@ -212,20 +392,21 @@ class DockerCommanderConsole {
 
     if (lines != null) {
       for (var line in lines) {
-        _printToConsole(line, true, _printID, from);
+        var output = allowPrintAsOutput ? true : false;
+        _printToConsole(line, output, _printID, from);
       }
     }
   }
 
-  Future<Map<String, String>> _requireParameters(
-      Map<String, String> fields, Set<String> required) async {
+  Future<Map<String, String>> _requireParameters(Map<String, String> fields,
+      Set<String> required, bool askAllProperties) async {
     var parameters = <String, String>{};
     for (var name in fields.keys.toList()) {
       var value = fields[name];
 
       if (isNotEmptyString(value, trim: true)) {
         parameters[name] = value.trim();
-      } else if (required.contains(name)) {
+      } else if (required.contains(name) || askAllProperties) {
         var value = await _askParameter(name);
         if (isNotEmptyString(value, trim: true)) {
           parameters[name] = value.trim();
@@ -260,20 +441,20 @@ class ConsoleCMD {
   Map<String, String> _properties;
 
   ConsoleCMD(String cmd, List<String> args)
-      : cmd = cmd.trim().toLowerCase().replaceAll(RegExp(r'[_\-]+'), '') {
+      : cmd = cmd.trim().toLowerCase().replaceAll(RegExp(r'[\s._\-]+'), '') {
     _args = <String>[];
     _properties = <String, String>{};
 
     for (var i = 0; i < args.length; ++i) {
       var arg = args[i];
-      if (arg.startsWith('--')) {
+      if (arg.startsWith('----')) {
         var nextI = i + 1;
-        var name = arg.substring(2);
+        var name = arg.substring(4);
 
         String value;
         if (nextI < args.length) {
           value = args[nextI];
-          if (value.startsWith('--')) {
+          if (value.startsWith('----')) {
             value = 'true';
           } else {
             args.removeAt(nextI);
@@ -282,7 +463,7 @@ class ConsoleCMD {
           value = 'true';
         }
 
-        _properties[name] = value;
+        _properties[name.toLowerCase().trim()] = value;
       } else {
         _args.add(arg);
       }
@@ -314,10 +495,20 @@ class ConsoleCMD {
       argIndex != null && argIndex < _args.length ? _args[argIndex] : null;
 
   String getProperty(String propKey) =>
-      propKey != null ? _properties[propKey] : null;
+      propKey != null ? _properties[propKey.toLowerCase().trim()] : null;
 
-  String get(int index, [String propertyKey]) =>
-      getArg(index) ?? getProperty(propertyKey);
+  String get(int index,
+          [String propertyKey,
+          propertyKey1,
+          propertyKey2,
+          propertyKey3,
+          propertyKey4]) =>
+      getArg(index) ??
+      getProperty(propertyKey) ??
+      getProperty(propertyKey1) ??
+      getProperty(propertyKey2) ??
+      getProperty(propertyKey3) ??
+      getProperty(propertyKey4);
 
   ConsoleCMDReturnType get returnType {
     var ret = getProperty('return');
@@ -339,6 +530,8 @@ class ConsoleCMD {
         return ConsoleCMDReturnType.STDOUT;
     }
   }
+
+  bool get askAllProperties => parseBool(getProperty('*'), false);
 
   @override
   String toString() {

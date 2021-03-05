@@ -587,6 +587,8 @@ class DockerHostServer {
       HttpRequest request, Map<String, String> parameters, json) async {
     if (_dockerHostLocal == null) return null;
 
+    _LOG.info('_processExec> parameters: $parameters');
+
     String cmd = _getParameter(parameters, json, 'cmd');
     String argsEncoded = _getParameter(parameters, json, 'args');
     String containerName = _getParameter(parameters, json, 'name');

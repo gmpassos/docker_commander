@@ -37,6 +37,10 @@ class DockerHostRemote extends DockerHost {
       ..authorization = Authorization.fromProvider(_authenticate);
   }
 
+  /// The default timeout to wait data in STDOUT/STDERR outputs.
+  @override
+  Duration get defaultOutputTime => Duration(seconds: 10);
+
   String get baseURL {
     var scheme = secure ? 'https' : 'http';
     return '$scheme://$serverHost:$serverPort/';
