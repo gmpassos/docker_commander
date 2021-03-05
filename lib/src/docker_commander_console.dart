@@ -31,12 +31,14 @@ class DockerCommanderConsole {
         '  - cmd %command %args*    # Executes a Docker command.');
     await _printToConsole('');
     await _printToConsole(
-        '  - create-container %containerName %imageName %version %replicas %ports %volumes %hostname %network %environment --cleanContainer');
+        '  - create-container %containerName %imageName %version %ports %volumes %hostname %network %environment --cleanContainer');
     await _printToConsole(
         '  - create-service %serviceName %imageName %version %replicas %ports %volumes %hostname %network %environment');
     await _printToConsole('');
     await _printToConsole(
         '  - start %containerName   # Starts a Docker container.');
+    await _printToConsole(
+        '  - stop %containerName    # Stops a Docker container.');
     await _printToConsole('  - exec %containerName %binaryName %args*');
     await _printToConsole('  - exec-which %containerName %binaryName');
     await _printToConsole('');
@@ -80,6 +82,24 @@ class DockerCommanderConsole {
         }
       case 'createcontainer':
         {
+          cmd.parseSimpleProperties({
+            'containerName',
+            'container',
+            'imageName',
+            'image',
+            'version',
+            'ver',
+            'ports',
+            'port',
+            'volumes',
+            'hostname',
+            'host',
+            'network',
+            'environment',
+            'env',
+            'cleanContainer'
+          });
+
           var parameters = await _requireParameters({
             'containerName': cmd.get(0, 'containerName', 'container'),
             'imageName': cmd.get(1, 'imageName', 'image'),
@@ -99,7 +119,8 @@ class DockerCommanderConsole {
             parameters['containerName'],
             parameters['imageName'],
             version: parameters['version'],
-            ports: parseStringFromInlineList(parameters['ports']),
+            ports: parseStringFromInlineList(
+                parameters['ports'], RegExp(r'\s*,\s*')),
             volumes: parseFromInlineMap(
                 parameters['volumes'], RegExp(r'[;|]'), RegExp(r'[:=]')),
             hostname: parameters['hostname'],
@@ -118,6 +139,24 @@ class DockerCommanderConsole {
         }
       case 'createservice':
         {
+          cmd.parseSimpleProperties({
+            'serviceName',
+            'service',
+            'imageName',
+            'image',
+            'version',
+            'ver',
+            'ports',
+            'port',
+            'volumes',
+            'hostname',
+            'host',
+            'network',
+            'environment',
+            'env',
+            'cleanContainer'
+          });
+
           var parameters = await _requireParameters({
             'serviceName': cmd.get(0, 'serviceName', 'service'),
             'imageName': cmd.get(1, 'imageName', 'image'),
@@ -138,7 +177,8 @@ class DockerCommanderConsole {
             parameters['imageName'],
             version: parameters['version'],
             replicas: parseInt(parameters['replicas']),
-            ports: parseStringFromInlineList(parameters['ports']),
+            ports: parseStringFromInlineList(
+                parameters['ports'], RegExp(r'\s*,\s*')),
             volumes: parseFromInlineMap(
                 parameters['volumes'], RegExp(r'[;|]'), RegExp(r'[:=]')),
             hostname: parameters['hostname'],
@@ -156,10 +196,17 @@ class DockerCommanderConsole {
         }
       case 'start':
         {
+          cmd.parseSimpleProperties({
+            'containerOrServiceName',
+            'containerName',
+            'container',
+            'serviceName',
+            'service'
+          });
+
           var parameters = await _requireParameters({
             'containerName': cmd.get(0, 'containerOrServiceName',
                 'containerName', 'container', 'serviceName', 'service'),
-            'return': cmd.getProperty('return') ?? 'stdout',
           }, {
             'containerName',
           }, cmd.askAllProperties);
@@ -167,20 +214,63 @@ class DockerCommanderConsole {
           var ok =
               await dockerCommander.startContainer(parameters['containerName']);
 
-          await _printToConsole('START CONTAINER: $ok');
+          await _printToConsole('STARTED CONTAINER: $ok');
+
+          return ok;
+        }
+      case 'stop':
+        {
+          cmd.parseSimpleProperties({
+            'containerOrServiceName',
+            'containerName',
+            'container',
+            'serviceName',
+            'service'
+          });
+
+          var parameters = await _requireParameters({
+            'containerName': cmd.get(0, 'containerOrServiceName',
+                'containerName', 'container', 'serviceName', 'service'),
+          }, {
+            'containerName',
+          }, cmd.askAllProperties);
+
+          var ok =
+              await dockerCommander.stopContainer(parameters['containerName']);
+
+          await _printToConsole('STOPPED CONTAINER: $ok');
 
           return ok;
         }
       case 'log':
       case 'logs':
         {
+          cmd.parseSimpleProperties({
+            'containerOrServiceName',
+            'containerName',
+            'container',
+            'serviceName',
+            'service',
+            'stdout',
+            'stderr',
+          });
+
+          cmd.defaultReturnType = ConsoleCMDReturnType.STDOUT;
+
           var parameters = await _requireParameters({
             'name': cmd.get(0, 'containerOrServiceName', 'containerName',
                 'container', 'serviceName', 'service'),
-            'return': cmd.getProperty('return') ?? 'stdout',
+            'stdout': cmd.getProperty('stdout'),
+            'stderr': cmd.getProperty('stderr'),
           }, {
-            'containerName',
+            'name',
           }, cmd.askAllProperties);
+
+          if (parseBool(parameters['stdout'], false)) {
+            cmd.returnType = ConsoleCMDReturnType.STDOUT;
+          } else if (parseBool(parameters['stderr'], false)) {
+            cmd.returnType = ConsoleCMDReturnType.STDERR;
+          }
 
           var name = parameters['name'];
 
@@ -206,10 +296,13 @@ class DockerCommanderConsole {
         }
       case 'execwhich':
         {
+          cmd.parseSimpleProperties();
+
+          cmd.returnType = ConsoleCMDReturnType.STDOUT;
+
           var parameters = await _requireParameters({
             'containerName': cmd.get(0, 'containerName', 'container'),
             'binary': cmd.get(1, 'binaryName', 'binary'),
-            'return': 'stdout',
           }, {
             'containerName',
             'binary',
@@ -224,10 +317,16 @@ class DockerCommanderConsole {
         }
       case 'exec':
         {
+          cmd.parseSimpleProperties({
+            'containerName',
+            'container',
+          });
+
+          cmd.defaultReturnType = ConsoleCMDReturnType.STDOUT;
+
           var parameters = await _requireParameters({
             'containerName': cmd.get(0, 'containerName', 'container'),
             'command': cmd.get(1, 'command', 'cmd'),
-            'return': cmd.getProperty('return') ?? 'stdout',
           }, {
             'containerName',
             'command'
@@ -241,11 +340,11 @@ class DockerCommanderConsole {
       case 'cmd':
       case 'command':
         {
+          cmd.defaultReturnType = ConsoleCMDReturnType.STDOUT;
+
           var parameters = await _requireParameters({
             'command': cmd.get(0, 'command', 'cmd'),
-            'return': cmd.getProperty('return') ?? 'stdout',
           }, {
-            'containerName',
             'command'
           }, cmd.askAllProperties);
 
@@ -288,10 +387,13 @@ class DockerCommanderConsole {
 
           var anyDataReceived = Completer<int>();
 
+          var waitingData = <String>[];
+
           var listener = output.onData.listen((d) {
             if (anyDataReceived.isCompleted) {
               _printData(d, allowPrintAsOutput, 'listener');
             } else {
+              waitingData.add('$d');
               anyDataReceived.complete(-1);
             }
           });
@@ -324,6 +426,10 @@ class DockerCommanderConsole {
           } else {
             if (!anyDataReceived.isCompleted) {
               anyDataReceived.complete(-3);
+            }
+
+            for (var d in waitingData) {
+              _printData(d, allowPrintAsOutput, 'printData2');
             }
 
             while (true) {
@@ -496,6 +602,41 @@ class ConsoleCMD {
     return ConsoleCMD(cmd, args.map(parseString).toList());
   }
 
+  void parseSimpleProperties([Set<String> simpleProperties]) {
+    if (simpleProperties != null) {
+      simpleProperties =
+          simpleProperties.map((e) => e.toLowerCase().trim()).toSet();
+    }
+
+    for (var i = 0; i < _args.length; ++i) {
+      var arg = _args[i];
+
+      if (arg.startsWith('--')) {
+        var name = arg.substring(2).toLowerCase().trim();
+
+        if (simpleProperties != null && !simpleProperties.contains(name)) {
+          continue;
+        }
+
+        _args.removeAt(i);
+
+        String value;
+        if (i < _args.length) {
+          value = _args[i];
+          if (value.startsWith('--')) {
+            value = 'true';
+          } else {
+            _args.removeAt(i);
+          }
+        } else {
+          value = 'true';
+        }
+
+        _properties[name] = value;
+      }
+    }
+  }
+
   String operator [](dynamic argOrProperty) => argOrProperty is int
       ? getArg(argOrProperty)
       : getProperty('$argOrProperty');
@@ -524,6 +665,37 @@ class ConsoleCMD {
       getProperty(propertyKey3) ??
       getProperty(propertyKey4);
 
+  set returnType(ConsoleCMDReturnType type) {
+    var typeStr;
+
+    switch (type) {
+      case ConsoleCMDReturnType.STDOUT:
+        {
+          typeStr = 'stdout';
+          break;
+        }
+      case ConsoleCMDReturnType.STDERR:
+        {
+          typeStr = 'stderr';
+          break;
+        }
+      case ConsoleCMDReturnType.EXIT_CODE:
+        {
+          typeStr = 'exit_code';
+          break;
+        }
+      default:
+        typeStr = null;
+    }
+    _properties['return'] = typeStr;
+  }
+
+  set defaultReturnType(ConsoleCMDReturnType type) {
+    var ret = getProperty('return');
+    if (isNotEmptyString(ret)) return;
+    returnType = type;
+  }
+
   ConsoleCMDReturnType get returnType {
     var ret = getProperty('return');
     if (isEmptyString(ret, trim: true)) {
@@ -534,6 +706,8 @@ class ConsoleCMD {
     switch (ret) {
       case 'stdout':
         return ConsoleCMDReturnType.STDOUT;
+      case 'err':
+      case 'error':
       case 'stderr':
         return ConsoleCMDReturnType.STDERR;
       case 'exit':

@@ -1,5 +1,6 @@
 ## 1.0.20
 
+- Improve console `stdout/stderr` output.
 - `Dockerfile`: `--server` and `--console` modes.
 - `README.md`: improved Docker image usage.
 

@@ -676,14 +676,28 @@ abstract class DockerCMD {
 
   /// Opens a Container logs, by [containerNameOrID]:
   static Future<DockerProcess> openContainerLogs(
-          DockerCMDExecutor executor, String containerNameOrID) =>
-      executor.command('logs', [containerNameOrID],
-          outputReadyType: OutputReadyType.STARTS_READY);
+          DockerCMDExecutor executor, String containerNameOrID,
+          {bool follow = true}) =>
+      executor.command(
+        'logs',
+        [
+          containerNameOrID,
+          if (follow ?? false) '-f',
+        ],
+        outputReadyType: OutputReadyType.STARTS_READY,
+      );
 
   /// Opens a Service logs, by [serviceNameOrTask]:
   static Future<DockerProcess> openServiceLogs(
-          DockerCMDExecutor executor, String serviceNameOrTask) =>
-      executor.command('service', ['logs', serviceNameOrTask],
+          DockerCMDExecutor executor, String serviceNameOrTask,
+          {bool follow = true}) =>
+      executor.command(
+          'service',
+          [
+            'logs',
+            serviceNameOrTask,
+            if (follow ?? false) '-f',
+          ],
           outputReadyType: OutputReadyType.STARTS_READY);
 
   /// Returns the Container logs as [String].
@@ -695,8 +709,10 @@ abstract class DockerCMD {
     Duration waitDataTimeout,
     bool waitExit = false,
     int desiredExitCode,
+    bool follow = false,
   }) async {
-    var logs = await openContainerLogs(executor, containerNameOrID);
+    var logs =
+        await openContainerLogs(executor, containerNameOrID, follow: follow);
     return await _waitLogs(waitExit, logs, desiredExitCode, stderr,
         waitDataMatcher, waitDataTimeout);
   }
@@ -710,8 +726,10 @@ abstract class DockerCMD {
     Duration waitDataTimeout,
     bool waitExit = false,
     int desiredExitCode,
+    bool follow = false,
   }) async {
-    var logs = await openServiceLogs(executor, containerNameOrID);
+    var logs =
+        await openServiceLogs(executor, containerNameOrID, follow: follow);
     return await _waitLogs(waitExit, logs, desiredExitCode, stderr,
         waitDataMatcher, waitDataTimeout);
   }

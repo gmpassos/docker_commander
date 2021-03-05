@@ -667,8 +667,8 @@ class DockerHostServer {
 
     var timeout = timeoutMs != null ? Duration(milliseconds: timeoutMs) : null;
 
-    var ok = await runner.waitExit(timeout: timeout);
-    return ok;
+    var code = await runner.waitExit(timeout: timeout);
+    return code;
   }
 
   Future<bool> _processStop(
@@ -705,13 +705,14 @@ class DockerHostServer {
     var length = output.entriesLength;
     var removed = output.entriesRemoved;
     var entries = output.getEntries(realOffset: realOffset);
+    var exitCode = process.exitCode;
 
     return {
       'running': true,
       'length': length,
       'removed': removed,
       'entries': entries,
-      'exit_code': process.exitCode,
+      'exit_code': exitCode,
     };
   }
 

@@ -87,6 +87,7 @@ class Service {
     Duration waitDataTimeout,
     bool waitExit = false,
     int desiredExitCode,
+    bool follow = false,
   }) {
     var name = isNotEmptyString(taskName) ? taskName : serviceName;
 
@@ -99,7 +100,8 @@ class Service {
         waitDataMatcher: waitDataMatcher,
         waitDataTimeout: waitDataTimeout,
         waitExit: waitExit,
-        desiredExitCode: desiredExitCode);
+        desiredExitCode: desiredExitCode,
+        follow: follow);
   }
 }
 
@@ -388,13 +390,15 @@ abstract class DockerHost extends DockerCMDExecutor {
     Duration waitDataTimeout,
     bool waitExit = false,
     int desiredExitCode,
+    bool follow = false,
   }) =>
       DockerCMD.catContainerLogs(this, containerNameOrID,
           stderr: stderr,
           waitDataMatcher: waitDataMatcher,
           waitDataTimeout: waitDataTimeout,
           waitExit: waitExit,
-          desiredExitCode: desiredExitCode);
+          desiredExitCode: desiredExitCode,
+          follow: follow);
 
   /// Returns a Service logs as [String].
   Future<String> catServiceLogs(
@@ -404,13 +408,15 @@ abstract class DockerHost extends DockerCMDExecutor {
     Duration waitDataTimeout,
     bool waitExit = false,
     int desiredExitCode,
+    bool follow = false,
   }) =>
       DockerCMD.catServiceLogs(this, containerNameOrID,
           stderr: stderr,
           waitDataMatcher: waitDataMatcher,
           waitDataTimeout: waitDataTimeout,
           waitExit: waitExit,
-          desiredExitCode: desiredExitCode);
+          desiredExitCode: desiredExitCode,
+          follow: follow);
 
   /// Returns a [List<int>] of [DockerRunner] `instanceID`.
   List<int> getRunnersInstanceIDs();

@@ -67,13 +67,13 @@ class DockerHostRemote extends DockerHost {
   @override
   Future<bool> initialize() async {
     var ok = await _httpClient.getJSON('initialize') as bool;
-    return ok;
+    return ok ?? false;
   }
 
   @override
   Future<bool> checkDaemon() async {
     var ok = await _httpClient.getJSON('check_daemon') as bool;
-    return ok;
+    return ok ?? false;
   }
 
   @override
@@ -118,6 +118,8 @@ class DockerHostRemote extends DockerHost {
       'volumes': encodeQueryString(volumes),
       'cleanContainer': '$cleanContainer',
     }) as Map;
+
+    if (response == null) return null;
 
     containerName = response['containerName'] as String;
     var id = response['id'] as String;
@@ -172,6 +174,8 @@ class DockerHostRemote extends DockerHost {
       'outputAsLines': '$outputAsLines',
       'outputLimit': '$outputLimit',
     }) as Map;
+
+    if (response == null) return null;
 
     var instanceID = response['instanceID'] as int;
     containerName = response['containerName'] as String;
@@ -311,6 +315,8 @@ class DockerHostRemote extends DockerHost {
       'outputAsLines': '$outputAsLines',
       'outputLimit': '$outputLimit',
     }) as Map;
+
+    if (response == null) return null;
 
     var instanceID = response['instanceID'] as int;
 

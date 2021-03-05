@@ -493,11 +493,13 @@ class DockerContainer {
     Duration waitDataTimeout,
     bool waitExit = false,
     int desiredExitCode,
+    bool follow = false,
   }) =>
       runner.dockerHost.catContainerLogs(name,
           stderr: stderr,
           waitDataMatcher: waitDataMatcher,
           waitDataTimeout: waitDataTimeout,
           waitExit: waitExit,
-          desiredExitCode: desiredExitCode);
+          desiredExitCode: desiredExitCode,
+          follow: follow);
 }
