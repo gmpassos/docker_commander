@@ -5,7 +5,7 @@ import 'docker_commander_host.dart';
 
 /// The Docker manager.
 class DockerCommander extends DockerCMDExecutor {
-  static final String VERSION = '1.0.22';
+  static final String VERSION = '2.0.0';
 
   /// Docker machine host.
   final DockerHost dockerHost;
@@ -222,7 +222,7 @@ class DockerCommander extends DockerCMDExecutor {
   }
 
   /// Removes a Docker network with [networkName].
-  Future<bool> removeNetwork(String networkName) =>
+  Future<bool /*!*/ > removeNetwork(String networkName) =>
       DockerCMD.removeNetwork(this, networkName);
 
   /// Returns the container IP by [name].
@@ -315,7 +315,7 @@ typedef DockerContainerInstantiator = DockerContainer Function(
 
 /// A Docker container being executed.
 class DockerContainer {
-  final DockerRunner runner;
+  final DockerRunner /*!*/ runner;
 
   DockerContainer(this.runner);
 
@@ -343,7 +343,7 @@ class DockerContainer {
   /// Executes a [command] inside this container with [args]
   /// (if [isRunning] or returns null).
   Future<DockerProcess> exec(
-    String command,
+    String /*!*/ command,
     List<String> args, {
     bool outputAsLines = true,
     int outputLimit,

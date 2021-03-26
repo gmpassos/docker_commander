@@ -95,7 +95,8 @@ class DockerHostRemote extends DockerHost {
   }
 
   @override
-  Future<ContainerInfos> createContainer(String containerName, String imageName,
+  Future<ContainerInfos> createContainer(
+      String /*!*/ containerName, String /*!*/ imageName,
       {String version,
       List<String> ports,
       String network,
@@ -109,13 +110,13 @@ class DockerHostRemote extends DockerHost {
 
     var response = await _httpClient.getJSON('create', parameters: {
       'image': imageName,
-      'version': version,
+      if (version != null) 'version': version,
       'name': containerName,
-      'ports': ports?.join(','),
-      'network': network,
-      'hostname': hostname,
-      'environment': encodeQueryString(environment),
-      'volumes': encodeQueryString(volumes),
+      if (ports != null) 'ports': ports.join(','),
+      if (network != null) 'network': network,
+      if (hostname != null) 'hostname': hostname,
+      if (environment != null) 'environment': encodeQueryString(environment),
+      if (volumes != null) 'volumes': encodeQueryString(volumes),
       'cleanContainer': '$cleanContainer',
     }) as Map;
 
@@ -135,7 +136,7 @@ class DockerHostRemote extends DockerHost {
 
   @override
   Future<DockerRunner> run(
-    String imageName, {
+    String /*!*/ imageName, {
     String version,
     List<String> imageArgs,
     String containerName,
@@ -240,9 +241,9 @@ class DockerHostRemote extends DockerHost {
 
   @override
   Future<DockerProcess> exec(
-    String containerName,
+    String /*!*/ containerName,
     String command,
-    List<String> args, {
+    List<String /*!*/ > args, {
     bool outputAsLines = true,
     int outputLimit,
     OutputReadyFunction stdoutReadyFunction,
@@ -348,7 +349,7 @@ class DockerHostRemote extends DockerHost {
   }
 
   Future<OutputSync> processGetOutput(
-      int instanceID, int realOffset, bool stderr) async {
+      int /*!*/ instanceID, int realOffset, bool stderr) async {
     var outputType = stderr ? 'stderr' : 'stdout';
     var parameters = {'instanceID': '$instanceID', 'realOffset': '$realOffset'};
 
@@ -374,7 +375,7 @@ class DockerHostRemote extends DockerHost {
   static final Duration EXITED_PROCESS_EXPIRE_TIME =
       Duration(minutes: 2, seconds: 15);
 
-  final Map<int, DockerProcessRemote> _processes = {};
+  final Map<int /*!*/, DockerProcessRemote> _processes = {};
 
   void _notifyProcessExited(DockerProcessRemote dockerProcess) {
     _cleanupExitedProcesses();
@@ -385,7 +386,7 @@ class DockerHostRemote extends DockerHost {
         EXITED_PROCESS_EXPIRE_TIME, _processes);
   }
 
-  final Map<int, DockerRunnerRemote> _runners = {};
+  final Map<int /*!*/, DockerRunnerRemote> _runners = {};
 
   @override
   bool isContainerARunner(String containerName) =>
@@ -396,10 +397,10 @@ class DockerHostRemote extends DockerHost {
       getRunnerByName(containerName)?.isRunning ?? false;
 
   @override
-  List<int> getRunnersInstanceIDs() => _runners.keys.toList();
+  List<int /*!*/ > getRunnersInstanceIDs() => _runners.keys.toList();
 
   @override
-  List<String> getRunnersNames() => _runners.values
+  List<String /*!*/ > getRunnersNames() => _runners.values
       .map((r) => r.containerName)
       .where((n) => n != null && n.isNotEmpty)
       .toList();
@@ -417,7 +418,7 @@ class DockerHostRemote extends DockerHost {
       _processes[instanceID];
 
   @override
-  Future<bool> stopByName(String name, {Duration timeout}) async {
+  Future<bool /*!*/ > stopByName(String name, {Duration timeout}) async {
     var ok = await _httpClient.getJSON('stop', parameters: {
       'name': '$name',
       if (timeout != null) 'timeout': '${timeout.inSeconds}',
@@ -425,7 +426,7 @@ class DockerHostRemote extends DockerHost {
     return ok;
   }
 
-  Future<bool> processWaitReady(int instanceID) async {
+  Future<bool /*!*/ > processWaitReady(int instanceID) async {
     var ok = await _httpClient.getJSON('wait_ready',
         parameters: {'instanceID': '$instanceID'}) as bool;
     return ok;

@@ -83,8 +83,8 @@ class DockerHostLocal extends DockerHost {
 
   @override
   ContainerInfosLocal buildContainerArgs(
-    String cmd,
-    String imageName,
+    String /*!*/ cmd,
+    String /*!*/ imageName,
     String version,
     String containerName,
     List<String> ports,
@@ -152,15 +152,15 @@ class DockerHostLocal extends DockerHost {
 
   @override
   Future<ContainerInfos> createContainer(
-    String containerName,
-    String imageName, {
+    String /*!*/ containerName,
+    String /*!*/ imageName, {
     String version,
     List<String> ports,
     String network,
     String hostname,
     Map<String, String> environment,
     Map<String, String> volumes,
-    bool cleanContainer = false,
+    bool /*!*/ cleanContainer = false,
   }) async {
     if (isEmptyString(containerName, trim: true)) {
       return null;
@@ -236,7 +236,7 @@ class DockerHostLocal extends DockerHost {
 
   @override
   Future<DockerRunner> run(
-    String imageName, {
+    String /*!*/ imageName, {
     String version,
     List<String> imageArgs,
     String containerName,
@@ -342,9 +342,9 @@ class DockerHostLocal extends DockerHost {
 
   @override
   Future<DockerProcess> exec(
-    String containerName,
-    String command,
-    List<String> args, {
+    String /*!*/ containerName,
+    String /*!*/ command,
+    List<String /*!*/ > /*!*/ args, {
     bool outputAsLines = true,
     int outputLimit,
     OutputReadyFunction stdoutReadyFunction,
@@ -419,9 +419,9 @@ class DockerHostLocal extends DockerHost {
 
   @override
   Future<DockerProcess> command(
-    String command,
-    List<String> args, {
-    bool outputAsLines = true,
+    String /*!*/ command,
+    List<String> /*!*/ args, {
+    bool /*!*/ outputAsLines = true,
     int outputLimit,
     OutputReadyFunction stdoutReadyFunction,
     OutputReadyFunction stderrReadyFunction,
@@ -462,14 +462,14 @@ class DockerHostLocal extends DockerHost {
   }
 
   @override
-  Future<bool> stopByName(String name, {Duration timeout}) async {
+  Future<bool> stopByName(String /*!*/ name, {Duration timeout}) async {
     if (isEmptyString(name)) return false;
 
     var time = timeout != null ? timeout.inSeconds : 15;
     if (time < 1) time = 1;
 
     var process = Process.run(
-        dockerBinaryPath, <String>['stop', '--time', '$time', name]);
+        dockerBinaryPath, <String /*!*/ >['stop', '--time', '$time', name]);
     var result = await process;
     return result.exitCode == 0;
   }
@@ -498,19 +498,21 @@ class DockerHostLocal extends DockerHost {
   bool isContainerRunnerRunning(String containerName) =>
       getRunnerByName(containerName)?.isRunning ?? false;
 
-  List<String> getRunnersIPs() => _runners.values.map((e) => e.ip).toList();
+  List<String /*!*/ > getRunnersIPs() =>
+      _runners.values.map((e) => e.ip).toList();
 
-  List<String> getNetworkRunnersIPs(String network) => _runners.values
+  List<String /*!*/ > getNetworkRunnersIPs(String network) => _runners.values
       .where((e) => e.network == network)
       .map((e) => e.ip)
       .toList();
 
-  List<String> getNetworkRunnersHostnames(String network) => _runners.values
-      .where((e) => e.network == network)
-      .map((e) => e.hostname)
-      .toList();
+  List<String /*!*/ > getNetworkRunnersHostnames(String network) =>
+      _runners.values
+          .where((e) => e.network == network)
+          .map((e) => e.hostname)
+          .toList();
 
-  List<String> getNetworkRunnersNames(String network) => _runners.values
+  List<String /*!*/ > getNetworkRunnersNames(String network) => _runners.values
       .where((e) => e.network == network)
       .map((e) => e.containerName)
       .toList();
@@ -530,7 +532,7 @@ class DockerHostLocal extends DockerHost {
   List<int> getRunnersInstanceIDs() => _runners.keys.toList();
 
   @override
-  List<String> getRunnersNames() => _runners.values
+  List<String /*!*/ > getRunnersNames() => _runners.values
       .map((r) => r.containerName)
       .where((n) => n != null && n.isNotEmpty)
       .toList();

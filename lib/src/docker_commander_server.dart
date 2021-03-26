@@ -12,7 +12,7 @@ import 'docker_commander_local.dart';
 final _LOG = Logger('docker_commander/server');
 
 typedef AuthenticationGrantor = Future<bool> Function(
-    String username, String password);
+    String /*!*/ username, String /*!*/ password);
 
 /// A basic table of `username` and `password`.
 class AuthenticationTable {
@@ -32,11 +32,11 @@ class AuthenticationTable {
 }
 
 class Authentication {
-  final String username;
+  final String /*?*/ username;
 
-  final String token;
+  final String /*?*/ token;
 
-  final bool grant;
+  final bool /*!*/ grant;
 
   Authentication({this.username, this.token, this.grant = false});
 }
@@ -327,9 +327,9 @@ class DockerHostServer {
     return responseBody;
   }
 
-  final Map<String, int> _authenticationCount = {};
+  final Map<String /*!*/, int> _authenticationCount = {};
 
-  final Map<String, int> _authenticationTime = {};
+  final Map<String /*!*/, int> _authenticationTime = {};
 
   void _cleanAuthentications(int now) {
     var timeout = Duration(minutes: 5).inMilliseconds;
@@ -513,7 +513,7 @@ class DockerHostServer {
     request.response.headers.add(key, value, preserveHeaderCase: true);
   }
 
-  final Map<String, AccessToken> _usersTokens = {};
+  final Map<String /*!*/, AccessToken> _usersTokens = {};
 
   bool validateToken(String token) {
     _checkTokens();
@@ -527,7 +527,7 @@ class DockerHostServer {
     _usersTokens.removeWhere((key, value) => !value.isValid(now, timeout));
   }
 
-  Future<Map<String, String>> _processAuth(
+  Future<Map<String, String /*!*/ >> _processAuth(
       HttpRequest request, Map<String, String> parameters, dynamic json) async {
     var authentication = await checkAuthentication(request, parameters);
 

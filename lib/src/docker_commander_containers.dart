@@ -16,9 +16,9 @@ class DockerContainerConfig<D extends DockerContainer> {
   final List<int> containerPorts;
   final Map<String, String> environment;
   final Map<String, String> volumes;
-  final bool cleanContainer;
+  final bool/*?*/ cleanContainer;
   final int outputLimit;
-  final bool outputAsLines;
+  final bool/*!*/ outputAsLines;
   final OutputReadyFunction stdoutReadyFunction;
   final OutputReadyFunction stderrReadyFunction;
 
@@ -36,7 +36,7 @@ class DockerContainerConfig<D extends DockerContainer> {
     this.volumes,
     this.cleanContainer,
     this.outputLimit,
-    this.outputAsLines,
+    this.outputAsLines = true,
     this.stdoutReadyFunction,
     this.stderrReadyFunction,
   });
@@ -117,7 +117,7 @@ class DockerContainerConfig<D extends DockerContainer> {
       hostname: hostname ?? this.hostname,
       environment: environment,
       volumes: volumes,
-      cleanContainer: cleanContainer ?? this.cleanContainer,
+      cleanContainer: cleanContainer ?? this.cleanContainer ?? true,
       outputAsLines: outputAsLines,
       outputLimit: outputLimit ?? this.outputLimit,
       stdoutReadyFunction: stdoutReadyFunction,
@@ -134,7 +134,7 @@ class DockerContainerConfig<D extends DockerContainer> {
 
   D instantiateDockerContainer(DockerRunner runner) => null;
 
-  Future<bool> initializeContainer(D dockerContainer) => null;
+  Future<bool>/*!*/ initializeContainer(D dockerContainer) => null;
 }
 
 /// PostgreSQL pre-configured container.

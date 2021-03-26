@@ -1,6 +1,7 @@
 # docker_commander
 
 [![pub package](https://img.shields.io/pub/v/docker_commander.svg?logo=dart&logoColor=00b9fc)](https://pub.dartlang.org/packages/docker_commander)
+[![Null Safety](https://img.shields.io/badge/null-safety-brightgreen)](https://dart.dev/null-safety)
 
 [![Docker image size](https://img.shields.io/docker/image-size/gmpassos/docker_commander?label=docker%20image%20size)](https://hub.docker.com/r/gmpassos/docker_commander)
 [![Docker puuls](https://img.shields.io/docker/pulls/gmpassos/docker_commander)](https://hub.docker.com/r/gmpassos/docker_commander)

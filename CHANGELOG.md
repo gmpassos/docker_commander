@@ -1,3 +1,13 @@
+## 2.0.0
+
+- Dart 2.12.0:
+  - Sound null safety compatibility.
+  - Update CI dart commands.
+  - sdk: '>=2.12.0 <3.0.0'
+- swiss_knife: ^3.0.6
+- mercury_client: ^2.0.2
+- logging: ^1.0.1
+
 ## 1.0.23
 
 - Added `DockerHostServer.checkAuthenticationBasicSecurity`.

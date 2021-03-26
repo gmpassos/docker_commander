@@ -182,15 +182,15 @@ abstract class DockerHost extends DockerCMDExecutor {
 
   /// Creates a Docker containers with [image] and optional [version].
   Future<ContainerInfos> createContainer(
-    String containerName,
-    String imageName, {
+    String /*!*/ containerName,
+    String /*!*/ imageName, {
     String version,
     List<String> ports,
     String network,
     String hostname,
     Map<String, String> environment,
     Map<String, String> volumes,
-    bool cleanContainer = false,
+    bool /*!*/ cleanContainer = false,
   });
 
   /// Removes a container by [containerNameOrID].
@@ -203,7 +203,7 @@ abstract class DockerHost extends DockerCMDExecutor {
 
   /// Runs a Docker containers with [image] and optional [version].
   Future<DockerRunner> run(
-    String image, {
+    String /*!*/ image, {
     String version,
     List<String> imageArgs,
     String containerName,
@@ -212,8 +212,8 @@ abstract class DockerHost extends DockerCMDExecutor {
     String hostname,
     Map<String, String> environment,
     Map<String, String> volumes,
-    bool cleanContainer = true,
-    bool outputAsLines = true,
+    bool /*!*/ cleanContainer = true,
+    bool /*!*/ outputAsLines = true,
     int outputLimit,
     OutputReadyFunction stdoutReadyFunction,
     OutputReadyFunction stderrReadyFunction,
@@ -223,9 +223,9 @@ abstract class DockerHost extends DockerCMDExecutor {
   /// Executes a [command] inside [containerName] with [args].
   @override
   Future<DockerProcess> exec(
-    String containerName,
-    String command,
-    List<String> args, {
+    String /*!*/ containerName,
+    String /*!*/ command,
+    List<String /*!*/ > args, {
     bool outputAsLines = true,
     int outputLimit,
     OutputReadyFunction stdoutReadyFunction,
@@ -236,8 +236,8 @@ abstract class DockerHost extends DockerCMDExecutor {
   /// Executes an arbitrary Docker [command] with [args].
   @override
   Future<DockerProcess> command(
-    String command,
-    List<String> args, {
+    String /*!*/ command,
+    List<String /*!*/ > args, {
     bool outputAsLines = true,
     int outputLimit,
     OutputReadyFunction stdoutReadyFunction,
@@ -246,8 +246,8 @@ abstract class DockerHost extends DockerCMDExecutor {
   });
 
   ContainerInfos buildContainerArgs(
-    String cmd,
-    String imageName,
+    String /*!*/ cmd,
+    String /*!*/ imageName,
     String version,
     String containerName,
     List<String> ports,
@@ -255,13 +255,13 @@ abstract class DockerHost extends DockerCMDExecutor {
     String hostname,
     Map<String, String> environment,
     Map<String, String> volumes,
-    bool cleanContainer,
+    bool /*!*/ cleanContainer,
   ) {
     var image = DockerHost.resolveImage(imageName, version);
 
     ports = DockerHost.normalizeMappedPorts(ports);
 
-    var args = <String>[
+    List<String /*!*/ > args = <String /*!*/ >[
       if (isNotEmptyString(cmd)) cmd,
       '--name',
       containerName,
@@ -317,8 +317,8 @@ abstract class DockerHost extends DockerCMDExecutor {
   /// Creates a Docker service with [serviceName], [image] and optional [version].
   /// Note that the Docker Daemon should be in Swarm mode.
   Future<Service> createService(
-    String serviceName,
-    String imageName, {
+    String /*!*/ serviceName,
+    String /*!*/ imageName, {
     String version,
     int replicas,
     List<String> ports,
@@ -384,7 +384,7 @@ abstract class DockerHost extends DockerCMDExecutor {
 
   /// Returns the Container logs as [String].
   Future<String> catContainerLogs(
-    String containerNameOrID, {
+    String /*!*/ containerNameOrID, {
     bool stderr = false,
     Pattern waitDataMatcher,
     Duration waitDataTimeout,
@@ -402,7 +402,7 @@ abstract class DockerHost extends DockerCMDExecutor {
 
   /// Returns a Service logs as [String].
   Future<String> catServiceLogs(
-    String containerNameOrID, {
+    String /*!*/ containerNameOrID, {
     bool stderr = false,
     Pattern waitDataMatcher,
     Duration waitDataTimeout,
@@ -422,7 +422,7 @@ abstract class DockerHost extends DockerCMDExecutor {
   List<int> getRunnersInstanceIDs();
 
   /// Returns a [List<String>] of [DockerRunner] `name`.
-  List<String> getRunnersNames();
+  List<String /*!*/ > getRunnersNames();
 
   /// Returns a [DockerRunner] with [instanceID].
   DockerRunner getRunnerByInstanceID(int instanceID);
@@ -441,7 +441,7 @@ abstract class DockerHost extends DockerCMDExecutor {
   }
 
   /// Stops a container by [name].
-  Future<bool> stopByName(String name, {Duration timeout});
+  Future<bool /*!*/ > stopByName(String name, {Duration timeout});
 
   /// Stops all [DockerRunner] returned by [getRunnersInstanceIDs].
   Future<void> stopRunners() async {
@@ -494,7 +494,8 @@ abstract class DockerHost extends DockerCMDExecutor {
   }
 
   /// Resolves a Docker image, composed by [imageName] and [version].
-  static String resolveImage(String imageName, [String version]) {
+  static String /*!*/ resolveImage(String /*!*/ imageName,
+      [String /*?*/ version]) {
     var image = imageName.trim();
 
     if (isNotEmptyString(version, trim: true)) {
@@ -549,7 +550,7 @@ abstract class DockerProcess {
   final int instanceID;
 
   /// The name of the associated container.
-  final String containerName;
+  final String /*!*/ containerName;
 
   DockerProcess(this.dockerHost, this.instanceID, this.containerName);
 
@@ -747,7 +748,7 @@ class Output {
   String toString() => asString;
 }
 
-typedef OutputReadyFunction = bool Function(
+typedef OutputReadyFunction = bool /*!*/ Function(
     OutputStream outputStream, dynamic data);
 
 /// Indicates which output should be ready.

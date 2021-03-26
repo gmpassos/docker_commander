@@ -21,7 +21,7 @@ abstract class DockerCMDExecutor {
   /// Executes a Docker [command] with [args]
   Future<DockerProcess> command(
     String command,
-    List<String> args, {
+    List<String /*!*/ > args, {
     bool outputAsLines = true,
     int outputLimit,
     OutputReadyFunction stdoutReadyFunction,
@@ -34,7 +34,7 @@ abstract class DockerCMDExecutor {
   Future<DockerProcess> exec(
     String containerName,
     String command,
-    List<String> args, {
+    List<String /*!*/ > args, {
     bool outputAsLines = true,
     int outputLimit,
     OutputReadyFunction stdoutReadyFunction,
@@ -60,7 +60,7 @@ abstract class DockerCMDExecutor {
 
   /// Calls [exec] than [waitStdout].
   Future<Output> execAndWaitStdout(
-      String containerName, String command, List<String> args,
+      String /*!*/ containerName, String /*!*/ command, List<String> args,
       {int desiredExitCode}) async {
     var process = await exec(containerName, command, args);
     return process.waitStdout(desiredExitCode: desiredExitCode);
@@ -76,7 +76,7 @@ abstract class DockerCMDExecutor {
 
   /// Calls [execAndWaitStdoutAsString] and returns [Output.asString].
   Future<String> execAndWaitStdoutAsString(
-      String containerName, String command, List<String> args,
+      String /*!*/ containerName, String /*!*/ command, List<String> args,
       {bool trim = false, int desiredExitCode, Pattern dataMatcher}) async {
     var output = await execAndWaitStdout(containerName, command, args,
         desiredExitCode: desiredExitCode);
@@ -104,13 +104,13 @@ abstract class DockerCMDExecutor {
     return s;
   }
 
-  final Map<String, Map<String, String>> _whichCache = {};
+  final Map<String /*!*/, Map<String, String>> _whichCache = {};
 
   /// Call POSIX `which` command.
   /// Calls [exec] with command `which` and args [commandName].
   /// Caches response than returns the executable path for [commandName].
-  Future<String> execWhich(String containerName, String commandName,
-      {bool ignoreCache, String def}) async {
+  Future<String> execWhich(String /*!*/ containerName, String /*!*/ commandName,
+      {bool /*!*/ ignoreCache = false, String def}) async {
     if (isEmptyString(containerName) || isEmptyString(commandName)) return null;
 
     ignoreCache ??= false;
@@ -222,9 +222,10 @@ abstract class DockerCMD {
     return ip;
   }
 
-  static Future<Map<String, bool>> addContainersHostMapping(
+  static Future<Map<String /*!*/, bool>> addContainersHostMapping(
       DockerCMDExecutor executor,
-      Map<String, Map<String, String>> containersHostMapping) async {
+      Map<String /*!*/, Map<String /*!*/, String>>
+          containersHostMapping) async {
     var allHostMapping = <String, String>{};
     for (var hostMapping in containersHostMapping.values) {
       allHostMapping.addAll(hostMapping);
@@ -254,7 +255,7 @@ abstract class DockerCMD {
   }
 
   static Future<bool> addContainerHostMapping(DockerCMDExecutor executor,
-      String containerName, Map<String, String> hostIPMapping) async {
+      String /*!*/ containerName, Map<String, String> hostIPMapping) async {
     if (isEmptyString(containerName) ||
         hostIPMapping == null ||
         hostIPMapping.isEmpty) {
@@ -333,7 +334,7 @@ abstract class DockerCMD {
   /// Executes a shell [script]. Tries to use `bash` or `sh`.
   /// Note that [script] should be inline, without line breaks (`\n`).
   static Future<DockerProcess> execShell(
-      DockerCMDExecutor executor, String containerName, String script,
+      DockerCMDExecutor executor, String /*!*/ containerName, String script,
       {bool sudo = false}) async {
     if (isEmptyString(containerName) || isEmptyString(script, trim: true)) {
       return null;
@@ -359,7 +360,7 @@ abstract class DockerCMD {
 
   /// Save the file [containerFilePath] with [content], inside [containerName].
   static Future<bool> putFileContent(DockerCMDExecutor executor,
-      String containerName, String containerFilePath, String content,
+      String /*!*/ containerName, String containerFilePath, String content,
       {bool sudo = false, bool append = false}) async {
     if (isEmptyString(containerName)) return false;
 
@@ -381,7 +382,7 @@ abstract class DockerCMD {
 
   /// Append to the file [filePath] with [content], inside [containerName].
   static Future<bool> appendFileContent(DockerCMDExecutor executor,
-      String containerName, String filePath, String content,
+      String /*!*/ containerName, String filePath, String content,
       {bool sudo = false}) async {
     return putFileContent(executor, containerName, filePath, content,
         sudo: sudo, append: true);
@@ -391,7 +392,7 @@ abstract class DockerCMD {
   ///
   /// See also [putFileContent], that can perform the operation using
   /// container user and `sudo`.
-  static Future<bool> copyFileContentToContainer(
+  static Future<bool /*!*/ > copyFileContentToContainer(
       DockerCMDExecutor executor,
       String containerName,
       String content,
@@ -410,7 +411,7 @@ abstract class DockerCMD {
   /// of name [containerName], with internal file path [containerFilePath].
   static Future<bool> copyFileToContainer(
       DockerCMDExecutor executor,
-      String containerName,
+      String /*!*/ containerName,
       String hostFilePath,
       String containerFilePath) async {
     if (isEmptyString(containerName) ||
@@ -426,7 +427,7 @@ abstract class DockerCMD {
   /// to the host machine, at [hostFilePath].
   static Future<bool> copyFileFromContainer(
       DockerCMDExecutor executor,
-      String containerName,
+      String /*!*/ containerName,
       String containerFilePath,
       String hostFilePath) async {
     if (isEmptyString(containerName) ||
@@ -468,7 +469,7 @@ abstract class DockerCMD {
   }
 
   /// Removes a Docker network with [networkName].
-  static Future<bool> removeNetwork(
+  static Future<bool /*!*/ > removeNetwork(
       DockerCMDExecutor executor, String networkName) async {
     if (isEmptyString(networkName, trim: true)) return null;
     networkName = networkName.trim();
@@ -669,7 +670,7 @@ abstract class DockerCMD {
 
   /// Removes a service from the Swarm cluster by [serviceName].
   static Future<bool> removeService(
-      DockerCMDExecutor executor, String serviceName) async {
+      DockerCMDExecutor executor, String /*!*/ serviceName) async {
     var cmd = await executor.command('service', ['rm', serviceName]);
     var cmdOK = await cmd.waitExitAndConfirm(0);
     return cmdOK;
@@ -677,7 +678,7 @@ abstract class DockerCMD {
 
   /// Opens a Container logs, by [containerNameOrID]:
   static Future<DockerProcess> openContainerLogs(
-          DockerCMDExecutor executor, String containerNameOrID,
+          DockerCMDExecutor executor, String /*!*/ containerNameOrID,
           {bool follow = true}) =>
       executor.command(
         'logs',
@@ -690,7 +691,7 @@ abstract class DockerCMD {
 
   /// Opens a Service logs, by [serviceNameOrTask]:
   static Future<DockerProcess> openServiceLogs(
-          DockerCMDExecutor executor, String serviceNameOrTask,
+          DockerCMDExecutor executor, String /*!*/ serviceNameOrTask,
           {bool follow = true}) =>
       executor.command(
           'service',

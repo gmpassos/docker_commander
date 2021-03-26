@@ -19,11 +19,11 @@ jobs:
     - name: Dart version
       run: dart --version
     - name: Install dependencies
-      run: pub get
-    - name: dartfmt
-      run: dartfmt -n --set-exit-if-changed .
-    - name: dartanalyzer
-      run: dartanalyzer --fatal-infos --fatal-warnings .
-    - name: publish --dry-run
-      run: pub publish --dry-run
+      run: dart pub get
+    - name: dart format
+      run: dart format -o none --set-exit-if-changed .
+    - name: dart analyze
+      run: dart analyze --fatal-infos --fatal-warnings .
+    - name: dart pub publish --dry-run
+      run: dart pub publish --dry-run
 
