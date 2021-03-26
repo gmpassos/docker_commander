@@ -48,7 +48,7 @@ void _printLine() {
       '------------------------------------------------------------------------------');
 }
 
-Future<void> _printToConsole(String line, bool output) async {
+Future<void> _printToConsole(String? line, bool? output) async {
   if (output ?? false) {
     print('>> $line');
   } else {
@@ -56,7 +56,7 @@ Future<void> _printToConsole(String line, bool output) async {
   }
 }
 
-Future<String> _ask(String name, [String description]) async {
+Future<String> _ask(String name, [String? description]) async {
   if (name == 'CONTINUE') {
     name = 'Press ENTER to continue';
   }
@@ -177,7 +177,7 @@ void main(List<String> args) async {
 
     emptyLineCounter = 0;
 
-    var cmd = ConsoleCMD.parse(line);
+    var cmd = ConsoleCMD.parse(line)!;
 
     try {
       var ok = await console.executeConsoleCMD(cmd);

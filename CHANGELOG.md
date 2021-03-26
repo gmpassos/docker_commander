@@ -7,6 +7,7 @@
 - swiss_knife: ^3.0.6
 - mercury_client: ^2.0.2
 - logging: ^1.0.1
+- collection: ^1.15.0
 
 ## 1.0.23
 

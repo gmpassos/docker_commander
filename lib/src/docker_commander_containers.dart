@@ -6,21 +6,21 @@ import 'docker_commander_host.dart';
 /// Base class for pre-configured containers.
 class DockerContainerConfig<D extends DockerContainer> {
   final String image;
-  final String version;
-  final List<String> imageArgs;
-  final String name;
-  final String network;
-  final String hostname;
-  final List<String> ports;
-  final List<int> hostPorts;
-  final List<int> containerPorts;
-  final Map<String, String> environment;
-  final Map<String, String> volumes;
-  final bool/*?*/ cleanContainer;
-  final int outputLimit;
-  final bool/*!*/ outputAsLines;
-  final OutputReadyFunction stdoutReadyFunction;
-  final OutputReadyFunction stderrReadyFunction;
+  final String? version;
+  final List<String>? imageArgs;
+  final String? name;
+  final String? network;
+  final String? hostname;
+  final List<String>? ports;
+  final List<int>? hostPorts;
+  final List<int>? containerPorts;
+  final Map<String, String>? environment;
+  final Map<String, String>? volumes;
+  final bool? cleanContainer;
+  final int? outputLimit;
+  final bool outputAsLines;
+  final OutputReadyFunction? stdoutReadyFunction;
+  final OutputReadyFunction? stderrReadyFunction;
 
   DockerContainerConfig(
     this.image, {
@@ -42,22 +42,22 @@ class DockerContainerConfig<D extends DockerContainer> {
   });
 
   DockerContainerConfig copy({
-    String image,
-    String version,
-    List<String> imageArgs,
-    String name,
-    String network,
-    String hostname,
-    List<String> ports,
-    List<int> hostPorts,
-    List<int> containerPorts,
-    Map<String, String> environment,
-    Map<String, String> volumes,
-    bool cleanContainer,
-    int outputLimit,
-    bool outputAsLines,
-    OutputReadyFunction stdoutReadyFunction,
-    OutputReadyFunction stderrReadyFunction,
+    String? image,
+    String? version,
+    List<String>? imageArgs,
+    String? name,
+    String? network,
+    String? hostname,
+    List<String>? ports,
+    List<int>? hostPorts,
+    List<int>? containerPorts,
+    Map<String, String>? environment,
+    Map<String, String>? volumes,
+    bool? cleanContainer,
+    int? outputLimit,
+    bool? outputAsLines,
+    OutputReadyFunction? stdoutReadyFunction,
+    OutputReadyFunction? stderrReadyFunction,
   }) {
     return DockerContainerConfig<D>(
       image ?? this.image,
@@ -80,12 +80,12 @@ class DockerContainerConfig<D extends DockerContainer> {
   }
 
   Future<D> run(DockerCommander dockerCommander,
-      {String name,
-      String network,
-      String hostname,
-      List<int> hostPorts,
+      {String? name,
+      String? network,
+      String? hostname,
+      List<int>? hostPorts,
       bool cleanContainer = true,
-      int outputLimit}) {
+      int? outputLimit}) {
     var mappedPorts = ports?.toList();
 
     hostPorts ??= this.hostPorts;
@@ -93,14 +93,14 @@ class DockerContainerConfig<D extends DockerContainer> {
     if (hostPorts != null &&
         containerPorts != null &&
         hostPorts.isNotEmpty &&
-        containerPorts.isNotEmpty) {
+        containerPorts!.isNotEmpty) {
       mappedPorts ??= <String>[];
 
-      var portsLength = Math.min(hostPorts.length, containerPorts.length);
+      var portsLength = Math.min(hostPorts.length, containerPorts!.length);
 
       for (var i = 0; i < portsLength; ++i) {
         var p1 = hostPorts[i];
-        var p2 = containerPorts[i];
+        var p2 = containerPorts![i];
         mappedPorts.add('$p1:$p2');
       }
 
@@ -117,7 +117,7 @@ class DockerContainerConfig<D extends DockerContainer> {
       hostname: hostname ?? this.hostname,
       environment: environment,
       volumes: volumes,
-      cleanContainer: cleanContainer ?? this.cleanContainer ?? true,
+      cleanContainer: cleanContainer,
       outputAsLines: outputAsLines,
       outputLimit: outputLimit ?? this.outputLimit,
       stdoutReadyFunction: stdoutReadyFunction,
@@ -132,18 +132,18 @@ class DockerContainerConfig<D extends DockerContainer> {
     });
   }
 
-  D instantiateDockerContainer(DockerRunner runner) => null;
+  D? instantiateDockerContainer(DockerRunner runner) => null;
 
-  Future<bool>/*!*/ initializeContainer(D dockerContainer) => null;
+  Future<bool> initializeContainer(D dockerContainer) async => false;
 }
 
 /// PostgreSQL pre-configured container.
 class PostgreSQLContainer extends DockerContainerConfig<DockerContainer> {
   PostgreSQLContainer(
-      {String pgUser,
-      String pgPassword,
-      String pgDatabase,
-      List<int> hostPorts})
+      {String? pgUser,
+      String? pgPassword,
+      String? pgDatabase,
+      List<int>? hostPorts})
       : super(
           'postgres',
           version: 'latest',
@@ -162,7 +162,7 @@ class PostgreSQLContainer extends DockerContainerConfig<DockerContainer> {
 
 /// Apache HTTPD pre-configured container.
 class ApacheHttpdContainer extends DockerContainerConfig<DockerContainer> {
-  ApacheHttpdContainer({List<int> hostPorts})
+  ApacheHttpdContainer({List<int>? hostPorts})
       : super(
           'httpd',
           version: 'latest',

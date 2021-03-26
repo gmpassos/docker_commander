@@ -1,3 +1,4 @@
+import 'package:collection/collection.dart' show IterableExtension;
 import 'package:swiss_knife/swiss_knife.dart';
 
 import 'docker_commander_host.dart';
@@ -15,38 +16,40 @@ abstract class DockerCMDExecutor {
   /// Returns if [containerName] is running (checks at Docker Daemon).
   Future<bool> isContainerRunning(String containerName) async {
     var runningContainers = await DockerCMD.psContainerNames(this);
+    if (runningContainers == null) return false;
     return runningContainers.contains(containerName);
   }
 
   /// Executes a Docker [command] with [args]
-  Future<DockerProcess> command(
+  Future<DockerProcess?> command(
     String command,
-    List<String /*!*/ > args, {
+    List<String> args, {
     bool outputAsLines = true,
-    int outputLimit,
-    OutputReadyFunction stdoutReadyFunction,
-    OutputReadyFunction stderrReadyFunction,
-    OutputReadyType outputReadyType,
+    int? outputLimit,
+    OutputReadyFunction? stdoutReadyFunction,
+    OutputReadyFunction? stderrReadyFunction,
+    OutputReadyType? outputReadyType,
   });
 
   /// Executes a [command] inside this container with [args]
   /// Only executes if [isContainerRunnerRunning] [containerName] returns true.
-  Future<DockerProcess> exec(
+  Future<DockerProcess?> exec(
     String containerName,
     String command,
-    List<String /*!*/ > args, {
+    List<String> args, {
     bool outputAsLines = true,
-    int outputLimit,
-    OutputReadyFunction stdoutReadyFunction,
-    OutputReadyFunction stderrReadyFunction,
-    OutputReadyType outputReadyType,
+    int? outputLimit,
+    OutputReadyFunction? stdoutReadyFunction,
+    OutputReadyFunction? stderrReadyFunction,
+    OutputReadyType? outputReadyType,
   });
 
   /// Calls [exec] than [waitExit].
-  Future<int> execAndWaitExit(
+  Future<int?> execAndWaitExit(
       String containerName, String command, List<String> args,
-      {int desiredExitCode}) async {
+      {int? desiredExitCode}) async {
     var process = await exec(containerName, command, args);
+    if (process == null) return null;
     return process.waitExit(desiredExitCode: desiredExitCode);
   }
 
@@ -59,61 +62,61 @@ abstract class DockerCMDExecutor {
   }
 
   /// Calls [exec] than [waitStdout].
-  Future<Output> execAndWaitStdout(
-      String /*!*/ containerName, String /*!*/ command, List<String> args,
-      {int desiredExitCode}) async {
+  Future<Output?> execAndWaitStdout(
+      String containerName, String command, List<String> args,
+      {int? desiredExitCode}) async {
     var process = await exec(containerName, command, args);
+    if (process == null) return null;
     return process.waitStdout(desiredExitCode: desiredExitCode);
   }
 
   /// Calls [exec] than [waitStderr].
-  Future<Output> execAndWaitStderr(
+  Future<Output?> execAndWaitStderr(
       String containerName, String command, List<String> args,
-      {int desiredExitCode}) async {
+      {int? desiredExitCode}) async {
     var process = await exec(containerName, command, args);
+    if (process == null) return null;
     return process.waitStderr(desiredExitCode: desiredExitCode);
   }
 
   /// Calls [execAndWaitStdoutAsString] and returns [Output.asString].
-  Future<String> execAndWaitStdoutAsString(
-      String /*!*/ containerName, String /*!*/ command, List<String> args,
-      {bool trim = false, int desiredExitCode, Pattern dataMatcher}) async {
+  Future<String?> execAndWaitStdoutAsString(
+      String containerName, String command, List<String> args,
+      {bool trim = false, int? desiredExitCode, Pattern? dataMatcher}) async {
     var output = await execAndWaitStdout(containerName, command, args,
         desiredExitCode: desiredExitCode);
     return _waitOutputAsString(output, trim, dataMatcher);
   }
 
   /// Calls [execAndWaitStderrAsString] and returns [Output.asString].
-  Future<String> execAndWaitStderrAsString(
+  Future<String?> execAndWaitStderrAsString(
       String containerName, String command, List<String> args,
-      {bool trim = false, int desiredExitCode, Pattern dataMatcher}) async {
+      {bool trim = false, int? desiredExitCode, Pattern? dataMatcher}) async {
     var output = await execAndWaitStderr(containerName, command, args,
         desiredExitCode: desiredExitCode);
     return _waitOutputAsString(output, trim, dataMatcher);
   }
 
-  Future<String> _waitOutputAsString(Output output, bool trim,
-      [Pattern dataMatcher]) async {
+  Future<String?> _waitOutputAsString(Output? output, bool trim,
+      [Pattern? dataMatcher]) async {
     if (output == null) return null;
     dataMatcher ??= RegExp(r'.');
     await output.waitForDataMatch(dataMatcher);
     var s = output.asString;
-    if (trim ?? false) {
+    if (trim) {
       s = s.trim();
     }
     return s;
   }
 
-  final Map<String /*!*/, Map<String, String>> _whichCache = {};
+  final Map<String, Map<String, String>> _whichCache = {};
 
   /// Call POSIX `which` command.
   /// Calls [exec] with command `which` and args [commandName].
   /// Caches response than returns the executable path for [commandName].
-  Future<String> execWhich(String /*!*/ containerName, String /*!*/ commandName,
-      {bool /*!*/ ignoreCache = false, String def}) async {
+  Future<String?> execWhich(String containerName, String commandName,
+      {bool ignoreCache = false, String? def}) async {
     if (isEmptyString(containerName) || isEmptyString(commandName)) return null;
-
-    ignoreCache ??= false;
 
     if (isEmptyString(commandName, trim: true)) return null;
 
@@ -121,7 +124,7 @@ abstract class DockerCMDExecutor {
 
     var containerCache =
         _whichCache.putIfAbsent(containerName, () => <String, String>{});
-    String cached;
+    String? cached;
 
     if (!ignoreCache) {
       cached = containerCache[commandName];
@@ -141,7 +144,7 @@ abstract class DockerCMDExecutor {
   }
 
   /// Creates a temporary file.
-  Future<String> createTempFile(String content);
+  Future<String?> createTempFile(String content);
 
   /// Deletes a temporary [filePath].
   Future<bool> deleteTempFile(String filePath);
@@ -149,15 +152,17 @@ abstract class DockerCMDExecutor {
 
 abstract class DockerCMD {
   /// Returns the container ID by [name].
-  static Future<String> getContainerIDByName(
-      DockerCMDExecutor executor, String name) async {
+  static Future<String?> getContainerIDByName(
+      DockerCMDExecutor executor, String? name) async {
     if (isEmptyString(name)) return null;
 
     var process = await executor.command('ps', ['-aqf', 'name=$name']);
+    if (process == null) return null;
+
     var ok = await process.waitExitAndConfirm(0);
     if (!ok) return null;
 
-    var stdout = process.stdout;
+    var stdout = process.stdout!;
     var dataOK = await stdout.waitForDataMatch(RegExp(r'\w+'),
         timeout: executor.defaultOutputTime);
     if (!dataOK) return null;
@@ -167,16 +172,17 @@ abstract class DockerCMD {
   }
 
   /// Returns the container ID by [name].
-  static Future<String> getServiceIDByName(
+  static Future<String?> getServiceIDByName(
       DockerCMDExecutor executor, String name) async {
     if (isEmptyString(name)) return null;
 
     var process = await executor
         .command('service', ['ls', '-f', 'name=$name', '--format', '{{.ID}}']);
+    if (process == null) return null;
     var ok = await process.waitExitAndConfirm(0);
     if (!ok) return null;
 
-    var stdout = process.stdout;
+    var stdout = process.stdout!;
     var dataOK = await stdout.waitForDataMatch(RegExp(r'\w+'),
         timeout: executor.defaultOutputTime);
     if (!dataOK) return null;
@@ -186,16 +192,17 @@ abstract class DockerCMD {
   }
 
   /// Returns the container IP by [name].
-  static Future<String> getContainerIP(
-      DockerCMDExecutor executor, String name) async {
+  static Future<String?> getContainerIP(
+      DockerCMDExecutor executor, String? name) async {
     if (isEmptyString(name)) return null;
 
-    var process = await executor.command('container', ['inspect', name]);
+    var process = await executor.command('container', ['inspect', name!]);
+    if (process == null) return null;
     var exitOK = await process.waitExitAndConfirm(0);
     if (!exitOK) return null;
 
-    await process.stdout.waitForDataMatch('IPAddress');
-    var json = process.stdout.asString;
+    await process.stdout!.waitForDataMatch('IPAddress');
+    var json = process.stdout!.asString;
     if (isEmptyString(json, trim: true)) return null;
 
     var inspect = parseJSON(json);
@@ -206,12 +213,12 @@ abstract class DockerCMD {
         .where((e) => e.containsKey('NetworkSettings'))
         .map((e) => e['NetworkSettings'])
         .whereType<Map>()
-        .firstWhere((e) => e.containsKey('IPAddress'), orElse: () => null);
+        .firstWhereOrNull((e) => e.containsKey('IPAddress'));
 
     var ip = networkSettings != null ? networkSettings['IPAddress'] : null;
 
     if (isEmptyString(ip, trim: true)) {
-      var networks = networkSettings['Networks'] as Map;
+      var networks = networkSettings!['Networks'] as Map;
 
       var network = networks.values.firstWhere(
           (e) => isNotEmptyString(e['IPAddress']),
@@ -222,11 +229,10 @@ abstract class DockerCMD {
     return ip;
   }
 
-  static Future<Map<String /*!*/, bool>> addContainersHostMapping(
+  static Future<Map<String, bool>> addContainersHostMapping(
       DockerCMDExecutor executor,
-      Map<String /*!*/, Map<String /*!*/, String>>
-          containersHostMapping) async {
-    var allHostMapping = <String, String>{};
+      Map<String, Map<String, String?>> containersHostMapping) async {
+    var allHostMapping = <String, String?>{};
     for (var hostMapping in containersHostMapping.values) {
       allHostMapping.addAll(hostMapping);
     }
@@ -234,7 +240,7 @@ abstract class DockerCMD {
     var oks = <String, bool>{};
 
     for (var containerName in containersHostMapping.keys) {
-      var hostMapping = containersHostMapping[containerName];
+      var hostMapping = containersHostMapping[containerName]!;
       var allHostMapping2 = Map<String, String>.from(allHostMapping);
 
       for (var containerHost in hostMapping.keys) {
@@ -255,10 +261,8 @@ abstract class DockerCMD {
   }
 
   static Future<bool> addContainerHostMapping(DockerCMDExecutor executor,
-      String /*!*/ containerName, Map<String, String> hostIPMapping) async {
-    if (isEmptyString(containerName) ||
-        hostIPMapping == null ||
-        hostIPMapping.isEmpty) {
+      String containerName, Map<String, String> hostIPMapping) async {
+    if (isEmptyString(containerName) || hostIPMapping.isEmpty) {
       return false;
     }
 
@@ -288,10 +292,10 @@ abstract class DockerCMD {
   }
 
   /// parses a `/etc/hosts` file to IPs and mapped hosts.
-  static Map<String, List<String>> parseHostsFile(String hosts) {
+  static Map<String, List<String>> parseHostsFile(String? hosts) {
     if (isEmptyString(hosts, trim: true)) return <String, List<String>>{};
 
-    var entries = hosts
+    var entries = hosts!
         .split(RegExp(r'[\r\n]'))
         .map((e) => e.trim())
         .where((e) => e.isNotEmpty && !e.startsWith('#'))
@@ -308,11 +312,12 @@ abstract class DockerCMD {
   /// Call POSIX `cat` command.
   /// Calls [exec] with command `cat` and args [filePath].
   /// Returns the executable path for [filePath].
-  static Future<String> execCat(
+  static Future<String?> execCat(
       DockerCMDExecutor executor, String containerName, String filePath,
       {bool trim = false}) async {
     var catBin =
         await executor.execWhich(containerName, 'cat', def: '/bin/cat');
+    if (catBin == null) return null;
     var content = await executor.execAndWaitStdoutAsString(
         containerName, catBin, [filePath],
         trim: trim, desiredExitCode: 0);
@@ -321,10 +326,11 @@ abstract class DockerCMD {
 
   /// Call POSIX `whoami` command.
   /// Calls [exec] with command `whoami` and returns current user.
-  static Future<String> execWhoami(
+  static Future<String?> execWhoami(
       DockerCMDExecutor executor, String containerName) async {
     var whoamiBin = await executor.execWhich(containerName, 'whoami',
         def: '/usr/bin/whoami');
+    if (whoamiBin == null) return null;
     var user = await executor.execAndWaitStdoutAsString(
         containerName, whoamiBin, [],
         trim: true, desiredExitCode: 0);
@@ -333,8 +339,8 @@ abstract class DockerCMD {
 
   /// Executes a shell [script]. Tries to use `bash` or `sh`.
   /// Note that [script] should be inline, without line breaks (`\n`).
-  static Future<DockerProcess> execShell(
-      DockerCMDExecutor executor, String /*!*/ containerName, String script,
+  static Future<DockerProcess?> execShell(
+      DockerCMDExecutor executor, String containerName, String script,
       {bool sudo = false}) async {
     if (isEmptyString(containerName) || isEmptyString(script, trim: true)) {
       return null;
@@ -346,12 +352,15 @@ abstract class DockerCMD {
       bin = await executor.execWhich(containerName, 'sh', def: '/bin/sh');
     }
 
+    if (bin == null) return null;
+
     script =
         script.replaceAll(RegExp(r'(?:\r\n|\r|\n)', multiLine: false), ' ');
 
-    if (sudo ?? false) {
+    if (sudo) {
       var sudoBin =
           await executor.execWhich(containerName, 'sudo', def: '/bin/sudo');
+      if (sudoBin == null) return null;
       return executor.exec(containerName, sudoBin, [bin, '-c', script]);
     } else {
       return executor.exec(containerName, bin, ['-c', script]);
@@ -360,7 +369,7 @@ abstract class DockerCMD {
 
   /// Save the file [containerFilePath] with [content], inside [containerName].
   static Future<bool> putFileContent(DockerCMDExecutor executor,
-      String /*!*/ containerName, String containerFilePath, String content,
+      String containerName, String containerFilePath, String content,
       {bool sudo = false, bool append = false}) async {
     if (isEmptyString(containerName)) return false;
 
@@ -375,6 +384,7 @@ abstract class DockerCMD {
         'echo "$base64" | $base64Bin --decode | tee $teeParam $containerFilePath > /dev/null ';
 
     var shell = await execShell(executor, containerName, script);
+    if (shell == null) return false;
 
     var ok = await shell.waitExitAndConfirm(0);
     return ok;
@@ -382,7 +392,7 @@ abstract class DockerCMD {
 
   /// Append to the file [filePath] with [content], inside [containerName].
   static Future<bool> appendFileContent(DockerCMDExecutor executor,
-      String /*!*/ containerName, String filePath, String content,
+      String containerName, String filePath, String content,
       {bool sudo = false}) async {
     return putFileContent(executor, containerName, filePath, content,
         sudo: sudo, append: true);
@@ -392,14 +402,14 @@ abstract class DockerCMD {
   ///
   /// See also [putFileContent], that can perform the operation using
   /// container user and `sudo`.
-  static Future<bool /*!*/ > copyFileContentToContainer(
+  static Future<bool> copyFileContentToContainer(
       DockerCMDExecutor executor,
       String containerName,
       String content,
       bool append,
       String containerFilePath) async {
     var tempFilePath = await executor.createTempFile(content);
-    if (tempFilePath == null) return null;
+    if (tempFilePath == null) return false;
     var ok = await copyFileToContainer(
         executor, containerName, tempFilePath, containerFilePath);
     await executor.deleteTempFile(tempFilePath);
@@ -411,7 +421,7 @@ abstract class DockerCMD {
   /// of name [containerName], with internal file path [containerFilePath].
   static Future<bool> copyFileToContainer(
       DockerCMDExecutor executor,
-      String /*!*/ containerName,
+      String containerName,
       String hostFilePath,
       String containerFilePath) async {
     if (isEmptyString(containerName) ||
@@ -420,6 +430,7 @@ abstract class DockerCMD {
 
     var cmd = await executor
         .command('cp', [hostFilePath, '$containerName:$containerFilePath']);
+    if (cmd == null) return false;
     return cmd.waitExitAndConfirm(0);
   }
 
@@ -427,7 +438,7 @@ abstract class DockerCMD {
   /// to the host machine, at [hostFilePath].
   static Future<bool> copyFileFromContainer(
       DockerCMDExecutor executor,
-      String /*!*/ containerName,
+      String containerName,
       String containerFilePath,
       String hostFilePath) async {
     if (isEmptyString(containerName) ||
@@ -436,20 +447,22 @@ abstract class DockerCMD {
 
     var cmd = await executor
         .command('cp', ['$containerName:$containerFilePath', hostFilePath]);
+    if (cmd == null) return false;
     return cmd.waitExitAndConfirm(0);
   }
 
   /// Executes Docker command `docker ps --format "{{.Names}}"`
-  static Future<List<String>> psContainerNames(DockerCMDExecutor executor,
+  static Future<List<String>?> psContainerNames(DockerCMDExecutor executor,
       {bool all = true}) async {
     var process = await executor.command('ps', [
       if (all) '-a',
       '--format',
       '{{.Names}}',
     ]);
+    if (process == null) return null;
     var exitCode = await process.waitExit();
     if (exitCode != 0) return null;
-    var stdout = process.stdout;
+    var stdout = process.stdout!;
     await stdout.waitForDataMatch(RegExp(r'\w'), timeout: Duration(seconds: 1));
     var output = stdout.asString;
     var names =
@@ -458,22 +471,25 @@ abstract class DockerCMD {
   }
 
   /// Creates a Docker network with [networkName].
-  static Future<String> createNetwork(
-      DockerCMDExecutor executor, String networkName) async {
+  static Future<String?> createNetwork(
+      DockerCMDExecutor executor, String? networkName) async {
     if (isEmptyString(networkName, trim: true)) return null;
-    networkName = networkName.trim();
+    networkName = networkName!.trim();
 
     var process = await executor.command('network', ['create', networkName]);
+    if (process == null) return null;
+
     var exitCode = await process.waitExit();
     return exitCode == 0 ? networkName : null;
   }
 
   /// Removes a Docker network with [networkName].
-  static Future<bool /*!*/ > removeNetwork(
-      DockerCMDExecutor executor, String networkName) async {
-    if (isEmptyString(networkName, trim: true)) return null;
-    networkName = networkName.trim();
+  static Future<bool> removeNetwork(
+      DockerCMDExecutor executor, String? networkName) async {
+    if (isEmptyString(networkName, trim: true)) return false;
+    networkName = networkName!.trim();
     var process = await executor.command('network', ['rm', networkName]);
+    if (process == null) return false;
     var exitCode = await process.waitExit();
     return exitCode == 0;
   }
@@ -483,68 +499,76 @@ abstract class DockerCMD {
       DockerCMDExecutor executor, String containerNameOrID) async {
     if (isEmptyString(containerNameOrID)) return false;
     var process = await executor.command('rm', [containerNameOrID]);
+    if (process == null) return false;
     return process.waitExitAndConfirm(0);
   }
 
   /// Starts a container by [containerNameOrID].
   static Future<bool> startContainer(
-      DockerCMDExecutor executor, String containerNameOrID) async {
+      DockerCMDExecutor executor, String? containerNameOrID) async {
     if (isEmptyString(containerNameOrID)) return false;
-    var process = await executor.command('start', [containerNameOrID]);
+    var process = await executor.command('start', [containerNameOrID!]);
+    if (process == null) return false;
     return process.waitExitAndConfirm(0);
   }
 
   /// Initialize swarm mode.
-  static Future<SwarmInfos> swarmInit(DockerCMDExecutor executor,
-      {String advertiseAddress, String listenAddress}) async {
+  static Future<SwarmInfos?> swarmInit(DockerCMDExecutor executor,
+      {String? advertiseAddress, String? listenAddress}) async {
     var args = ['init'];
 
     if (isNotEmptyString(advertiseAddress)) {
       args.add('--advertise-addr');
-      args.add(advertiseAddress);
+      args.add(advertiseAddress!);
     }
 
     if (isNotEmptyString(listenAddress)) {
       args.add('--listen-addr');
-      args.add(listenAddress);
+      args.add(listenAddress!);
     }
 
     var cmd = await executor.command('swarm', args);
+    if (cmd == null) return null;
+
     var ok = await cmd.waitExitAndConfirm(0);
     if (!ok) return null;
 
-    var stdout = cmd.stdout;
+    var stdout = cmd.stdout!;
     var dataOK = await stdout.waitForDataMatch(RegExp(r'-token'));
     if (!dataOK) return null;
 
     var output = stdout.asString;
 
     var swarmInfosWorker = await _parseSwarmInfos(executor, output, true);
+
     var swarmInfosManager = await _getSwarmJoinToken(executor, false);
+    if (swarmInfosManager == null) return null;
 
     return SwarmInfos(swarmInfosManager.nodeID, swarmInfosManager.managerToken,
         swarmInfosWorker.workerToken, swarmInfosManager.advertiseAddress);
   }
 
   /// Returns a [SwarmInfos]. Only if in Swarm mode.
-  static Future<SwarmInfos> getSwarmInfos(DockerCMDExecutor executor) async {
+  static Future<SwarmInfos?> getSwarmInfos(DockerCMDExecutor executor) async {
     var swarmInfosManager = await _getSwarmJoinToken(executor, false);
     if (swarmInfosManager == null) return null;
     var swarmInfosWorker = await _getSwarmJoinToken(executor, true);
+    if (swarmInfosWorker == null) return null;
 
     return SwarmInfos(swarmInfosManager.nodeID, swarmInfosManager.managerToken,
         swarmInfosWorker.workerToken, swarmInfosManager.advertiseAddress);
   }
 
   /// Returns the Swarm join token, for manager or [worker].
-  static Future<SwarmInfos> _getSwarmJoinToken(
+  static Future<SwarmInfos?> _getSwarmJoinToken(
       DockerCMDExecutor executor, bool worker) async {
     var type = worker ? 'worker' : 'manager';
     var cmd = await executor.command('swarm', ['join-token', type]);
+    if (cmd == null) return null;
     var ok = await cmd.waitExitAndConfirm(0);
     if (!ok) return null;
 
-    var stdout = cmd.stdout;
+    var stdout = cmd.stdout!;
     var dataOK = await stdout.waitForDataMatch(RegExp(r'-token'));
     if (!dataOK) return null;
 
@@ -577,22 +601,24 @@ abstract class DockerCMD {
       {bool force = false}) async {
     var args = ['leave'];
 
-    if (force ?? false) {
+    if (force) {
       args.add('--force');
     }
 
     var cmd = await executor.command('swarm', args);
+    if (cmd == null) return false;
     return cmd.waitExitAndConfirm(0);
   }
 
   /// Returns the node ID of the current Docker Daemon the swarm cluster.
-  static Future<String> swarmSelfNodeID(DockerCMDExecutor executor) async {
+  static Future<String?> swarmSelfNodeID(DockerCMDExecutor executor) async {
     var cmd =
         await executor.command('node', ['ls', '--format', '{{.ID}}:{{.Self}}']);
+    if (cmd == null) return null;
     var ok = await cmd.waitExitAndConfirm(0);
     if (!ok) return null;
 
-    var stdout = cmd.stdout;
+    var stdout = cmd.stdout!;
     var dataOK = await stdout.waitForDataMatch(RegExp(r'\w+'),
         timeout: executor.defaultOutputTime);
     if (!dataOK) return null;
@@ -600,7 +626,7 @@ abstract class DockerCMD {
     var output = stdout.asString.trim();
     var ids = output.split(RegExp(r'\s+'));
 
-    var myID = ids.firstWhere((l) => l.contains(':true'), orElse: () => null);
+    var myID = ids.firstWhereOrNull((l) => l.contains(':true'));
     if (myID == null) return null;
 
     myID = myID.split(':true')[0];
@@ -608,14 +634,15 @@ abstract class DockerCMD {
   }
 
   /// Returns a list of services names.
-  static Future<List<String>> listServicesNames(
+  static Future<List<String>?> listServicesNames(
       DockerCMDExecutor executor) async {
     var cmd =
         await executor.command('service', ['ls', '--format', '{{.Name}}']);
+    if (cmd == null) return null;
     var cmdOK = await cmd.waitExitAndConfirm(0);
     if (!cmdOK) return null;
 
-    var stdout = cmd.stdout;
+    var stdout = cmd.stdout!;
     var dataOK = await stdout.waitForDataMatch(RegExp(r'\w'),
         timeout: executor.defaultOutputTime);
     if (!dataOK) return null;
@@ -623,14 +650,14 @@ abstract class DockerCMD {
     var lines = stdout.asString
         .trim()
         .split(RegExp(r'[\r\n]+'))
-        .where((s) => s != null && s.isNotEmpty)
+        .where((s) => s.isNotEmpty)
         .toList();
 
     return lines;
   }
 
   /// Returns a list of [ServiceTaskInfos] of a service by [serviceName].
-  static Future<List<ServiceTaskInfos>> listServiceTasks(
+  static Future<List<ServiceTaskInfos>?> listServiceTasks(
       DockerCMDExecutor executor, String serviceName) async {
     var d = ';!-!;';
     var cmd = await executor.command('service', [
@@ -639,10 +666,11 @@ abstract class DockerCMD {
       '{{.ID}}$d{{.Name}}$d{{.Image}}$d{{.Node}}$d{{.DesiredState}}$d{{.CurrentState}}$d{{.Ports}}$d{{.Error}}$d',
       serviceName
     ]);
+    if (cmd == null) return null;
     var cmdOK = await cmd.waitExitAndConfirm(0);
     if (!cmdOK) return null;
 
-    var stdout = cmd.stdout;
+    var stdout = cmd.stdout!;
     var dataOK =
         await stdout.waitForDataMatch(d, timeout: executor.defaultOutputTime);
     if (!dataOK) return null;
@@ -670,47 +698,48 @@ abstract class DockerCMD {
 
   /// Removes a service from the Swarm cluster by [serviceName].
   static Future<bool> removeService(
-      DockerCMDExecutor executor, String /*!*/ serviceName) async {
+      DockerCMDExecutor executor, String serviceName) async {
     var cmd = await executor.command('service', ['rm', serviceName]);
+    if (cmd == null) return false;
     var cmdOK = await cmd.waitExitAndConfirm(0);
     return cmdOK;
   }
 
   /// Opens a Container logs, by [containerNameOrID]:
-  static Future<DockerProcess> openContainerLogs(
-          DockerCMDExecutor executor, String /*!*/ containerNameOrID,
+  static Future<DockerProcess?> openContainerLogs(
+          DockerCMDExecutor executor, String containerNameOrID,
           {bool follow = true}) =>
       executor.command(
         'logs',
         [
           containerNameOrID,
-          if (follow ?? false) '-f',
+          if (follow) '-f',
         ],
         outputReadyType: OutputReadyType.STARTS_READY,
       );
 
   /// Opens a Service logs, by [serviceNameOrTask]:
-  static Future<DockerProcess> openServiceLogs(
-          DockerCMDExecutor executor, String /*!*/ serviceNameOrTask,
+  static Future<DockerProcess?> openServiceLogs(
+          DockerCMDExecutor executor, String serviceNameOrTask,
           {bool follow = true}) =>
       executor.command(
           'service',
           [
             'logs',
             serviceNameOrTask,
-            if (follow ?? false) '-f',
+            if (follow) '-f',
           ],
           outputReadyType: OutputReadyType.STARTS_READY);
 
   /// Returns the Container logs as [String].
-  static Future<String> catContainerLogs(
+  static Future<String?> catContainerLogs(
     DockerCMDExecutor executor,
     String containerNameOrID, {
     bool stderr = false,
-    Pattern waitDataMatcher,
-    Duration waitDataTimeout,
+    Pattern? waitDataMatcher,
+    Duration? waitDataTimeout,
     bool waitExit = false,
-    int desiredExitCode,
+    int? desiredExitCode,
     bool follow = false,
   }) async {
     var logs =
@@ -720,14 +749,14 @@ abstract class DockerCMD {
   }
 
   /// Returns a Service logs as [String].
-  static Future<String> catServiceLogs(
+  static Future<String?> catServiceLogs(
     DockerCMDExecutor executor,
     String containerNameOrID, {
     bool stderr = false,
-    Pattern waitDataMatcher,
-    Duration waitDataTimeout,
+    Pattern? waitDataMatcher,
+    Duration? waitDataTimeout,
     bool waitExit = false,
-    int desiredExitCode,
+    int? desiredExitCode,
     bool follow = false,
   }) async {
     var logs =
@@ -736,25 +765,25 @@ abstract class DockerCMD {
         waitDataMatcher, waitDataTimeout);
   }
 
-  static Future<String> _waitLogs(
+  static Future<String?> _waitLogs(
       bool waitExit,
-      DockerProcess logs,
-      int desiredExitCode,
+      DockerProcess? logs,
+      int? desiredExitCode,
       bool stderr,
-      Pattern waitDataMatcher,
-      Duration waitDataTimeout) async {
-    if (waitExit ?? false) {
-      var waitExit = logs.waitExit(desiredExitCode: desiredExitCode);
+      Pattern? waitDataMatcher,
+      Duration? waitDataTimeout) async {
+    if (waitExit) {
+      var waitExit = logs?.waitExit(desiredExitCode: desiredExitCode);
       if (waitExit == null) return null;
     }
 
-    var stdout = (stderr ?? false) ? logs.stderr : logs.stdout;
+    var stdout = (stderr) ? logs!.stderr : logs!.stdout;
 
     try {
       if (waitDataMatcher != null) {
         waitDataTimeout ??= Duration(seconds: 15);
-        var dataOK = await stdout.waitForDataMatch(waitDataMatcher,
-            timeout: waitDataTimeout);
+        var dataOK = await stdout!
+            .waitForDataMatch(waitDataMatcher, timeout: waitDataTimeout);
         if (dataOK) {
           return stdout.asString;
         } else {
@@ -762,7 +791,7 @@ abstract class DockerCMD {
         }
       } else {
         waitDataTimeout ??= Duration(milliseconds: 100);
-        var dataOK = await stdout.waitData(timeout: waitDataTimeout);
+        var dataOK = await stdout!.waitData(timeout: waitDataTimeout);
         if (dataOK) {
           return stdout.asString;
         } else {

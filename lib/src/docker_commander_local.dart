@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:collection/collection.dart' show IterableExtension;
 import 'package:logging/logging.dart';
 import 'package:swiss_knife/swiss_knife.dart';
 
@@ -10,25 +11,25 @@ import 'docker_commander_host.dart';
 final _LOG = Logger('docker_commander/io');
 
 class ContainerInfosLocal extends ContainerInfos {
-  final File idFile;
+  final File? idFile;
 
   ContainerInfosLocal(
       String containerName,
-      String image,
+      String? image,
       this.idFile,
-      List<String> ports,
-      String containerNetwork,
-      String containerHostname,
-      List<String> args)
+      List<String>? ports,
+      String? containerNetwork,
+      String? containerHostname,
+      List<String>? args)
       : super(containerName, null, image, ports, containerNetwork,
             containerHostname, args);
 }
 
 /// [DockerHost] Implementation for Local Docker machine host.
 class DockerHostLocal extends DockerHost {
-  String _dockerBinaryPath;
+  String? _dockerBinaryPath;
 
-  DockerHostLocal({String dockerBinaryPath})
+  DockerHostLocal({String? dockerBinaryPath})
       : _dockerBinaryPath = isNotEmptyString(dockerBinaryPath, trim: true)
             ? dockerBinaryPath
             : null;
@@ -40,7 +41,7 @@ class DockerHostLocal extends DockerHost {
   }
 
   /// The Docker binary path.
-  String get dockerBinaryPath {
+  String? get dockerBinaryPath {
     if (_dockerBinaryPath == null) throw StateError('Null _dockerBinaryPath');
     return _dockerBinaryPath;
   }
@@ -52,7 +53,7 @@ class DockerHostLocal extends DockerHost {
         stdoutEncoding: systemEncoding);
 
     if (processResult.exitCode == 0) {
-      var output = processResult.stdout as String;
+      var output = processResult.stdout as String?;
       output ??= '';
       output = output.trim();
 
@@ -68,7 +69,7 @@ class DockerHostLocal extends DockerHost {
   Future<bool> checkDaemon() async {
     _LOG.info('Check Docker Daemon: $dockerBinaryPath info');
 
-    var process = Process.run(dockerBinaryPath, <String>['info']);
+    var process = Process.run(dockerBinaryPath!, <String>['info']);
     var result = await process;
 
     var ok = result.exitCode == 0;
@@ -83,15 +84,15 @@ class DockerHostLocal extends DockerHost {
 
   @override
   ContainerInfosLocal buildContainerArgs(
-    String /*!*/ cmd,
-    String /*!*/ imageName,
-    String version,
+    String cmd,
+    String imageName,
+    String? version,
     String containerName,
-    List<String> ports,
-    String network,
-    String hostname,
-    Map<String, String> environment,
-    Map<String, String> volumes,
+    List<String>? ports,
+    String? network,
+    String? hostname,
+    Map<String, String>? environment,
+    Map<String, String>? volumes,
     bool cleanContainer, {
     bool addCIDFile = false,
   }) {
@@ -108,7 +109,7 @@ class DockerHostLocal extends DockerHost {
       cleanContainer,
     );
 
-    var args = containerInfos.args;
+    var args = containerInfos.args!;
     // Last parameter is the image.
     // Remove to append more parameters, then add it in the end:
     args.removeLast();
@@ -120,7 +121,7 @@ class DockerHostLocal extends DockerHost {
       for (var networkContainerName in networkHostsIPs.keys) {
         if (networkContainerName == containerName) continue;
 
-        var hostMaps = networkHostsIPs[networkContainerName];
+        var hostMaps = networkHostsIPs[networkContainerName]!;
 
         for (var host in hostMaps.keys) {
           var ip = hostMaps[host];
@@ -130,14 +131,14 @@ class DockerHostLocal extends DockerHost {
       }
     }
 
-    File idFile;
+    File? idFile;
     if (addCIDFile) {
       idFile = _createTemporaryFile('cidfile');
       args.add('--cidfile');
       args.add(idFile.path);
     }
 
-    args.add(containerInfos.image);
+    args.add(containerInfos.image!);
 
     return ContainerInfosLocal(
       containerInfos.containerName,
@@ -151,16 +152,16 @@ class DockerHostLocal extends DockerHost {
   }
 
   @override
-  Future<ContainerInfos> createContainer(
-    String /*!*/ containerName,
-    String /*!*/ imageName, {
-    String version,
-    List<String> ports,
-    String network,
-    String hostname,
-    Map<String, String> environment,
-    Map<String, String> volumes,
-    bool /*!*/ cleanContainer = false,
+  Future<ContainerInfos?> createContainer(
+    String containerName,
+    String imageName, {
+    String? version,
+    List<String>? ports,
+    String? network,
+    String? hostname,
+    Map<String, String>? environment,
+    Map<String, String>? volumes,
+    bool cleanContainer = false,
   }) async {
     if (isEmptyString(containerName, trim: true)) {
       return null;
@@ -180,11 +181,11 @@ class DockerHostLocal extends DockerHost {
       addCIDFile: true,
     );
 
-    var cmdArgs = containerInfos.args;
+    var cmdArgs = containerInfos.args!;
 
     _LOG.info('create[CMD]>\t$dockerBinaryPath ${cmdArgs.join(' ')}');
 
-    var process = await Process.start(dockerBinaryPath, cmdArgs);
+    var process = await Process.start(dockerBinaryPath!, cmdArgs);
     var exitCode = await process.exitCode;
 
     if (containerInfos.idFile != null) {
@@ -196,8 +197,8 @@ class DockerHostLocal extends DockerHost {
     return exitCode == 0 ? containerInfos : null;
   }
 
-  Future<String> _getContainerID(String containerName, File idFile) async {
-    String id;
+  Future<String?> _getContainerID(String containerName, File? idFile) async {
+    String? id;
     if (idFile != null) {
       var fileExists = await _waitFile(idFile);
       if (!fileExists) {
@@ -210,8 +211,7 @@ class DockerHostLocal extends DockerHost {
     return id;
   }
 
-  Future<bool> _waitFile(File file, {Duration timeout}) async {
-    if (file == null) return false;
+  Future<bool> _waitFile(File file, {Duration? timeout}) async {
     if (file.existsSync() && file.lengthSync() > 1) return true;
 
     timeout ??= Duration(minutes: 1);
@@ -236,21 +236,21 @@ class DockerHostLocal extends DockerHost {
 
   @override
   Future<DockerRunner> run(
-    String /*!*/ imageName, {
-    String version,
-    List<String> imageArgs,
-    String containerName,
-    List<String> ports,
-    String network,
-    String hostname,
-    Map<String, String> environment,
-    Map<String, String> volumes,
+    String imageName, {
+    String? version,
+    List<String>? imageArgs,
+    String? containerName,
+    List<String>? ports,
+    String? network,
+    String? hostname,
+    Map<String, String>? environment,
+    Map<String, String>? volumes,
     bool cleanContainer = true,
-    bool outputAsLines = true,
-    int outputLimit,
-    OutputReadyFunction stdoutReadyFunction,
-    OutputReadyFunction stderrReadyFunction,
-    OutputReadyType outputReadyType,
+    bool? outputAsLines = true,
+    int? outputLimit,
+    OutputReadyFunction? stdoutReadyFunction,
+    OutputReadyFunction? stderrReadyFunction,
+    OutputReadyType? outputReadyType,
   }) async {
     outputAsLines ??= true;
 
@@ -270,7 +270,7 @@ class DockerHostLocal extends DockerHost {
       'run',
       imageName,
       version,
-      containerName,
+      containerName!,
       ports,
       network,
       hostname,
@@ -280,7 +280,7 @@ class DockerHostLocal extends DockerHost {
       addCIDFile: true,
     );
 
-    var cmdArgs = containerInfos.args;
+    var cmdArgs = containerInfos.args!;
 
     if (imageArgs != null) {
       cmdArgs.addAll(imageArgs);
@@ -288,7 +288,7 @@ class DockerHostLocal extends DockerHost {
 
     _LOG.info('run[CMD]>\t$dockerBinaryPath ${cmdArgs.join(' ')}');
 
-    var process = await Process.start(dockerBinaryPath, cmdArgs);
+    var process = await Process.start(dockerBinaryPath!, cmdArgs);
 
     var containerNetwork = containerInfos.containerNetwork;
 
@@ -341,15 +341,15 @@ class DockerHostLocal extends DockerHost {
   }
 
   @override
-  Future<DockerProcess> exec(
-    String /*!*/ containerName,
-    String /*!*/ command,
-    List<String /*!*/ > /*!*/ args, {
-    bool outputAsLines = true,
-    int outputLimit,
-    OutputReadyFunction stdoutReadyFunction,
-    OutputReadyFunction stderrReadyFunction,
-    OutputReadyType outputReadyType,
+  Future<DockerProcess?> exec(
+    String containerName,
+    String command,
+    List<String> args, {
+    bool? outputAsLines = true,
+    int? outputLimit,
+    OutputReadyFunction? stdoutReadyFunction,
+    OutputReadyFunction? stderrReadyFunction,
+    OutputReadyType? outputReadyType,
   }) async {
     if (isContainerARunner(containerName)) {
       if (!isContainerRunnerRunning(containerName)) return null;
@@ -366,10 +366,10 @@ class DockerHostLocal extends DockerHost {
     stdoutReadyFunction ??= (outputStream, data) => true;
     stderrReadyFunction ??= (outputStream, data) => true;
 
-    var cmdArgs = ['exec', containerName, command, ...?args];
+    var cmdArgs = ['exec', containerName, command, ...args];
     _LOG.info('docker exec [CMD]>\t$dockerBinaryPath ${cmdArgs.join(' ')}');
 
-    var process = await Process.start(dockerBinaryPath, cmdArgs);
+    var process = await Process.start(dockerBinaryPath!, cmdArgs);
 
     var dockerProcess = DockerProcessLocal(
         this,
@@ -393,7 +393,7 @@ class DockerHostLocal extends DockerHost {
   }
 
   Future<bool> _initializeAndWaitReady(DockerProcessLocal dockerProcess,
-      [Function() onInitialize]) async {
+      [Function()? onInitialize]) async {
     var ok = await dockerProcess.initialize();
 
     if (!ok) {
@@ -419,13 +419,13 @@ class DockerHostLocal extends DockerHost {
 
   @override
   Future<DockerProcess> command(
-    String /*!*/ command,
-    List<String> /*!*/ args, {
-    bool /*!*/ outputAsLines = true,
-    int outputLimit,
-    OutputReadyFunction stdoutReadyFunction,
-    OutputReadyFunction stderrReadyFunction,
-    OutputReadyType outputReadyType,
+    String command,
+    List<String> args, {
+    bool outputAsLines = true,
+    int? outputLimit,
+    OutputReadyFunction? stdoutReadyFunction,
+    OutputReadyFunction? stderrReadyFunction,
+    OutputReadyType? outputReadyType,
   }) async {
     var instanceID = DockerProcess.incrementInstanceID();
 
@@ -435,17 +435,17 @@ class DockerHostLocal extends DockerHost {
     stdoutReadyFunction ??= (outputStream, data) => true;
     stderrReadyFunction ??= (outputStream, data) => true;
 
-    var cmdArgs = [command, ...?args];
+    var cmdArgs = [command, ...args];
     _LOG.info('docker command [CMD]>\t$dockerBinaryPath ${cmdArgs.join(' ')}');
 
-    var process = await Process.start(dockerBinaryPath, cmdArgs);
+    var process = await Process.start(dockerBinaryPath!, cmdArgs);
 
     var dockerProcess = DockerProcessLocal(
         this,
         instanceID,
         '',
         process,
-        outputAsLines ?? true,
+        outputAsLines,
         outputLimit,
         stdoutReadyFunction,
         stderrReadyFunction,
@@ -462,14 +462,14 @@ class DockerHostLocal extends DockerHost {
   }
 
   @override
-  Future<bool> stopByName(String /*!*/ name, {Duration timeout}) async {
+  Future<bool> stopByName(String name, {Duration? timeout}) async {
     if (isEmptyString(name)) return false;
 
     var time = timeout != null ? timeout.inSeconds : 15;
     if (time < 1) time = 1;
 
     var process = Process.run(
-        dockerBinaryPath, <String /*!*/ >['stop', '--time', '$time', name]);
+        dockerBinaryPath!, <String>['stop', '--time', '$time', name]);
     var result = await process;
     return result.exitCode == 0;
   }
@@ -498,61 +498,63 @@ class DockerHostLocal extends DockerHost {
   bool isContainerRunnerRunning(String containerName) =>
       getRunnerByName(containerName)?.isRunning ?? false;
 
-  List<String /*!*/ > getRunnersIPs() =>
-      _runners.values.map((e) => e.ip).toList();
+  List<String> getRunnersIPs() =>
+      _runners.values.map((e) => e.ip).whereType<String>().toList();
 
-  List<String /*!*/ > getNetworkRunnersIPs(String network) => _runners.values
+  List<String> getNetworkRunnersIPs(String network) => _runners.values
       .where((e) => e.network == network)
       .map((e) => e.ip)
+      .whereType<String>()
       .toList();
 
-  List<String /*!*/ > getNetworkRunnersHostnames(String network) =>
-      _runners.values
-          .where((e) => e.network == network)
-          .map((e) => e.hostname)
-          .toList();
+  List<String> getNetworkRunnersHostnames(String network) => _runners.values
+      .where((e) => e.network == network)
+      .map((e) => e.hostname)
+      .whereType<String>()
+      .toList();
 
-  List<String /*!*/ > getNetworkRunnersNames(String network) => _runners.values
+  List<String> getNetworkRunnersNames(String network) => _runners.values
       .where((e) => e.network == network)
       .map((e) => e.containerName)
       .toList();
 
-  Map<String, String> getNetworkRunnersIPsAndHostnames(String network) =>
+  Map<String?, String?> getNetworkRunnersIPsAndHostnames(String network) =>
       Map.fromEntries(_runners.values
           .where((e) => e.network == network)
           .map((e) => MapEntry(e.ip, e.hostname)));
 
   Map<String, Map<String, String>> getNetworkRunnersHostnamesAndIPs(
-          String network) =>
+          String? network) =>
       Map.fromEntries(_runners.values
-          .where((r) => r.network == network)
-          .map((r) => MapEntry(r.containerName, {r.hostname: r.ip})));
+          .where(
+              (r) => r.network == network && r.hostname != null && r.ip != null)
+          .map((r) => MapEntry(r.containerName, {r.hostname!: r.ip!})));
 
   @override
   List<int> getRunnersInstanceIDs() => _runners.keys.toList();
 
   @override
-  List<String /*!*/ > getRunnersNames() => _runners.values
+  List<String> getRunnersNames() => _runners.values
       .map((r) => r.containerName)
-      .where((n) => n != null && n.isNotEmpty)
+      .where((n) => n.isNotEmpty)
       .toList();
 
   @override
-  DockerRunnerLocal getRunnerByInstanceID(int instanceID) =>
-      _runners[instanceID];
+  DockerRunnerLocal? getRunnerByInstanceID(int? instanceID) =>
+      _runners[instanceID!];
 
   @override
-  DockerRunner getRunnerByName(String name) => _runners.values
-      .firstWhere((r) => r.containerName == name, orElse: () => null);
+  DockerRunner? getRunnerByName(String name) =>
+      _runners.values.firstWhereOrNull((r) => r.containerName == name);
 
   @override
-  DockerProcessLocal getProcessByInstanceID(int instanceID) =>
-      _processes[instanceID];
+  DockerProcessLocal? getProcessByInstanceID(int? instanceID) =>
+      _processes[instanceID!];
 
-  Directory _temporaryDirectory;
+  Directory? _temporaryDirectory;
 
   /// Returns the temporary directory for this instance.
-  Directory get temporaryDirectory {
+  Directory? get temporaryDirectory {
     _temporaryDirectory ??= _createTemporaryDirectory();
     return _temporaryDirectory;
   }
@@ -566,7 +568,7 @@ class DockerHostLocal extends DockerHost {
     if (_temporaryDirectory == null) return;
 
     var files =
-        _temporaryDirectory.listSync(recursive: true, followLinks: false);
+        _temporaryDirectory!.listSync(recursive: true, followLinks: false);
 
     for (var file in files) {
       try {
@@ -579,7 +581,7 @@ class DockerHostLocal extends DockerHost {
 
   int _tempFileCount = 0;
 
-  File _createTemporaryFile([String prefix]) {
+  File _createTemporaryFile([String? prefix]) {
     if (isEmptyString(prefix, trim: true)) {
       prefix = 'temp-';
     }
@@ -587,7 +589,7 @@ class DockerHostLocal extends DockerHost {
     var time = DateTime.now().millisecondsSinceEpoch;
     var id = ++_tempFileCount;
 
-    var file = File('${temporaryDirectory.path}/$prefix-$time-$id.tmp');
+    var file = File('${temporaryDirectory!.path}/$prefix-$time-$id.tmp');
     return file;
   }
 
@@ -616,7 +618,7 @@ class DockerHostLocal extends DockerHost {
   Future<String> createTempFile(String content) async {
     var file = _createTemporaryFile('temp');
 
-    if (content != null && content.isNotEmpty) {
+    if (content.isNotEmpty) {
       await file.writeAsString(content, flush: true);
     }
 
@@ -637,15 +639,15 @@ class DockerHostLocal extends DockerHost {
 
 class DockerRunnerLocal extends DockerProcessLocal implements DockerRunner {
   @override
-  final String image;
+  final String? image;
 
   /// An optional [File] that contains the container ID.
-  final File idFile;
+  final File? idFile;
 
-  final List<String> _ports;
+  final List<String>? _ports;
 
-  final String network;
-  final String hostname;
+  final String? network;
+  final String? hostname;
 
   DockerRunnerLocal(
       DockerHostLocal dockerHost,
@@ -658,7 +660,7 @@ class DockerRunnerLocal extends DockerProcessLocal implements DockerRunner {
       this.network,
       this.hostname,
       bool outputAsLines,
-      int outputLimit,
+      int? outputLimit,
       OutputReadyFunction stdoutReadyFunction,
       OutputReadyFunction stderrReadyFunction,
       OutputReadyType outputReadyType)
@@ -673,14 +675,14 @@ class DockerRunnerLocal extends DockerProcessLocal implements DockerRunner {
             stderrReadyFunction,
             outputReadyType);
 
-  String _id;
+  String? _id;
 
   @override
-  String get id => _id;
+  String? get id => _id;
 
-  String _ip;
+  String? _ip;
 
-  String get ip => _ip;
+  String? get ip => _ip;
 
   @override
   Future<bool> initialize() async {
@@ -697,7 +699,7 @@ class DockerRunnerLocal extends DockerProcessLocal implements DockerRunner {
   List<String> get ports => List.unmodifiable(_ports ?? []);
 
   @override
-  Future<bool> stop({Duration timeout}) =>
+  Future<bool> stop({Duration? timeout}) =>
       dockerHost.stopByInstanceID(instanceID, timeout: timeout);
 
   @override
@@ -709,8 +711,8 @@ class DockerRunnerLocal extends DockerProcessLocal implements DockerRunner {
 class DockerProcessLocal extends DockerProcess {
   final Process process;
 
-  final bool outputAsLines;
-  final int _outputLimit;
+  final bool? outputAsLines;
+  final int? _outputLimit;
 
   final OutputReadyFunction _stdoutReadyFunction;
   final OutputReadyFunction _stderrReadyFunction;
@@ -729,9 +731,9 @@ class DockerProcessLocal extends DockerProcess {
       : super(dockerHost, instanceID, containerName);
 
   @override
-  DockerHostLocal get dockerHost => super.dockerHost;
+  DockerHostLocal get dockerHost => super.dockerHost as DockerHostLocal;
 
-  final Completer<int> _exitCompleter = Completer();
+  final Completer<int?> _exitCompleter = Completer();
 
   Future<bool> initialize() async {
     // ignore: unawaited_futures
@@ -757,8 +759,8 @@ class DockerProcessLocal extends DockerProcess {
 
     _exitCompleter.complete(exitCode);
 
-    this.stdout?.getOutputStream()?.markReady();
-    this.stderr?.getOutputStream()?.markReady();
+    this.stdout?.getOutputStream().markReady();
+    this.stderr?.getOutputStream().markReady();
 
     // Schedule dispose:
     Future.delayed(Duration(seconds: 30), () => dispose());
@@ -770,7 +772,7 @@ class DockerProcessLocal extends DockerProcess {
       Stream<List<int>> stdout,
       OutputReadyFunction outputReadyFunction,
       Completer<bool> anyOutputReadyCompleter) {
-    if (outputAsLines) {
+    if (outputAsLines!) {
       var outputStream = OutputStream<String>(
         systemEncoding,
         true,
@@ -821,15 +823,15 @@ class DockerProcessLocal extends DockerProcess {
 
     switch (outputReadyType) {
       case OutputReadyType.STDOUT:
-        return this.stdout.waitReady();
+        return this.stdout!.waitReady();
       case OutputReadyType.STDERR:
-        return this.stderr.waitReady();
+        return this.stderr!.waitReady();
       case OutputReadyType.ANY:
-        return this.stdout.waitAnyOutputReady();
+        return this.stdout!.waitAnyOutputReady();
       case OutputReadyType.STARTS_READY:
         return true;
       default:
-        return this.stdout.waitReady();
+        return this.stdout!.waitReady();
     }
   }
 
@@ -837,41 +839,41 @@ class DockerProcessLocal extends DockerProcess {
   bool get isReady {
     switch (outputReadyType) {
       case OutputReadyType.STDOUT:
-        return this.stdout.isReady;
+        return this.stdout!.isReady;
       case OutputReadyType.STDERR:
-        return this.stderr.isReady;
+        return this.stderr!.isReady;
       case OutputReadyType.ANY:
-        return this.stdout.isReady || this.stderr.isReady;
+        return this.stdout!.isReady || this.stderr!.isReady;
       case OutputReadyType.STARTS_READY:
         return true;
       default:
-        return this.stdout.isReady;
+        return this.stdout!.isReady;
     }
   }
 
   @override
   bool get isRunning => _exitCode == null;
 
-  int _exitCode;
-  DateTime _exitTime;
+  int? _exitCode;
+  DateTime? _exitTime;
 
   @override
-  int get exitCode => _exitCode;
+  int? get exitCode => _exitCode;
 
   @override
-  DateTime get exitTime => _exitTime;
+  DateTime? get exitTime => _exitTime;
 
   @override
-  Future<int> waitExit({int desiredExitCode, Duration timeout}) async {
+  Future<int?> waitExit({int? desiredExitCode, Duration? timeout}) async {
     var exitCode = await _waitExitImpl(timeout);
     if (desiredExitCode != null && exitCode != desiredExitCode) return null;
     return exitCode;
   }
 
-  Future<int> _waitExitImpl(Duration timeout) async {
+  Future<int?> _waitExitImpl(Duration? timeout) async {
     if (_exitCode != null) return _exitCode;
 
-    int code;
+    int? code;
     if (timeout != null) {
       code =
           await _exitCompleter.future.timeout(timeout, onTimeout: () => null);
@@ -879,7 +881,8 @@ class DockerProcessLocal extends DockerProcess {
       code = await _exitCompleter.future;
     }
 
-    assert(code == _exitCode);
+    assert(code == null || code == _exitCode);
+
     return _exitCode;
   }
 }

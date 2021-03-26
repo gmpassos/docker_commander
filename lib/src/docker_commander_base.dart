@@ -21,7 +21,6 @@ class DockerCommander extends DockerCMDExecutor {
   Future<bool> initialize() async {
     if (_initialized > 0) return _initialized == 1;
     var hostOk = await dockerHost.initialize();
-    hostOk ??= false;
     _initialized = hostOk ? 1 : 2;
     return hostOk;
   }
@@ -39,10 +38,10 @@ class DockerCommander extends DockerCMDExecutor {
     }
   }
 
-  DateTime _lastDaemonCheck;
+  DateTime? _lastDaemonCheck;
 
   /// Returns the last [DateTime] that Docker daemon was checked.
-  DateTime get lastDaemonCheck => _lastDaemonCheck;
+  DateTime? get lastDaemonCheck => _lastDaemonCheck;
 
   /// Checks if Docker daemon is accessible.
   Future<void> checkDaemon() async {
@@ -61,15 +60,15 @@ class DockerCommander extends DockerCMDExecutor {
   }
 
   /// Creates a Docker container with [containerName], [image] and optional [version].
-  Future<ContainerInfos> createContainer(
+  Future<ContainerInfos?> createContainer(
     String containerName,
     String imageName, {
-    String version,
-    List<String> ports,
-    String network,
-    String hostname,
-    Map<String, String> environment,
-    Map<String, String> volumes,
+    String? version,
+    List<String>? ports,
+    String? network,
+    String? hostname,
+    Map<String, String>? environment,
+    Map<String, String>? volumes,
     bool cleanContainer = false,
   }) async {
     await ensureInitialized();
@@ -92,26 +91,26 @@ class DockerCommander extends DockerCMDExecutor {
       dockerHost.startContainer(containerNameOrID);
 
   /// Stops a container by [containerNameOrID] with an optional [timeout].
-  Future<bool> stopContainer(String containerNameOrID, {Duration timeout}) =>
+  Future<bool> stopContainer(String containerNameOrID, {Duration? timeout}) =>
       dockerHost.stopByName(containerNameOrID, timeout: timeout);
 
   /// Runs a Docker container, using [image] and optional [version].
-  Future<DockerContainer> run(
+  Future<DockerContainer?> run(
     String image, {
-    String version,
-    List<String> imageArgs,
-    String containerName,
-    List<String> ports,
-    String network,
-    String hostname,
-    Map<String, String> environment,
-    Map<String, String> volumes,
+    String? version,
+    List<String>? imageArgs,
+    String? containerName,
+    List<String>? ports,
+    String? network,
+    String? hostname,
+    Map<String, String>? environment,
+    Map<String, String>? volumes,
     bool cleanContainer = true,
     bool outputAsLines = true,
-    int outputLimit,
-    OutputReadyFunction stdoutReadyFunction,
-    OutputReadyFunction stderrReadyFunction,
-    DockerContainerInstantiator dockerContainerInstantiator,
+    int? outputLimit,
+    OutputReadyFunction? stdoutReadyFunction,
+    OutputReadyFunction? stderrReadyFunction,
+    DockerContainerInstantiator? dockerContainerInstantiator,
   }) async {
     await ensureInitialized();
 
@@ -132,7 +131,9 @@ class DockerCommander extends DockerCMDExecutor {
       stderrReadyFunction: stderrReadyFunction,
     );
 
-    DockerContainer dockerContainer;
+    if (runner == null) return null;
+
+    DockerContainer? dockerContainer;
 
     if (dockerContainerInstantiator != null) {
       dockerContainer = dockerContainerInstantiator(runner);
@@ -152,18 +153,18 @@ class DockerCommander extends DockerCMDExecutor {
       dockerHost.isContainerRunnerRunning(containerName);
 
   @override
-  Future<DockerProcess> exec(
+  Future<DockerProcess?> exec(
     String containerName,
-    String command,
+    String? command,
     List<String> args, {
     bool outputAsLines = true,
-    int outputLimit,
-    OutputReadyFunction stdoutReadyFunction,
-    OutputReadyFunction stderrReadyFunction,
-    OutputReadyType outputReadyType,
+    int? outputLimit,
+    OutputReadyFunction? stdoutReadyFunction,
+    OutputReadyFunction? stderrReadyFunction,
+    OutputReadyType? outputReadyType,
   }) async {
     await ensureInitialized();
-    return dockerHost.exec(containerName, command, args,
+    return dockerHost.exec(containerName, command!, args,
         outputAsLines: outputAsLines,
         outputLimit: outputLimit,
         stdoutReadyFunction: stdoutReadyFunction,
@@ -172,14 +173,14 @@ class DockerCommander extends DockerCMDExecutor {
   }
 
   @override
-  Future<DockerProcess> command(
+  Future<DockerProcess?> command(
     String command,
     List<String> args, {
     bool outputAsLines = true,
-    int outputLimit,
-    OutputReadyFunction stdoutReadyFunction,
-    OutputReadyFunction stderrReadyFunction,
-    OutputReadyType outputReadyType,
+    int? outputLimit,
+    OutputReadyFunction? stdoutReadyFunction,
+    OutputReadyFunction? stderrReadyFunction,
+    OutputReadyType? outputReadyType,
   }) async {
     await ensureInitialized();
     return dockerHost.command(command, args,
@@ -191,29 +192,29 @@ class DockerCommander extends DockerCMDExecutor {
   }
 
   /// Executes Docker command `docker ps --format "{{.Names}}"`
-  Future<List<String>> psContainerNames({bool all = true}) async =>
+  Future<List<String>?> psContainerNames({bool all = true}) async =>
       DockerCMD.psContainerNames(this, all: all);
 
   /// Returns a list of services names.
-  Future<List<String>> listServicesNames() async =>
+  Future<List<String>?> listServicesNames() async =>
       DockerCMD.listServicesNames(this);
 
   /// Returns a list of [ServiceTaskInfos] of a service by [serviceName].
-  Future<List<ServiceTaskInfos>> listServiceTasks(String serviceName) async =>
+  Future<List<ServiceTaskInfos>?> listServiceTasks(String serviceName) async =>
       DockerCMD.listServiceTasks(this, serviceName);
 
   /// Opens a Container logs, by [containerNameOrID].
-  Future<DockerProcess> openContainerLogs(String containerNameOrID) =>
+  Future<DockerProcess?> openContainerLogs(String containerNameOrID) =>
       dockerHost.openContainerLogs(containerNameOrID);
 
   /// Opens a Service logs, by [serviceNameOrTask].
-  Future<DockerProcess> openServiceLogs(String serviceNameOrTask) =>
+  Future<DockerProcess?> openServiceLogs(String serviceNameOrTask) =>
       dockerHost.openServiceLogs(serviceNameOrTask);
 
   int _networkCounter = 0;
 
   /// Creates a Docker network with [networkName].
-  Future<String> createNetwork([String networkName]) {
+  Future<String?> createNetwork([String? networkName]) {
     if (isEmptyString(networkName, trim: true)) {
       networkName =
           'docker_commander_network-${dockerHost.session}-${++_networkCounter}';
@@ -222,24 +223,24 @@ class DockerCommander extends DockerCMDExecutor {
   }
 
   /// Removes a Docker network with [networkName].
-  Future<bool /*!*/ > removeNetwork(String networkName) =>
+  Future<bool> removeNetwork(String? networkName) =>
       DockerCMD.removeNetwork(this, networkName);
 
   /// Returns the container IP by [name].
-  Future<String> getContainerIP(String name) async =>
+  Future<String?> getContainerIP(String name) async =>
       DockerCMD.getContainerIP(this, name);
 
-  SwarmInfos _swarmInfos;
+  SwarmInfos? _swarmInfos;
 
   /// Returns a [SwarmInfos]. Only if in Swarm mode.
-  Future<SwarmInfos> getSwarmInfos() async {
+  Future<SwarmInfos?> getSwarmInfos() async {
     _swarmInfos ??= await DockerCMD.getSwarmInfos(this);
     return _swarmInfos;
   }
 
   /// Initialize swarm mode. Returns the secret key to join the cluster.
-  Future<SwarmInfos> swarmInit(
-      {String advertiseAddress, String listenAddress}) async {
+  Future<SwarmInfos?> swarmInit(
+      {String? advertiseAddress, String? listenAddress}) async {
     var swarmInfos = await DockerCMD.swarmInit(this,
         advertiseAddress: advertiseAddress, listenAddress: listenAddress);
     _swarmInfos = swarmInfos;
@@ -253,7 +254,7 @@ class DockerCommander extends DockerCMDExecutor {
   }
 
   /// Returns the node ID of the current Docker Daemon the swarm cluster.
-  Future<String> swarmSelfNodeID() => DockerCMD.swarmSelfNodeID(this);
+  Future<String?> swarmSelfNodeID() => DockerCMD.swarmSelfNodeID(this);
 
   /// Returns true if this Docker Daemon is in Swarm mode.
   Future<bool> isInSwarmMode() async {
@@ -263,16 +264,16 @@ class DockerCommander extends DockerCMDExecutor {
 
   /// Creates a Docker service with [serviceName], [image] and optional [version].
   /// Note that the Docker Daemon should be in Swarm mode.
-  Future<Service> createService(
+  Future<Service?> createService(
     String serviceName,
     String imageName, {
-    String version,
-    int replicas,
-    List<String> ports,
-    String network,
-    String hostname,
-    Map<String, String> environment,
-    Map<String, String> volumes,
+    String? version,
+    int? replicas,
+    List<String>? ports,
+    String? network,
+    String? hostname,
+    Map<String, String>? environment,
+    Map<String, String>? volumes,
   }) async {
     await ensureInitialized();
     return dockerHost.createService(serviceName, imageName,
@@ -301,7 +302,7 @@ class DockerCommander extends DockerCMDExecutor {
 
   /// Creates a temporary file.
   @override
-  Future<String> createTempFile(String content) =>
+  Future<String?> createTempFile(String content) =>
       dockerHost.createTempFile(content);
 
   /// Deletes a temporary [filePath].
@@ -310,12 +311,12 @@ class DockerCommander extends DockerCMDExecutor {
       dockerHost.deleteTempFile(filePath);
 }
 
-typedef DockerContainerInstantiator = DockerContainer Function(
+typedef DockerContainerInstantiator = DockerContainer? Function(
     DockerRunner runner);
 
 /// A Docker container being executed.
 class DockerContainer {
-  final DockerRunner /*!*/ runner;
+  final DockerRunner runner;
 
   DockerContainer(this.runner);
 
@@ -326,13 +327,13 @@ class DockerContainer {
   String get name => runner.containerName;
 
   /// ID of the Docker container.
-  String get id => runner.id;
+  String? get id => runner.id;
 
   /// Waits for the container, ensuring that is started.
   Future<bool> waitReady() => runner.waitReady();
 
   /// Waits container to exit. Returns the process exit code.
-  Future<int> waitExit() => runner.waitExit();
+  Future<int?> waitExit() => runner.waitExit();
 
   /// Returns [true] if this container is started and ready.
   bool get isReady => runner.isReady;
@@ -342,14 +343,14 @@ class DockerContainer {
 
   /// Executes a [command] inside this container with [args]
   /// (if [isRunning] or returns null).
-  Future<DockerProcess> exec(
-    String /*!*/ command,
+  Future<DockerProcess?>? exec(
+    String command,
     List<String> args, {
     bool outputAsLines = true,
-    int outputLimit,
-    OutputReadyFunction stdoutReadyFunction,
-    OutputReadyFunction stderrReadyFunction,
-    OutputReadyType outputReadyType,
+    int? outputLimit,
+    OutputReadyFunction? stdoutReadyFunction,
+    OutputReadyFunction? stderrReadyFunction,
+    OutputReadyType? outputReadyType,
   }) {
     if (!isRunning) {
       return null;
@@ -363,45 +364,48 @@ class DockerContainer {
   }
 
   /// Calls [exec] than [waitExit].
-  Future<int> execAndWaitExit(String command, List<String> args) async {
+  Future<int?> execAndWaitExit(String command, List<String> args) async {
     var process = await exec(command, args);
+    if (process == null) return null;
     return process.waitExit();
   }
 
   /// Calls [exec] than [waitStdout].
-  Future<Output> execAndWaitStdout(String command, List<String> args,
-      {int desiredExitCode}) async {
+  Future<Output?> execAndWaitStdout(String command, List<String> args,
+      {int? desiredExitCode}) async {
     var process = await exec(command, args);
+    if (process == null) return null;
     return process.waitStdout(desiredExitCode: desiredExitCode);
   }
 
   /// Calls [exec] than [waitStderr].
-  Future<Output> execAndWaitStderr(String command, List<String> args,
-      {int desiredExitCode}) async {
+  Future<Output?> execAndWaitStderr(String command, List<String> args,
+      {int? desiredExitCode}) async {
     var process = await exec(command, args);
+    if (process == null) return null;
     return process.waitStderr(desiredExitCode: desiredExitCode);
   }
 
   /// Calls [execAndWaitStdoutAsString] and returns [Output.asString].
-  Future<String> execAndWaitStdoutAsString(String command, List<String> args,
-      {bool trim = false, int desiredExitCode}) async {
+  Future<String?> execAndWaitStdoutAsString(String command, List<String> args,
+      {bool trim = false, int? desiredExitCode}) async {
     var output = await execAndWaitStdout(command, args,
         desiredExitCode: desiredExitCode);
     return _waitOutputAsString(output, trim);
   }
 
   /// Calls [execAndWaitStderrAsString] and returns [Output.asString].
-  Future<String> execAndWaitStderrAsString(String command, List<String> args,
-      {bool trim = false, int desiredExitCode}) async {
+  Future<String?> execAndWaitStderrAsString(String command, List<String> args,
+      {bool trim = false, int? desiredExitCode}) async {
     var output = await execAndWaitStderr(command, args,
         desiredExitCode: desiredExitCode);
     return _waitOutputAsString(output, trim);
   }
 
-  String _waitOutputAsString(Output output, bool trim) {
+  String? _waitOutputAsString(Output? output, bool trim) {
     if (output == null) return null;
     var s = output.asString;
-    if (trim ?? false) {
+    if (trim) {
       s = s.trim();
     }
     return s;
@@ -410,21 +414,21 @@ class DockerContainer {
   /// Call POSIX `which` command.
   /// Calls [exec] with command `which` and args [commandName].
   /// Caches response than returns the executable path for [commandName].
-  Future<String> execWhich(String commandName,
-          {bool ignoreCache, String def}) async =>
+  Future<String?> execWhich(String commandName,
+          {bool ignoreCache = false, String? def}) async =>
       runner.dockerHost
           .execWhich(name, commandName, ignoreCache: ignoreCache, def: def);
 
   /// Call POSIX `cat` command.
   /// Calls [exec] with command `cat` and args [filePath].
   /// Returns the executable path for [filePath].
-  Future<String> execCat(String filePath, {bool trim = false}) async {
+  Future<String?> execCat(String filePath, {bool trim = false}) async {
     return DockerCMD.execCat(runner.dockerHost, name, filePath, trim: trim);
   }
 
   /// Executes a shell [script]. Tries to use `bash` or `sh`.
   /// Note that [script] should be inline, without line breaks (`\n`).
-  Future<DockerProcess> execShell(String script, {bool sudo = false}) async =>
+  Future<DockerProcess?> execShell(String script, {bool sudo = false}) async =>
       DockerCMD.execShell(runner.dockerHost, name, script, sudo: sudo);
 
   /// Save the file [filePath] with [content], inside this container.
@@ -454,28 +458,30 @@ class DockerContainer {
           runner.dockerHost, name, containerFilePath, hostFilePath);
 
   /// Stops this container.
-  Future<bool> stop({Duration timeout}) => runner.stop(timeout: timeout);
+  Future<bool> stop({Duration? timeout}) => runner.stop(timeout: timeout);
 
   /// The `STDOUT` of the container.
-  Output get stdout => runner.stdout;
+  Output? get stdout => runner.stdout;
 
   /// The `STDERR` of the container.
-  Output get stderr => runner.stderr;
+  Output? get stderr => runner.stderr;
 
   /// List of mapped ports.
   List<String> get ports => runner.ports;
 
   /// List of mapped ports as [Pair<int>].
-  List<Pair<int>> get portsAsPair => ports?.map((e) {
+  List<Pair<int>> get portsAsPair => ports.map((e) {
         var parts = e.split(':');
-        return Pair(parseInt(parts[0]), parseInt(parts[1]));
-      })?.toList();
+        var p1 = parseInt(parts[0])!;
+        var p2 = parts.length > 1 ? (parseInt(parts[1]) ?? p1) : p1;
+        return Pair(p1, p2);
+      }).toList();
 
   /// List of host ports.
-  List<int> get hostPorts => portsAsPair?.map((e) => e.a)?.toList();
+  List<int> get hostPorts => portsAsPair.map((e) => e.a).toList();
 
   /// List of container ports.
-  List<int> get containerPorts => portsAsPair?.map((e) => e.b)?.toList();
+  List<int> get containerPorts => portsAsPair.map((e) => e.b).toList();
 
   @override
   String toString() {
@@ -483,16 +489,16 @@ class DockerContainer {
   }
 
   /// Opens this Container logs:
-  Future<DockerProcess> openLogs(String containerNameOrID) =>
+  Future<DockerProcess?> openLogs(String containerNameOrID) =>
       runner.dockerHost.openContainerLogs(name);
 
   /// Returns this Container logs as [String].
-  Future<String> catLogs({
+  Future<String?> catLogs({
     bool stderr = false,
-    Pattern waitDataMatcher,
-    Duration waitDataTimeout,
+    Pattern? waitDataMatcher,
+    Duration? waitDataTimeout,
     bool waitExit = false,
-    int desiredExitCode,
+    int? desiredExitCode,
     bool follow = false,
   }) =>
       runner.dockerHost.catContainerLogs(name,

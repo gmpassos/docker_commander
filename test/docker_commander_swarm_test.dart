@@ -12,7 +12,7 @@ void main() {
   configureLogger();
 
   group('DockerContainerConfig', () {
-    DockerCommander dockerCommander;
+    late DockerCommander dockerCommander;
 
     setUp(() async {
       logTitle(_LOG, 'SETUP');
@@ -43,7 +43,7 @@ void main() {
 
       var swarmInfos = await dockerCommander.swarmInit();
       expect(swarmInfos, isNotNull);
-      expect(swarmInfos.nodeID, isNotEmpty);
+      expect(swarmInfos!.nodeID, isNotEmpty);
       expect(swarmInfos.managerToken, isNotEmpty);
       expect(swarmInfos.workerToken, isNotEmpty);
       expect(swarmInfos.advertiseAddress, isNotEmpty);
@@ -65,9 +65,9 @@ void main() {
 
       _LOG.info('Service: $service');
 
-      var tasks = await service.listTasks();
+      var tasks = await service!.listTasks();
 
-      _LOG.info('Tasks[${tasks.length}]:');
+      _LOG.info('Tasks[${tasks!.length}]:');
       for (var task in tasks) {
         _LOG.info('[${task.isCurrentlyRunning ? 'RUNNING' : '...'}] - $task');
       }

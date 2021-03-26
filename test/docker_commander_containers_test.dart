@@ -12,7 +12,7 @@ void main() {
   configureLogger();
 
   group('DockerContainerConfig', () {
-    DockerCommander dockerCommander;
+    late DockerCommander dockerCommander;
 
     setUp(() async {
       logTitle(_LOG, 'SETUP');
@@ -52,7 +52,7 @@ void main() {
       expect(dockerContainer.instanceID > 0, isTrue);
       expect(dockerContainer.name.isNotEmpty, isTrue);
 
-      var output = dockerContainer.stdout.asString;
+      var output = dockerContainer.stdout!.asString;
       expect(
           output, contains('database system is ready to accept connections'));
 
@@ -60,23 +60,23 @@ void main() {
       _LOG.info(output);
       _LOG.info('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>');
 
-      expect(dockerContainer.id.isNotEmpty, isTrue);
+      expect(dockerContainer.id!.isNotEmpty, isTrue);
 
       var execPsql = await dockerContainer.exec('/usr/bin/psql',
           ' -d postgres -U postgres -c \\l '.trim().split(RegExp(r'\s+')));
 
-      var execPsqlExitCode = await execPsql.waitExit();
+      var execPsqlExitCode = await execPsql!.waitExit();
 
       _LOG.info(
           '<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< PSQL[exitCode: $execPsqlExitCode]:');
-      _LOG.info(execPsql.stdout.asString);
+      _LOG.info(execPsql.stdout!.asString);
       _LOG.info('-------------------------------');
-      _LOG.info(execPsql.stderr.asString);
+      _LOG.info(execPsql.stderr!.asString);
       _LOG.info('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>');
 
       expect(execPsqlExitCode, equals(0));
-      expect(execPsql.stdout.asString, contains('List of databases'));
-      expect(execPsql.stderr.asString.isEmpty, isTrue);
+      expect(execPsql.stdout!.asString, contains('List of databases'));
+      expect(execPsql.stderr!.asString.isEmpty, isTrue);
 
       _LOG.info('Stopping PostgreSQL...');
       await dockerContainer.stop(timeout: Duration(seconds: 5));
@@ -97,19 +97,19 @@ void main() {
       expect(dockerContainer.instanceID > 0, isTrue);
       expect(dockerContainer.name.isNotEmpty, isTrue);
 
-      var output = dockerContainer.stderr.asString;
+      var output = dockerContainer.stderr!.asString;
       expect(output, contains('Apache'));
 
       _LOG.info('<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<');
       _LOG.info(output);
       _LOG.info('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>');
 
-      expect(dockerContainer.id.isNotEmpty, isTrue);
+      expect(dockerContainer.id!.isNotEmpty, isTrue);
 
       var aptGetUpdateOutput = await dockerContainer
           .execAndWaitStdout('/usr/bin/apt-get', ['update']);
       _LOG.info(aptGetUpdateOutput);
-      expect(aptGetUpdateOutput.exitCode, equals(0));
+      expect(aptGetUpdateOutput!.exitCode, equals(0));
 
       expect(
           await dockerContainer
@@ -121,13 +121,13 @@ void main() {
       expect(curlBinPath, contains('curl'));
 
       var getLocalhost = await dockerContainer
-          .execAndWaitStdoutAsString(curlBinPath, ['http://localhost/']);
+          .execAndWaitStdoutAsString(curlBinPath!, ['http://localhost/']);
       _LOG.info('getLocalhost:\n$getLocalhost');
       expect(getLocalhost, contains('<html>'));
 
       var httpdConf =
           await dockerContainer.execCat('/usr/local/apache2/conf/httpd.conf');
-      _LOG.info('httpdConf> size: ${httpdConf.length}');
+      _LOG.info('httpdConf> size: ${httpdConf!.length}');
       expect(httpdConf.contains(RegExp(r'Listen\s+80')), isTrue);
 
       _LOG.info('Stopping Apache Httpd...');
@@ -169,18 +169,18 @@ void main() {
       expect(nginxContainer.instanceID > 0, isTrue);
       expect(nginxContainer.name.isNotEmpty, isTrue);
 
-      var match = await nginxContainer.stdout
+      var match = await nginxContainer.stdout!
           .waitForDataMatch('nginx', timeout: Duration(seconds: 10));
 
       _LOG.info('Data match: $match');
 
-      var output = nginxContainer.stdout.asString;
+      var output = nginxContainer.stdout!.asString;
 
       _LOG.info(output);
 
       expect(output, contains('nginx'));
 
-      expect(nginxContainer.id.isNotEmpty, isTrue);
+      expect(nginxContainer.id!.isNotEmpty, isTrue);
 
       var configFileContent =
           await nginxContainer.execCat(nginxContainer.configPath);

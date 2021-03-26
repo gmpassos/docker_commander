@@ -12,7 +12,7 @@ import 'docker_commander_local.dart';
 final _LOG = Logger('docker_commander/server');
 
 typedef AuthenticationGrantor = Future<bool> Function(
-    String /*!*/ username, String /*!*/ password);
+    String username, String password);
 
 /// A basic table of `username` and `password`.
 class AuthenticationTable {
@@ -32,11 +32,11 @@ class AuthenticationTable {
 }
 
 class Authentication {
-  final String /*?*/ username;
+  final String? username;
 
-  final String /*?*/ token;
+  final String? token;
 
-  final bool /*!*/ grant;
+  final bool grant;
 
   Authentication({this.username, this.token, this.grant = false});
 }
@@ -44,7 +44,7 @@ class Authentication {
 /// A [DockerHost] Server, to be used by [DockerHostRemote].
 class DockerHostServer {
   /// The [HttpServer] port.
-  final int listenPort;
+  final int? listenPort;
 
   /// If [true] will accept connections from any hostname.
   final bool public;
@@ -61,7 +61,7 @@ class DockerHostServer {
   DockerHostServer(this._authenticationGrantor, this.listenPort,
       {this.public = false,
       this.ipv6 = false,
-      Duration authenticationTokenTimeout})
+      Duration? authenticationTokenTimeout})
       : authenticationTokenTimeout =
             authenticationTokenTimeout ?? Duration(hours: 1);
 
@@ -110,10 +110,6 @@ class DockerHostServer {
   };
 
   Future<bool> checkAuthenticationBasicSecurity() async {
-    if (_authenticationGrantor == null) {
-      throw StateError('Null authenticationGrantor');
-    }
-
     var usernames =
         WEAK_USERNAMES.expand((e) => [e, e.toLowerCase(), e.toUpperCase()]);
     var passwords =
@@ -128,7 +124,7 @@ class DockerHostServer {
       for (var pass in all) {
         var grant = await _authenticationGrantor(user, pass);
 
-        if (grant ?? false) {
+        if (grant) {
           weak = true;
           break USERNAMES_LOOP;
         }
@@ -143,13 +139,13 @@ class DockerHostServer {
     return !weak;
   }
 
-  DockerHostLocal _dockerHostLocal;
+  DockerHostLocal? _dockerHostLocal;
 
-  HttpServer _server;
+  HttpServer? _server;
 
-  Completer _started;
+  Completer? _started;
 
-  bool get isStarted => _started != null ? _started.isCompleted : false;
+  bool get isStarted => _started != null ? _started!.isCompleted : false;
 
   Future<void> startAndWait() async {
     await start();
@@ -158,7 +154,7 @@ class DockerHostServer {
 
   Future<void> waitStart() async {
     if (isStarted) return;
-    await _started.future;
+    await _started!.future;
   }
 
   Future<void> start() async {
@@ -177,22 +173,22 @@ class DockerHostServer {
 
     _server = await HttpServer.bind(
       address,
-      listenPort,
+      listenPort!,
     );
 
     _LOG.info('[SERVER]\tSTARTED> port: $listenPort ; server: $_server');
 
-    _started.complete(true);
+    _started!.complete(true);
 
     _acceptLoop();
   }
 
-  void _closeServer({Duration delay}) {
+  void _closeServer({Duration? delay}) {
     delay ??= Duration(milliseconds: 100);
 
     Future.delayed(delay, () {
       try {
-        _server.close(force: true);
+        _server!.close(force: true);
       } catch (e) {
         _LOG.severe('Error closing server', e);
       }
@@ -200,7 +196,7 @@ class DockerHostServer {
   }
 
   void _acceptLoop() async {
-    await for (HttpRequest request in _server) {
+    await for (HttpRequest request in _server!) {
       if (request.method == 'OPTION') {
         await _processOptionRequest(request);
       } else {
@@ -224,7 +220,7 @@ class DockerHostServer {
     var origin = request.headers['Origin'] ??
         'http://${request.headers.host}:$listenPort/';
 
-    setResponseHeader(request, 'Access-Control-Allow-Origin', origin);
+    setResponseHeader(request, 'Access-Control-Allow-Origin', '$origin');
     setResponseHeader(request, 'Access-Control-Allow-Methods',
         'GET,HEAD,PUT,POST,PATCH,DELETE,OPTIONS');
     setResponseHeader(request, 'Access-Control-Allow-Credentials', 'true');
@@ -235,7 +231,7 @@ class DockerHostServer {
   }
 
   Future<String> _decodeBody(
-      ContentType contentType, HttpRequest request) async {
+      ContentType? contentType, HttpRequest request) async {
     if (contentType != null) {
       var charset = contentType.charset;
 
@@ -257,7 +253,7 @@ class DockerHostServer {
 
   void close() async {
     _LOG.info('[SERVER]\tCLOSE> $_server');
-    await _server.close(force: true);
+    await _server!.close(force: true);
     _server = null;
     _started = null;
   }
@@ -287,7 +283,7 @@ class DockerHostServer {
     }
 
     if (operation != 'stdout' && operation != 'stderr') {
-      var responseBody = _bodyToShortString(response);
+      var responseBody = _bodyToShortString(response)!;
 
       print(
           '[SERVER]\tRESPONSE> responseStatus: ${request.response.statusCode} ; body: ${responseBody.length < 10 ? responseBody : responseBody.length} >> operation: $operation ; parameters: $requestParameters');
@@ -308,8 +304,8 @@ class DockerHostServer {
     await request.response.close();
   }
 
-  String _bodyToShortString(response) {
-    String responseBody;
+  String? _bodyToShortString(response) {
+    String? responseBody;
 
     if (response == null || response is int || response is bool) {
       responseBody = '$response';
@@ -327,9 +323,9 @@ class DockerHostServer {
     return responseBody;
   }
 
-  final Map<String /*!*/, int> _authenticationCount = {};
+  final Map<String, int> _authenticationCount = {};
 
-  final Map<String /*!*/, int> _authenticationTime = {};
+  final Map<String, int> _authenticationTime = {};
 
   void _cleanAuthentications(int now) {
     var timeout = Duration(minutes: 5).inMilliseconds;
@@ -350,19 +346,19 @@ class DockerHostServer {
     }
   }
 
-  Future<bool> checkPassword(String username, String password) async {
+  Future<bool> checkPassword(String? username, String? password) async {
     if (isEmptyString(username) || isEmptyString(password)) return false;
 
     var now = DateTime.now().millisecondsSinceEpoch;
     _cleanAuthentications(now);
 
-    var count = _authenticationCount.putIfAbsent(username, () => 0);
+    var count = _authenticationCount.putIfAbsent(username!, () => 0);
     if (count > 10) return false;
 
     _authenticationCount[username] = count + 1;
     _authenticationTime[username] = now;
 
-    var ok = (await _authenticationGrantor(username, password)) ?? false;
+    var ok = await _authenticationGrantor(username, password!);
     return ok;
   }
 
@@ -393,16 +389,16 @@ class DockerHostServer {
     }
   }
 
-  int _getParameterAsInt(
+  int? _getParameterAsInt(
       Map<String, String> parameters, dynamic json, String key,
-      [int def]) {
+      [int? def]) {
     var val = _getParameter(parameters, json, key);
     return parseInt(val, def);
   }
 
   dynamic _getParameter(
       Map<String, String> parameters, dynamic json, String key) {
-    var value = parameters != null ? parameters[key] : null;
+    var value = parameters[key];
     if (value != null) return value;
     if (json is Map) {
       return json[key];
@@ -414,7 +410,7 @@ class DockerHostServer {
       HttpRequest request,
       String operation,
       Map<String, String> parameters,
-      ContentType contentType,
+      ContentType? contentType,
       String body) async {
     if (operation != 'stdout' && operation != 'stderr') {
       _LOG.info(
@@ -465,13 +461,13 @@ class DockerHostServer {
 
   Future<Authentication> checkAuthentication(
       HttpRequest request, Map<String, String> parameters) async {
-    var authorization = request.headers['Authorization']?.first?.trim();
+    var authorization = request.headers['Authorization']?.first.trim();
 
-    String username;
-    String password;
+    String? username;
+    String? password;
 
     if (isNotEmptyString(authorization)) {
-      var parts = authorization.split(RegExp(r'\s+'));
+      var parts = authorization!.split(RegExp(r'\s+'));
       var type = parts[0].toLowerCase();
 
       if (type == 'basic') {
@@ -500,8 +496,8 @@ class DockerHostServer {
     }
 
     _checkTokens();
-    var accessToken =
-        _usersTokens.putIfAbsent(username, () => AccessToken(_generateToken()));
+    var accessToken = _usersTokens.putIfAbsent(
+        username!, () => AccessToken(_generateToken()));
 
     var token = accessToken.token;
 
@@ -513,7 +509,7 @@ class DockerHostServer {
     request.response.headers.add(key, value, preserveHeaderCase: true);
   }
 
-  final Map<String /*!*/, AccessToken> _usersTokens = {};
+  final Map<String, AccessToken> _usersTokens = {};
 
   bool validateToken(String token) {
     _checkTokens();
@@ -527,7 +523,7 @@ class DockerHostServer {
     _usersTokens.removeWhere((key, value) => !value.isValid(now, timeout));
   }
 
-  Future<Map<String, String /*!*/ >> _processAuth(
+  Future<Map<String, String>?> _processAuth(
       HttpRequest request, Map<String, String> parameters, dynamic json) async {
     var authentication = await checkAuthentication(request, parameters);
 
@@ -536,62 +532,62 @@ class DockerHostServer {
       return null;
     }
 
-    return {'access_token': authentication.token};
+    return {'access_token': authentication.token!};
   }
 
   Future<bool> _processInitialize(
       HttpRequest request, Map<String, String> parameters, json) async {
     _dockerHostLocal ??= DockerHostLocal();
-    var ok = await _dockerHostLocal.initialize();
+    var ok = await _dockerHostLocal!.initialize();
     return ok;
   }
 
   Future<bool> _processCheckDaemon(
       HttpRequest request, Map<String, String> parameters, json) async {
     if (_dockerHostLocal == null) return false;
-    var ok = await _dockerHostLocal.checkDaemon();
+    var ok = await _dockerHostLocal!.checkDaemon();
     return ok;
   }
 
-  Future<String> _processIDByName(
+  Future<String?> _processIDByName(
       HttpRequest request, Map<String, String> parameters, json) async {
     if (_dockerHostLocal == null) return null;
 
     var name = _getParameter(parameters, json, 'name');
 
-    var id = await _dockerHostLocal.getContainerIDByName(name);
+    var id = await _dockerHostLocal!.getContainerIDByName(name);
     return id;
   }
 
   Future<bool> _processClose(
       HttpRequest request, Map<String, String> parameters, json) async {
     if (_dockerHostLocal == null) return false;
-    await _dockerHostLocal.close();
+    await _dockerHostLocal!.close();
     _closeServer(delay: Duration(seconds: 2));
     return true;
   }
 
-  Future<Map> _processCreate(
+  Future<Map?> _processCreate(
       HttpRequest request, Map<String, String> parameters, json) async {
     if (_dockerHostLocal == null) return null;
 
     String imageName = _getParameter(parameters, json, 'image');
-    String version = _getParameter(parameters, json, 'version');
+    String? version = _getParameter(parameters, json, 'version');
     String containerName = _getParameter(parameters, json, 'name');
-    String portsLine = _getParameter(parameters, json, 'ports');
-    String network = _getParameter(parameters, json, 'network');
-    String hostname = _getParameter(parameters, json, 'hostname');
-    String environmentLine = _getParameter(parameters, json, 'environment');
-    String volumesLine = _getParameter(parameters, json, 'volumes');
-    String cleanContainer = _getParameter(parameters, json, 'cleanContainer');
+    String? portsLine = _getParameter(parameters, json, 'ports');
+    String? network = _getParameter(parameters, json, 'network');
+    String? hostname = _getParameter(parameters, json, 'hostname');
+    String? environmentLine = _getParameter(parameters, json, 'environment');
+    String? volumesLine = _getParameter(parameters, json, 'volumes');
+    String? cleanContainer = _getParameter(parameters, json, 'cleanContainer');
 
-    var ports = isNotEmptyString(portsLine) ? portsLine.split(',') : null;
+    var ports = isNotEmptyString(portsLine) ? portsLine!.split(',') : null;
 
     var environment = decodeQueryString(environmentLine);
 
     var volumes = decodeQueryString(volumesLine);
 
-    var containerInfos = await _dockerHostLocal.createContainer(
+    var containerInfos = await _dockerHostLocal!.createContainer(
       containerName,
       imageName,
       version: version,
@@ -600,8 +596,10 @@ class DockerHostServer {
       hostname: hostname,
       environment: environment,
       volumes: volumes,
-      cleanContainer: parseBool(cleanContainer),
+      cleanContainer: parseBool(cleanContainer)!,
     );
+
+    if (containerInfos == null) return null;
 
     return {
       'containerName': containerInfos.containerName,
@@ -613,35 +611,35 @@ class DockerHostServer {
     };
   }
 
-  Future<Map> _processRun(
+  Future<Map?> _processRun(
       HttpRequest request, Map<String, String> parameters, json) async {
     if (_dockerHostLocal == null) return null;
 
     String imageName = _getParameter(parameters, json, 'image');
-    String version = _getParameter(parameters, json, 'version');
-    String imageArgsEncoded = _getParameter(parameters, json, 'imageArgs');
-    String name = _getParameter(parameters, json, 'name');
-    String portsLine = _getParameter(parameters, json, 'ports');
-    String network = _getParameter(parameters, json, 'network');
-    String hostname = _getParameter(parameters, json, 'hostname');
-    String environmentLine = _getParameter(parameters, json, 'environment');
-    String volumesLine = _getParameter(parameters, json, 'volumes');
-    String cleanContainer = _getParameter(parameters, json, 'cleanContainer');
-    String outputAsLines = _getParameter(parameters, json, 'outputAsLines');
-    String outputLimit = _getParameter(parameters, json, 'outputLimit');
+    String? version = _getParameter(parameters, json, 'version');
+    String? imageArgsEncoded = _getParameter(parameters, json, 'imageArgs');
+    String? name = _getParameter(parameters, json, 'name');
+    String? portsLine = _getParameter(parameters, json, 'ports');
+    String? network = _getParameter(parameters, json, 'network');
+    String? hostname = _getParameter(parameters, json, 'hostname');
+    String? environmentLine = _getParameter(parameters, json, 'environment');
+    String? volumesLine = _getParameter(parameters, json, 'volumes');
+    String? cleanContainer = _getParameter(parameters, json, 'cleanContainer');
+    String? outputAsLines = _getParameter(parameters, json, 'outputAsLines');
+    String? outputLimit = _getParameter(parameters, json, 'outputLimit');
 
-    var ports = isNotEmptyString(portsLine) ? portsLine.split(',') : null;
+    var ports = isNotEmptyString(portsLine) ? portsLine!.split(',') : null;
 
     var environment = decodeQueryString(environmentLine);
 
     var volumes = decodeQueryString(volumesLine);
 
-    List<String> imageArgs;
+    List<String>? imageArgs;
     if (isNotEmptyString(imageArgsEncoded)) {
       imageArgs = parseJSON(imageArgsEncoded);
     }
 
-    var runner = await _dockerHostLocal.run(imageName,
+    var runner = await _dockerHostLocal!.run(imageName,
         version: version,
         imageArgs: imageArgs,
         containerName: name,
@@ -650,7 +648,7 @@ class DockerHostServer {
         hostname: hostname,
         environment: environment,
         volumes: volumes,
-        cleanContainer: parseBool(cleanContainer),
+        cleanContainer: parseBool(cleanContainer)!,
         outputAsLines: parseBool(outputAsLines),
         outputLimit: parseInt(outputLimit));
 
@@ -661,21 +659,21 @@ class DockerHostServer {
     };
   }
 
-  Future<Map> _processExec(
+  Future<Map?> _processExec(
       HttpRequest request, Map<String, String> parameters, json) async {
     if (_dockerHostLocal == null) return null;
 
     _LOG.info('_processExec> parameters: $parameters');
 
     String cmd = _getParameter(parameters, json, 'cmd');
-    String argsEncoded = _getParameter(parameters, json, 'args');
+    String? argsEncoded = _getParameter(parameters, json, 'args');
     String containerName = _getParameter(parameters, json, 'name');
-    String outputAsLines = _getParameter(parameters, json, 'outputAsLines');
-    String outputLimit = _getParameter(parameters, json, 'outputLimit');
+    String? outputAsLines = _getParameter(parameters, json, 'outputAsLines');
+    String? outputLimit = _getParameter(parameters, json, 'outputLimit');
 
-    var args = _decodeArgs(argsEncoded);
+    var args = _decodeArgs(argsEncoded)!;
 
-    var dockerProcess = await _dockerHostLocal.exec(
+    var dockerProcess = await _dockerHostLocal!.exec(
       containerName,
       cmd,
       args,
@@ -683,34 +681,36 @@ class DockerHostServer {
       outputLimit: parseInt(outputLimit),
     );
 
+    if (dockerProcess == null) return null;
+
     return {
       'instanceID': dockerProcess.instanceID,
       'containerName': dockerProcess.containerName,
     };
   }
 
-  Future<Map> _processCommand(
+  Future<Map?> _processCommand(
       HttpRequest request, Map<String, String> parameters, json) async {
     if (_dockerHostLocal == null) return null;
 
     String cmd = _getParameter(parameters, json, 'cmd');
-    String argsEncoded = _getParameter(parameters, json, 'args');
-    String outputAsLines = _getParameter(parameters, json, 'outputAsLines');
-    String outputLimit = _getParameter(parameters, json, 'outputLimit');
+    String? argsEncoded = _getParameter(parameters, json, 'args');
+    String? outputAsLines = _getParameter(parameters, json, 'outputAsLines');
+    String? outputLimit = _getParameter(parameters, json, 'outputLimit');
 
-    var args = _decodeArgs(argsEncoded);
+    var args = _decodeArgs(argsEncoded)!;
 
-    var dockerProcess = await _dockerHostLocal.command(
+    var dockerProcess = await _dockerHostLocal!.command(
       cmd,
       args,
-      outputAsLines: parseBool(outputAsLines),
+      outputAsLines: parseBool(outputAsLines)!,
       outputLimit: parseInt(outputLimit),
     );
 
     return {'instanceID': dockerProcess.instanceID};
   }
 
-  List<String> _decodeArgs(String argsEncoded) {
+  List<String>? _decodeArgs(String? argsEncoded) {
     if (isNotEmptyString(argsEncoded)) {
       var list = parseJSON(argsEncoded) as List;
       return list.cast<String>().toList();
@@ -724,23 +724,23 @@ class DockerHostServer {
 
     var instanceID = _getParameterAsInt(parameters, json, 'instanceID');
 
-    var runner = _dockerHostLocal.getProcessByInstanceID(instanceID);
-    runner ??= _dockerHostLocal.getRunnerByInstanceID(instanceID);
+    var runner = _dockerHostLocal!.getProcessByInstanceID(instanceID);
+    runner ??= _dockerHostLocal!.getRunnerByInstanceID(instanceID);
     if (runner == null) return false;
 
     var ok = await runner.waitReady();
     return ok;
   }
 
-  Future<int> _processWaitExit(
+  Future<int?> _processWaitExit(
       HttpRequest request, Map<String, String> parameters, json) async {
     if (_dockerHostLocal == null) return null;
 
     var instanceID = _getParameterAsInt(parameters, json, 'instanceID');
     var timeoutMs = _getParameterAsInt(parameters, json, 'timeout');
 
-    var runner = _dockerHostLocal.getProcessByInstanceID(instanceID);
-    runner ??= _dockerHostLocal.getRunnerByInstanceID(instanceID);
+    var runner = _dockerHostLocal!.getProcessByInstanceID(instanceID);
+    runner ??= _dockerHostLocal!.getRunnerByInstanceID(instanceID);
     if (runner == null) return null;
 
     var timeout = timeoutMs != null ? Duration(milliseconds: timeoutMs) : null;
@@ -759,26 +759,26 @@ class DockerHostServer {
     var timeoutDuration =
         timeout != null && timeout > 0 ? Duration(seconds: timeout) : null;
 
-    var ok = await _dockerHostLocal.stopByName(
+    var ok = await _dockerHostLocal!.stopByName(
       name,
       timeout: timeoutDuration,
     );
     return ok;
   }
 
-  Future<Map> _processOutput(HttpRequest request, String type,
+  Future<Map?> _processOutput(HttpRequest request, String type,
       Map<String, String> parameters, json) async {
     if (_dockerHostLocal == null) return null;
 
     var instanceID = _getParameterAsInt(parameters, json, 'instanceID');
     var realOffset = _getParameterAsInt(parameters, json, 'realOffset');
 
-    var process = _dockerHostLocal.getProcessByInstanceID(instanceID);
-    process ??= _dockerHostLocal.getRunnerByInstanceID(instanceID);
+    var process = _dockerHostLocal!.getProcessByInstanceID(instanceID);
+    process ??= _dockerHostLocal!.getRunnerByInstanceID(instanceID);
 
     if (process == null) return {'running': false};
 
-    var output = type == 'stderr' ? process.stderr : process.stdout;
+    var output = type == 'stderr' ? process.stderr! : process.stdout!;
 
     var length = output.entriesLength;
     var removed = output.entriesRemoved;

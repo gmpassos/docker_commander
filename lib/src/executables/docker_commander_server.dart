@@ -61,7 +61,7 @@ void main(List<String> args) async {
   var ipv6 = args.contains('--ipv6');
   var production = args.contains('--production');
 
-  if (private ?? false) {
+  if (private) {
     public = false;
   }
 

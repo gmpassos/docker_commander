@@ -13,12 +13,12 @@ final _LOG = Logger('docker_commander/host');
 /// Basic infos of a Container.
 class ContainerInfos {
   final String containerName;
-  String id;
-  final String image;
-  final List<String> ports;
-  final String containerNetwork;
-  final String containerHostname;
-  List<String> args;
+  String? id;
+  final String? image;
+  final List<String>? ports;
+  final String? containerNetwork;
+  final String? containerHostname;
+  List<String>? args;
 
   ContainerInfos(this.containerName, this.id, this.image, this.ports,
       this.containerNetwork, this.containerHostname,
@@ -32,10 +32,10 @@ class ContainerInfos {
 
 /// Base class for Docker Swarm infos.
 class SwarmInfos {
-  final String nodeID;
-  final String managerToken;
-  final String workerToken;
-  final String advertiseAddress;
+  final String? nodeID;
+  final String? managerToken;
+  final String? workerToken;
+  final String? advertiseAddress;
 
   SwarmInfos(
       this.nodeID, this.managerToken, this.workerToken, this.advertiseAddress);
@@ -51,19 +51,19 @@ class Service {
   final DockerHost dockerHost;
 
   final String serviceName;
-  String id;
-  final String image;
-  final List<String> ports;
-  final String containerNetwork;
-  final String containerHostname;
-  List<String> args;
+  String? id;
+  final String? image;
+  final List<String>? ports;
+  final String? containerNetwork;
+  final String? containerHostname;
+  List<String>? args;
 
   Service(this.dockerHost, this.serviceName, this.id, this.image, this.ports,
       this.containerNetwork, this.containerHostname,
       [this.args]);
 
   /// Returns a list of [ServiceTaskInfos] of this service.
-  Future<List<ServiceTaskInfos>> listTasks() =>
+  Future<List<ServiceTaskInfos>?> listTasks() =>
       dockerHost.listServiceTasks(serviceName);
 
   /// Removes this service from Swarm cluster.
@@ -75,18 +75,18 @@ class Service {
   }
 
   /// Opens this Service logs.
-  Future<DockerProcess> openLogs(String serviceNameOrTask) =>
+  Future<DockerProcess?> openLogs(String serviceNameOrTask) =>
       dockerHost.openServiceLogs(serviceNameOrTask);
 
   /// Returns this Service logs as [String].
-  Future<String> catLogs({
-    String taskName,
-    int taskNumber,
+  Future<String?> catLogs({
+    String? taskName,
+    int? taskNumber,
     bool stderr = false,
-    Pattern waitDataMatcher,
-    Duration waitDataTimeout,
+    Pattern? waitDataMatcher,
+    Duration? waitDataTimeout,
     bool waitExit = false,
-    int desiredExitCode,
+    int? desiredExitCode,
     bool follow = false,
   }) {
     var name = isNotEmptyString(taskName) ? taskName : serviceName;
@@ -95,7 +95,7 @@ class Service {
       name = '$serviceName.$taskNumber';
     }
 
-    return dockerHost.catServiceLogs(name,
+    return dockerHost.catServiceLogs(name!,
         stderr: stderr,
         waitDataMatcher: waitDataMatcher,
         waitDataTimeout: waitDataTimeout,
@@ -129,8 +129,7 @@ class ServiceTaskInfos {
     this.error,
   );
 
-  bool get isCurrentlyRunning =>
-      (currentState ?? '').toLowerCase().contains('running');
+  bool get isCurrentlyRunning => currentState.toLowerCase().contains('running');
 
   @override
   String toString() {
@@ -147,7 +146,7 @@ abstract class DockerHost extends DockerCMDExecutor {
   /// Initializes instance.
   Future<bool> initialize();
 
-  static List<String> normalizeMappedPorts(List<String> ports) {
+  static List<String>? normalizeMappedPorts(List<String>? ports) {
     if (ports == null) return null;
     var ports2 = ports
         .where((e) => isNotEmptyString(e, trim: true))
@@ -165,8 +164,8 @@ abstract class DockerHost extends DockerCMDExecutor {
   }
 
   static OutputReadyType resolveOutputReadyType(
-      OutputReadyFunction stdoutReadyFunction,
-      OutputReadyFunction stderrReadyFunction) {
+      OutputReadyFunction? stdoutReadyFunction,
+      OutputReadyFunction? stderrReadyFunction) {
     var outputReadyType = OutputReadyType.STDOUT;
 
     if ((stdoutReadyFunction != null && stderrReadyFunction != null) ||
@@ -181,16 +180,16 @@ abstract class DockerHost extends DockerCMDExecutor {
   }
 
   /// Creates a Docker containers with [image] and optional [version].
-  Future<ContainerInfos> createContainer(
-    String /*!*/ containerName,
-    String /*!*/ imageName, {
-    String version,
-    List<String> ports,
-    String network,
-    String hostname,
-    Map<String, String> environment,
-    Map<String, String> volumes,
-    bool /*!*/ cleanContainer = false,
+  Future<ContainerInfos?> createContainer(
+    String containerName,
+    String imageName, {
+    String? version,
+    List<String>? ports,
+    String? network,
+    String? hostname,
+    Map<String, String>? environment,
+    Map<String, String>? volumes,
+    bool cleanContainer = false,
   });
 
   /// Removes a container by [containerNameOrID].
@@ -198,76 +197,76 @@ abstract class DockerHost extends DockerCMDExecutor {
       DockerCMD.removeContainer(this, containerNameOrID);
 
   /// Starts a container by [containerNameOrID].
-  Future<bool> startContainer(String containerNameOrID) =>
+  Future<bool> startContainer(String? containerNameOrID) =>
       DockerCMD.startContainer(this, containerNameOrID);
 
   /// Runs a Docker containers with [image] and optional [version].
-  Future<DockerRunner> run(
-    String /*!*/ image, {
-    String version,
-    List<String> imageArgs,
-    String containerName,
-    List<String> ports,
-    String network,
-    String hostname,
-    Map<String, String> environment,
-    Map<String, String> volumes,
-    bool /*!*/ cleanContainer = true,
-    bool /*!*/ outputAsLines = true,
-    int outputLimit,
-    OutputReadyFunction stdoutReadyFunction,
-    OutputReadyFunction stderrReadyFunction,
-    OutputReadyType outputReadyType,
+  Future<DockerRunner?> run(
+    String image, {
+    String? version,
+    List<String>? imageArgs,
+    String? containerName,
+    List<String>? ports,
+    String? network,
+    String? hostname,
+    Map<String, String>? environment,
+    Map<String, String>? volumes,
+    bool cleanContainer = true,
+    bool outputAsLines = true,
+    int? outputLimit,
+    OutputReadyFunction? stdoutReadyFunction,
+    OutputReadyFunction? stderrReadyFunction,
+    OutputReadyType? outputReadyType,
   });
 
   /// Executes a [command] inside [containerName] with [args].
   @override
-  Future<DockerProcess> exec(
-    String /*!*/ containerName,
-    String /*!*/ command,
-    List<String /*!*/ > args, {
+  Future<DockerProcess?> exec(
+    String containerName,
+    String command,
+    List<String> args, {
     bool outputAsLines = true,
-    int outputLimit,
-    OutputReadyFunction stdoutReadyFunction,
-    OutputReadyFunction stderrReadyFunction,
-    OutputReadyType outputReadyType,
+    int? outputLimit,
+    OutputReadyFunction? stdoutReadyFunction,
+    OutputReadyFunction? stderrReadyFunction,
+    OutputReadyType? outputReadyType,
   });
 
   /// Executes an arbitrary Docker [command] with [args].
   @override
-  Future<DockerProcess> command(
-    String /*!*/ command,
-    List<String /*!*/ > args, {
+  Future<DockerProcess?> command(
+    String command,
+    List<String> args, {
     bool outputAsLines = true,
-    int outputLimit,
-    OutputReadyFunction stdoutReadyFunction,
-    OutputReadyFunction stderrReadyFunction,
-    OutputReadyType outputReadyType,
+    int? outputLimit,
+    OutputReadyFunction? stdoutReadyFunction,
+    OutputReadyFunction? stderrReadyFunction,
+    OutputReadyType? outputReadyType,
   });
 
   ContainerInfos buildContainerArgs(
-    String /*!*/ cmd,
-    String /*!*/ imageName,
-    String version,
+    String cmd,
+    String imageName,
+    String? version,
     String containerName,
-    List<String> ports,
-    String network,
-    String hostname,
-    Map<String, String> environment,
-    Map<String, String> volumes,
-    bool /*!*/ cleanContainer,
+    List<String>? ports,
+    String? network,
+    String? hostname,
+    Map<String, String>? environment,
+    Map<String, String>? volumes,
+    bool cleanContainer,
   ) {
     var image = DockerHost.resolveImage(imageName, version);
 
     ports = DockerHost.normalizeMappedPorts(ports);
 
-    List<String /*!*/ > args = <String /*!*/ >[
+    var args = <String>[
       if (isNotEmptyString(cmd)) cmd,
       '--name',
       containerName,
     ];
 
-    if (cleanContainer ?? true) {
+    if (cleanContainer) {
       args.add('--rm');
     }
 
@@ -278,18 +277,18 @@ abstract class DockerHost extends DockerCMDExecutor {
       }
     }
 
-    String containerNetwork;
+    String? containerNetwork;
 
     if (isNotEmptyString(network, trim: true)) {
-      containerNetwork = network.trim();
+      containerNetwork = network!.trim();
       args.add('--net');
       args.add(containerNetwork);
     }
 
-    String containerHostname;
+    String? containerHostname;
 
     if (isNotEmptyString(hostname, trim: true)) {
-      containerHostname = hostname.trim();
+      containerHostname = hostname!.trim();
       args.add('-h');
       args.add(containerHostname);
     }
@@ -316,16 +315,16 @@ abstract class DockerHost extends DockerCMDExecutor {
 
   /// Creates a Docker service with [serviceName], [image] and optional [version].
   /// Note that the Docker Daemon should be in Swarm mode.
-  Future<Service> createService(
-    String /*!*/ serviceName,
-    String /*!*/ imageName, {
-    String version,
-    int replicas,
-    List<String> ports,
-    String network,
-    String hostname,
-    Map<String, String> environment,
-    Map<String, String> volumes,
+  Future<Service?> createService(
+    String serviceName,
+    String imageName, {
+    String? version,
+    int? replicas,
+    List<String>? ports,
+    String? network,
+    String? hostname,
+    Map<String, String>? environment,
+    Map<String, String>? volumes,
   }) async {
     if (isEmptyString(serviceName, trim: true)) {
       return null;
@@ -344,7 +343,7 @@ abstract class DockerHost extends DockerCMDExecutor {
       false,
     );
 
-    var cmdArgs = containerInfos.args;
+    var cmdArgs = containerInfos.args!;
 
     cmdArgs.removeLast();
 
@@ -353,11 +352,12 @@ abstract class DockerHost extends DockerCMDExecutor {
       cmdArgs.add('$replicas');
     }
 
-    cmdArgs.add(containerInfos.image);
+    cmdArgs.add(containerInfos.image!);
 
     _LOG.info('Service create[CMD]>\t${cmdArgs.join(' ')}');
 
     var process = await command('service', cmdArgs);
+    if (process == null) return null;
 
     var exitCodeOK = await process.waitExitAndConfirm(0);
     if (!exitCodeOK) return null;
@@ -375,21 +375,21 @@ abstract class DockerHost extends DockerCMDExecutor {
   }
 
   /// Opens a Container logs, by [containerNameOrID].
-  Future<DockerProcess> openContainerLogs(String containerNameOrID) =>
+  Future<DockerProcess?> openContainerLogs(String containerNameOrID) =>
       DockerCMD.openContainerLogs(this, containerNameOrID);
 
   /// Opens a Service logs, by [serviceNameOrTask].
-  Future<DockerProcess> openServiceLogs(String serviceNameOrTask) =>
+  Future<DockerProcess?> openServiceLogs(String serviceNameOrTask) =>
       DockerCMD.openServiceLogs(this, serviceNameOrTask);
 
   /// Returns the Container logs as [String].
-  Future<String> catContainerLogs(
-    String /*!*/ containerNameOrID, {
+  Future<String?> catContainerLogs(
+    String containerNameOrID, {
     bool stderr = false,
-    Pattern waitDataMatcher,
-    Duration waitDataTimeout,
+    Pattern? waitDataMatcher,
+    Duration? waitDataTimeout,
     bool waitExit = false,
-    int desiredExitCode,
+    int? desiredExitCode,
     bool follow = false,
   }) =>
       DockerCMD.catContainerLogs(this, containerNameOrID,
@@ -401,13 +401,13 @@ abstract class DockerHost extends DockerCMDExecutor {
           follow: follow);
 
   /// Returns a Service logs as [String].
-  Future<String> catServiceLogs(
-    String /*!*/ containerNameOrID, {
+  Future<String?> catServiceLogs(
+    String containerNameOrID, {
     bool stderr = false,
-    Pattern waitDataMatcher,
-    Duration waitDataTimeout,
+    Pattern? waitDataMatcher,
+    Duration? waitDataTimeout,
     bool waitExit = false,
-    int desiredExitCode,
+    int? desiredExitCode,
     bool follow = false,
   }) =>
       DockerCMD.catServiceLogs(this, containerNameOrID,
@@ -422,26 +422,26 @@ abstract class DockerHost extends DockerCMDExecutor {
   List<int> getRunnersInstanceIDs();
 
   /// Returns a [List<String>] of [DockerRunner] `name`.
-  List<String /*!*/ > getRunnersNames();
+  List<String> getRunnersNames();
 
   /// Returns a [DockerRunner] with [instanceID].
-  DockerRunner getRunnerByInstanceID(int instanceID);
+  DockerRunner? getRunnerByInstanceID(int instanceID);
 
   /// Returns a [DockerRunner] with [name].
-  DockerRunner getRunnerByName(String name);
+  DockerRunner? getRunnerByName(String name);
 
   /// Returns a [DockerProcess] with [instanceID].
-  DockerProcess getProcessByInstanceID(int instanceID);
+  DockerProcess? getProcessByInstanceID(int instanceID);
 
   /// Stops a container by [instanceID].
-  Future<bool> stopByInstanceID(int instanceID, {Duration timeout}) async {
+  Future<bool> stopByInstanceID(int instanceID, {Duration? timeout}) async {
     var runner = getRunnerByInstanceID(instanceID);
     if (runner == null) return false;
     return stopByName(runner.containerName, timeout: timeout);
   }
 
   /// Stops a container by [name].
-  Future<bool /*!*/ > stopByName(String name, {Duration timeout});
+  Future<bool> stopByName(String name, {Duration? timeout});
 
   /// Stops all [DockerRunner] returned by [getRunnersInstanceIDs].
   Future<void> stopRunners() async {
@@ -456,15 +456,15 @@ abstract class DockerHost extends DockerCMDExecutor {
   Future<bool> checkDaemon();
 
   /// Returns a Docker container ID with [name].
-  Future<String> getContainerIDByName(String name) =>
+  Future<String?> getContainerIDByName(String? name) =>
       DockerCMD.getContainerIDByName(this, name);
 
   /// Returns a Docker service ID with [name].
-  Future<String> getServiceIDByName(String name) =>
+  Future<String?> getServiceIDByName(String name) =>
       DockerCMD.getServiceIDByName(this, name);
 
   /// Returns a list of [ServiceTaskInfos] of a service by [serviceName].
-  Future<List<ServiceTaskInfos>> listServiceTasks(String name) =>
+  Future<List<ServiceTaskInfos>?> listServiceTasks(String name) =>
       DockerCMD.listServiceTasks(this, name);
 
   /// Removes a service from the Swarm cluster by [name].
@@ -477,7 +477,7 @@ abstract class DockerHost extends DockerCMDExecutor {
     var now = DateTime.now().millisecondsSinceEpoch;
 
     for (var instanceID in _processes.keys.toList()) {
-      var process = _processes[instanceID];
+      var process = _processes[instanceID]!;
       assert(process.instanceID == instanceID);
 
       var exitTime = process.exitTime;
@@ -494,12 +494,11 @@ abstract class DockerHost extends DockerCMDExecutor {
   }
 
   /// Resolves a Docker image, composed by [imageName] and [version].
-  static String /*!*/ resolveImage(String /*!*/ imageName,
-      [String /*?*/ version]) {
+  static String resolveImage(String imageName, [String? version]) {
     var image = imageName.trim();
 
     if (isNotEmptyString(version, trim: true)) {
-      version = version.trim();
+      version = version!.trim();
       var idx = image.lastIndexOf(':');
       if (idx > 0) {
         image = image.substring(0, idx);
@@ -520,16 +519,16 @@ abstract class DockerRunner extends DockerProcess {
       : super(dockerHost, instanceID, containerName);
 
   /// The ID of this container.
-  String get id;
+  String? get id;
 
   /// The image:version of this container.
-  String get image;
+  String? get image;
 
   /// Returns the mapped ports.
   List<String> get ports;
 
   /// Stops this container.
-  Future<bool> stop({Duration timeout}) =>
+  Future<bool> stop({Duration? timeout}) =>
       dockerHost.stopByInstanceID(instanceID, timeout: timeout);
 
   @override
@@ -550,26 +549,26 @@ abstract class DockerProcess {
   final int instanceID;
 
   /// The name of the associated container.
-  final String /*!*/ containerName;
+  final String containerName;
 
   DockerProcess(this.dockerHost, this.instanceID, this.containerName);
 
   static final int DEFAULT_OUTPUT_LIMIT = 1000;
 
-  Output _stdout;
+  Output? _stdout;
 
-  Output _stderr;
+  Output? _stderr;
 
-  OutputReadyType _outputReadyType;
+  OutputReadyType? _outputReadyType;
 
   /// The STDOUT of this container.
-  Output get stdout => _stdout;
+  Output? get stdout => _stdout;
 
   /// The STDERR of this container.
-  Output get stderr => _stderr;
+  Output? get stderr => _stderr;
 
   /// The ready output behavior.
-  OutputReadyType get outputReadyType => _outputReadyType;
+  OutputReadyType? get outputReadyType => _outputReadyType;
 
   void setupStdout(OutputStream outputStream) {
     _stdout = Output(this, outputStream);
@@ -589,15 +588,15 @@ abstract class DockerProcess {
 
     switch (outputReadyType) {
       case OutputReadyType.STDOUT:
-        return stdout.waitReady();
+        return stdout!.waitReady();
       case OutputReadyType.STDERR:
-        return stderr.waitReady();
+        return stderr!.waitReady();
       case OutputReadyType.ANY:
-        return stdout.waitAnyOutputReady();
+        return stdout!.waitAnyOutputReady();
       case OutputReadyType.STARTS_READY:
         return true;
       default:
-        return stdout.waitReady();
+        return stdout!.waitReady();
     }
   }
 
@@ -605,15 +604,15 @@ abstract class DockerProcess {
   bool get isReady {
     switch (outputReadyType) {
       case OutputReadyType.STDOUT:
-        return stdout.isReady;
+        return stdout!.isReady;
       case OutputReadyType.STDERR:
-        return stderr.isReady;
+        return stderr!.isReady;
       case OutputReadyType.ANY:
-        return stdout.isReady || stderr.isReady;
+        return stdout!.isReady || stderr!.isReady;
       case OutputReadyType.STARTS_READY:
         return true;
       default:
-        return stdout.isReady;
+        return stdout!.isReady;
     }
   }
 
@@ -621,13 +620,13 @@ abstract class DockerProcess {
   bool get isRunning;
 
   /// The exist code, returned by [waitExit], or null if still running.
-  int get exitCode;
+  int? get exitCode;
 
   /// Returns the time of exit. Computed when [exitCode] is set.
-  DateTime get exitTime;
+  DateTime? get exitTime;
 
   /// If [exitCode] is defined, returns the elapsed time from [exitTime].
-  Duration get exitElapsedTime {
+  Duration? get exitElapsedTime {
     var exitTime = this.exitTime;
     if (exitTime == null) return null;
     var elapsedTime =
@@ -639,7 +638,7 @@ abstract class DockerProcess {
   bool get isFinished => exitCode != null;
 
   /// Waits this container to naturally exit.
-  Future<int> waitExit({int desiredExitCode, Duration timeout});
+  Future<int?> waitExit({int? desiredExitCode, Duration? timeout});
 
   /// Waits this container to naturally exit.
   Future<bool> waitExitAndConfirm(int desiredExitCode) async {
@@ -648,20 +647,20 @@ abstract class DockerProcess {
   }
 
   /// Calls [waitExit] and returns [stdout]
-  Future<Output> waitStdout({int desiredExitCode}) async {
+  Future<Output?> waitStdout({int? desiredExitCode}) async {
     var exitCode = await waitExit(desiredExitCode: desiredExitCode);
     return exitCode != null ? stdout : null;
   }
 
   /// Calls [waitExit] and returns [stderr]
-  Future<Output> waitStderr({int desiredExitCode}) async {
+  Future<Output?> waitStderr({int? desiredExitCode}) async {
     var exitCode = await waitExit(desiredExitCode: desiredExitCode);
     return exitCode != null ? stderr : null;
   }
 
   void dispose() {
-    stdout.dispose();
-    stderr.dispose();
+    stdout!.dispose();
+    stderr!.dispose();
   }
 
   @override
@@ -680,11 +679,11 @@ class Output {
   OutputStream getOutputStream() => _outputStream;
 
   /// Waits with a [timeout] for new data.
-  Future<bool> waitData({Duration timeout}) =>
+  Future<bool> waitData({Duration? timeout}) =>
       _outputStream.waitData(timeout: timeout);
 
   /// Waits for [dataMatcher] with a [timeout].
-  Future<bool> waitForDataMatch(Pattern dataMatcher, {Duration timeout}) =>
+  Future<bool> waitForDataMatch(Pattern dataMatcher, {Duration? timeout}) =>
       _outputStream.waitForDataMatch(dataMatcher, timeout: timeout);
 
   /// On data event listener.
@@ -697,7 +696,7 @@ class Output {
   String get asString => _outputStream.asString;
 
   /// Sames as [asString], but with optional parameters [entriesRealOffset] and [contentRealOffset].
-  String asStringFrom({int entriesRealOffset, int contentRealOffset}) =>
+  String asStringFrom({int? entriesRealOffset, int? contentRealOffset}) =>
       _outputStream.asStringFrom(
           entriesRealOffset: entriesRealOffset,
           contentRealOffset: contentRealOffset);
@@ -731,14 +730,14 @@ class Output {
   int get limit => _outputStream.limit;
 
   /// Returns a [List] of entries, from [offset] or [realOffset].
-  List getEntries({int offset, int realOffset}) =>
+  List getEntries({int? offset, int? realOffset}) =>
       _outputStream.getEntries(offset: offset, realOffset: realOffset);
 
   /// Calls [dockerProcess.waitExit].
-  Future<int> waitExit() => dockerProcess.waitExit();
+  Future<int?> waitExit() => dockerProcess.waitExit();
 
   /// Calls [dockerProcess.exitCode].
-  int get exitCode => dockerProcess.exitCode;
+  int? get exitCode => dockerProcess.exitCode;
 
   void dispose() {
     _outputStream.dispose();
@@ -748,7 +747,7 @@ class Output {
   String toString() => asString;
 }
 
-typedef OutputReadyFunction = bool /*!*/ Function(
+typedef OutputReadyFunction = bool Function(
     OutputStream outputStream, dynamic data);
 
 /// Indicates which output should be ready.
@@ -760,7 +759,7 @@ class OutputStream<T> {
   final bool stringData;
 
   /// The limit of entries.
-  int _limit;
+  int limit;
 
   /// The functions that determines if this output is ready.
   /// Called for each output entry.
@@ -768,7 +767,7 @@ class OutputStream<T> {
 
   final Completer<bool> anyOutputReadyCompleter;
 
-  OutputStream(this._encoding, this.stringData, this._limit,
+  OutputStream(this._encoding, this.stringData, this.limit,
       this.outputReadyFunction, this.anyOutputReadyCompleter);
 
   bool _ready = false;
@@ -802,12 +801,6 @@ class OutputStream<T> {
     }
   }
 
-  int get limit => _limit;
-
-  set limit(int value) {
-    _limit = value ?? 0;
-  }
-
   /// The data buffer;
   final List<T> _data = <T>[];
 
@@ -830,7 +823,7 @@ class OutputStream<T> {
   int get bufferedContentSize => _computeDataContentSize(_data);
 
   /// Returns a [List] of entries, from [offset] or [realOffset].
-  List<T> getEntries({int offset, int realOffset}) {
+  List<T> getEntries({int? offset, int? realOffset}) {
     if (realOffset != null) {
       offset = realOffset - _dataRemoved;
     }
@@ -871,15 +864,15 @@ class OutputStream<T> {
   }
 
   void _checkDataLimit() {
-    if (_limit > 0) {
+    if (limit > 0) {
       if (stringData) {
-        while (_data.length > _limit) {
+        while (_data.length > limit) {
           var content = _data.removeAt(0);
           ++_dataRemoved;
-          _contentRemoved += (content as String).length;
+          _contentRemoved += content.toString().length;
         }
       } else {
-        while (_data.length > _limit) {
+        while (_data.length > limit) {
           _data.removeAt(0);
           ++_dataRemoved;
           ++_contentRemoved;
@@ -920,7 +913,7 @@ class OutputStream<T> {
   }
 
   /// Waits with a [timeout] for new data.
-  Future<bool> waitData({Duration timeout}) {
+  Future<bool> waitData({Duration? timeout}) {
     // If disposed, new data won't arrive:
     if (isDisposed) return Future.value(false);
 
@@ -940,7 +933,8 @@ class OutputStream<T> {
   }
 
   /// Waits for [dataMatcher] with a [timeout].
-  Future<bool> waitForDataMatch(Pattern dataMatcher, {Duration timeout}) async {
+  Future<bool> waitForDataMatch(Pattern dataMatcher,
+      {Duration? timeout}) async {
     if (asString.contains(dataMatcher)) {
       return true;
     }
@@ -994,7 +988,7 @@ class OutputStream<T> {
   ///
   /// [entriesRealOffset] is an offset of all past entries (will considere [entriesRemoved]).
   /// [contentRealOffset]
-  String asStringFrom({int entriesRealOffset, int contentRealOffset}) {
+  String asStringFrom({int? entriesRealOffset, int? contentRealOffset}) {
     if ((entriesRealOffset == null || entriesRealOffset < 0) &&
         (contentRealOffset == null || contentRealOffset < 0)) {
       return asString;

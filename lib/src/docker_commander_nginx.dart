@@ -19,14 +19,14 @@ class DockerContainerNginx extends DockerContainer {
 
   Future<bool> testConfiguration() async {
     var nginxBin = await execWhich('nginx');
-    var processTestConfig = await exec(nginxBin, ['-t']);
-    var testConfigExit = await processTestConfig.waitExitAndConfirm(0);
+    var processTestConfig = await exec(nginxBin!, ['-t']);
+    var testConfigExit = await processTestConfig!.waitExitAndConfirm(0);
     return testConfigExit;
   }
 
   Future<bool> reloadConfiguration() async {
     var nginxBin = await execWhich('nginx');
-    var reloadExit = await execAndWaitExit(nginxBin, ['-s', 'reload']);
+    var reloadExit = await execAndWaitExit(nginxBin!, ['-s', 'reload']);
     return reloadExit == 0;
   }
 }
@@ -37,7 +37,7 @@ class NginxContainer extends DockerContainerConfig<DockerContainerNginx> {
 
   final String configPath;
 
-  NginxContainer(this.config, {List<int> hostPorts, String configPath})
+  NginxContainer(this.config, {List<int>? hostPorts, String? configPath})
       : configPath = configPath ?? '/etc/nginx/nginx.conf',
         super(
           'nginx',

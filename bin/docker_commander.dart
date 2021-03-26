@@ -24,10 +24,10 @@ void main(List<String> args) async {
   var console = args.contains('--console');
   var server = args.contains('--server');
 
-  if (console ?? false) {
+  if (console) {
     print('<CONSOLE MODE>');
     docker_commander_console.main(args);
-  } else if (server ?? false) {
+  } else if (server) {
     print('<SERVER MODE>');
     docker_commander_server.main(args);
   } else {

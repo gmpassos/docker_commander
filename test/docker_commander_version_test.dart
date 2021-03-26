@@ -32,7 +32,7 @@ void main() {
 
       var src = await catFile(srcFile);
 
-      var versionMatch = RegExp(r"VERSION\s*=\s*'(.*?)'").firstMatch(src);
+      var versionMatch = RegExp(r"VERSION\s*=\s*'(.*?)'").firstMatch(src)!;
 
       var srcVersion = versionMatch.group(1);
 
