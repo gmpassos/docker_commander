@@ -79,24 +79,6 @@ class DockerCommanderConsole {
         }
       case 'createcontainer':
         {
-          cmd.parseSimpleProperties({
-            'containerName',
-            'container',
-            'imageName',
-            'image',
-            'version',
-            'ver',
-            'ports',
-            'port',
-            'volumes',
-            'hostname',
-            'host',
-            'network',
-            'environment',
-            'env',
-            'cleanContainer'
-          });
-
           var parameters = await _requireParameters({
             'containerName': cmd.get(0, 'containerName', 'container'),
             'imageName': cmd.get(1, 'imageName', 'image'),
@@ -123,8 +105,8 @@ class DockerCommanderConsole {
             hostname: parameters['hostname'],
             network: parameters['network'],
             environment: parseFromInlineMap(
-                parameters['volumes'], RegExp(r'[|]'), RegExp(r'[:=]')),
-            cleanContainer: parseBool(parameters['cleanContainer'])!,
+                parameters['environment'], RegExp(r'[|]'), RegExp(r'[:=]')),
+            cleanContainer: parseBool(parameters['cleanContainer']) ?? false,
           );
 
           if (containerInfos != null) {
@@ -136,24 +118,6 @@ class DockerCommanderConsole {
         }
       case 'createservice':
         {
-          cmd.parseSimpleProperties({
-            'serviceName',
-            'service',
-            'imageName',
-            'image',
-            'version',
-            'ver',
-            'ports',
-            'port',
-            'volumes',
-            'hostname',
-            'host',
-            'network',
-            'environment',
-            'env',
-            'cleanContainer'
-          });
-
           var parameters = await _requireParameters({
             'serviceName': cmd.get(0, 'serviceName', 'service'),
             'imageName': cmd.get(1, 'imageName', 'image'),
@@ -181,7 +145,7 @@ class DockerCommanderConsole {
             hostname: parameters['hostname'],
             network: parameters['network'],
             environment: parseFromInlineMap(
-                parameters['volumes'], RegExp(r'[|]'), RegExp(r'[:=]')),
+                parameters['environment'], RegExp(r'[|]'), RegExp(r'[:=]')),
           );
 
           if (service != null) {
@@ -193,14 +157,6 @@ class DockerCommanderConsole {
         }
       case 'start':
         {
-          cmd.parseSimpleProperties({
-            'containerOrServiceName',
-            'containerName',
-            'container',
-            'serviceName',
-            'service'
-          });
-
           var parameters = await _requireParameters({
             'containerName': cmd.get(0, 'containerOrServiceName',
                 'containerName', 'container', 'serviceName', 'service'),
@@ -217,14 +173,6 @@ class DockerCommanderConsole {
         }
       case 'stop':
         {
-          cmd.parseSimpleProperties({
-            'containerOrServiceName',
-            'containerName',
-            'container',
-            'serviceName',
-            'service'
-          });
-
           var parameters = await _requireParameters({
             'containerName': cmd.get(0, 'containerOrServiceName',
                 'containerName', 'container', 'serviceName', 'service'),
@@ -242,16 +190,6 @@ class DockerCommanderConsole {
       case 'log':
       case 'logs':
         {
-          cmd.parseSimpleProperties({
-            'containerOrServiceName',
-            'containerName',
-            'container',
-            'serviceName',
-            'service',
-            'stdout',
-            'stderr',
-          });
-
           cmd.defaultReturnType = ConsoleCMDReturnType.STDOUT;
 
           var parameters = await _requireParameters({
@@ -293,8 +231,6 @@ class DockerCommanderConsole {
         }
       case 'execwhich':
         {
-          cmd.parseSimpleProperties();
-
           cmd.returnType = ConsoleCMDReturnType.STDOUT;
 
           var parameters = await _requireParameters({
@@ -314,11 +250,6 @@ class DockerCommanderConsole {
         }
       case 'exec':
         {
-          cmd.parseSimpleProperties({
-            'containerName',
-            'container',
-          });
-
           cmd.defaultReturnType = ConsoleCMDReturnType.STDOUT;
 
           var parameters = await _requireParameters({
@@ -591,6 +522,8 @@ class ConsoleCMD {
         _args.add(arg);
       }
     }
+
+    _normalizeCmdProperties();
   }
 
   static ConsoleCMD? parse(String? line) {
@@ -605,13 +538,117 @@ class ConsoleCMD {
     return ConsoleCMD(cmd, args.map(parseString).toList());
   }
 
+  bool _normalizeCmdProperties() {
+    switch (cmd) {
+      case 'createcontainer':
+        {
+          parseSimpleProperties({
+            'containerName',
+            'container',
+            'imageName',
+            'image',
+            'version',
+            'ver',
+            'ports',
+            'port',
+            'volumes',
+            'hostname',
+            'host',
+            'network',
+            'environment',
+            'env',
+            'cleanContainer'
+          });
+
+          return true;
+        }
+      case 'createservice':
+        {
+          parseSimpleProperties({
+            'serviceName',
+            'service',
+            'imageName',
+            'image',
+            'version',
+            'ver',
+            'ports',
+            'port',
+            'volumes',
+            'hostname',
+            'host',
+            'network',
+            'environment',
+            'env',
+            'cleanContainer'
+          });
+
+          return true;
+        }
+      case 'start':
+        {
+          parseSimpleProperties({
+            'containerOrServiceName',
+            'containerName',
+            'container',
+            'serviceName',
+            'service'
+          });
+
+          return true;
+        }
+      case 'stop':
+        {
+          parseSimpleProperties({
+            'containerOrServiceName',
+            'containerName',
+            'container',
+            'serviceName',
+            'service'
+          });
+
+          return true;
+        }
+      case 'log':
+      case 'logs':
+        {
+          parseSimpleProperties({
+            'containerOrServiceName',
+            'containerName',
+            'container',
+            'serviceName',
+            'service',
+            'stdout',
+            'stderr',
+          });
+          return true;
+        }
+      case 'execwhich':
+        {
+          parseSimpleProperties();
+
+          return true;
+        }
+      case 'exec':
+        {
+          parseSimpleProperties({
+            'containerName',
+            'container',
+          });
+
+          return true;
+        }
+      default:
+        return false;
+    }
+  }
+
   void parseSimpleProperties([Set<String>? simpleProperties]) {
     if (simpleProperties != null) {
       simpleProperties =
           simpleProperties.map((e) => e.toLowerCase().trim()).toSet();
     }
 
-    for (var i = 0; i < _args.length; ++i) {
+    for (var i = 0; i < _args.length;) {
       var arg = _args[i];
 
       if (arg.startsWith('--')) {
@@ -636,6 +673,8 @@ class ConsoleCMD {
         }
 
         _properties[name] = value;
+      } else {
+        ++i;
       }
     }
   }
@@ -651,6 +690,8 @@ class ConsoleCMD {
 
   String? getArg(int argIndex) =>
       argIndex < _args.length ? _args[argIndex] : null;
+
+  Map<String, String?> get properties => sortMapEntries(_properties);
 
   String? getProperty(String? propKey) =>
       propKey != null ? _properties[propKey.toLowerCase().trim()] : null;

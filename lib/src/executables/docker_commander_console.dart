@@ -177,7 +177,10 @@ void main(List<String> args) async {
 
     emptyLineCounter = 0;
 
-    var cmd = ConsoleCMD.parse(line)!;
+    var cmd = ConsoleCMD.parse(line);
+    if (cmd == null) {
+      continue;
+    }
 
     try {
       var ok = await console.executeConsoleCMD(cmd);

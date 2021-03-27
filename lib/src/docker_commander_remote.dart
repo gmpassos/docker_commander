@@ -250,7 +250,7 @@ class DockerHostRemote extends DockerHost {
 
     var response = await _httpClient.getJSON('exec', parameters: {
       'cmd': command,
-      'args': argsEncoded!,
+      if (argsEncoded != null) 'args': argsEncoded,
       'name': containerName,
       'outputAsLines': '$outputAsLines',
       'outputLimit': '$outputLimit',
@@ -302,7 +302,7 @@ class DockerHostRemote extends DockerHost {
 
     var response = await _httpClient.getJSON('command', parameters: {
       'cmd': command,
-      'args': argsEncoded!,
+      if (argsEncoded != null) 'args': argsEncoded,
       'outputAsLines': '$outputAsLines',
       'outputLimit': '$outputLimit',
     }) as Map?;

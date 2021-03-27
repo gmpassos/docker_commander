@@ -283,7 +283,7 @@ class DockerHostServer {
     }
 
     if (operation != 'stdout' && operation != 'stderr') {
-      var responseBody = _bodyToShortString(response)!;
+      var responseBody = _bodyToShortString(response);
 
       print(
           '[SERVER]\tRESPONSE> responseStatus: ${request.response.statusCode} ; body: ${responseBody.length < 10 ? responseBody : responseBody.length} >> operation: $operation ; parameters: $requestParameters');
@@ -304,7 +304,7 @@ class DockerHostServer {
     await request.response.close();
   }
 
-  String? _bodyToShortString(response) {
+  String _bodyToShortString(response) {
     String? responseBody;
 
     if (response == null || response is int || response is bool) {

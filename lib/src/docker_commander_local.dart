@@ -188,27 +188,58 @@ class DockerHostLocal extends DockerHost {
     var process = await Process.start(dockerBinaryPath!, cmdArgs);
     var exitCode = await process.exitCode;
 
-    if (containerInfos.idFile != null) {
-      var id = await _getContainerID(
-          containerInfos.containerName, containerInfos.idFile);
-      containerInfos.id = id;
-    }
+    if (exitCode != 0) return null;
+
+    containerInfos.id = await _readContainerID(
+        containerInfos.containerName, containerInfos.idFile, process);
 
     return exitCode == 0 ? containerInfos : null;
   }
 
-  Future<String?> _getContainerID(String containerName, File? idFile) async {
-    String? id;
+  Future<String?> _readContainerID(String containerName,
+      [File? idFile, Process? process]) async {
+    if (idFile != null) {
+      var id = await _getContainerID(containerName, idFile);
+      if (id != null && id.isNotEmpty) {
+        return id;
+      }
+    }
+
+    if (process != null) {
+      var output =
+          await process.stdout.transform(systemEncoding.decoder).join();
+      var id = output.trim();
+      if (id.isNotEmpty) {
+        return id;
+      }
+    } else if (idFile == null) {
+      var id = await _getContainerID(containerName);
+      return id != null && id.isNotEmpty ? id : null;
+    }
+
+    return null;
+  }
+
+  Future<String?> _getContainerID(String containerName, [File? idFile]) async {
     if (idFile != null) {
       var fileExists = await _waitFile(idFile);
       if (!fileExists) {
-        _LOG.warning("idFile doesn't exists: $idFile");
+        _LOG.warning("ID file doesn't exists: $idFile");
       }
-      id = idFile.readAsStringSync().trim();
-    } else {
-      id = await getContainerIDByName(containerName);
+      try {
+        var id = idFile.readAsStringSync().trim();
+        if (id.isNotEmpty) {
+          return id;
+        }
+      } catch (e, s) {
+        if (fileExists) {
+          _LOG.warning("Can't read ID File: $idFile", e, s);
+        }
+      }
     }
-    return id;
+
+    var id = await getContainerIDByName(containerName);
+    return id != null && id.isNotEmpty ? id : null;
   }
 
   Future<bool> _waitFile(File file, {Duration? timeout}) async {

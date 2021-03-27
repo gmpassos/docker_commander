@@ -1,3 +1,9 @@
+## 2.0.1
+
+- Null Safety adjustments.
+- Fix `ConsoleCMD` parse of properties.
+- Improve read of container ID.
+
 ## 2.0.0
 
 - Dart 2.12.0:
