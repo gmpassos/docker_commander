@@ -1,3 +1,8 @@
+## 2.0.2
+
+- `Dockerfile`: using AOT (native) compilation to execute the server,
+  with better response time and memory management. 
+
 ## 2.0.1
 
 - Null Safety adjustments.
