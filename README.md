@@ -105,6 +105,61 @@ $> help
 
 -------------------------------------------------------------------------------
 
+## Formulas
+
+Formulas are a very easy way to install/unistall and handle containers and services
+in `docker_commander`.
+
+You can use `docker_commander` formulas from a repository. Below there's a simple
+example of how to use the standard repository (`DockerCommanderFormulaRepositoryStandard`)
+from a Dart code.
+
+```dart
+import 'package:docker_commander/docker_commander_vm.dart';
+
+void main() async {
+  // Creates a `DockerCommander` for a local host machine:
+  var dockerCommander = DockerCommander(DockerHostLocal());
+  
+  // Initialize `DockerCommander`:
+  await dockerCommander.initialize();
+  
+  // The formula repository to use:
+  var repository = DockerCommanderFormulaRepositoryStandard();
+
+  // Get the `apache` formula source:
+  var formulaSource = await formulaRepositoryStandard.getFormulaSource('apache');
+
+  // Get the formula instance and perform setup:
+  var formula = formulaSource!.toFormula() ;
+  
+  formula.setup(dockerCommander: dockerCommander);
+
+  // Install the formula:
+  var installed = await formula.install();
+
+  //...
+
+  // Stop the formula:
+  var stopped = await formula.stop();
+
+  //...
+  
+  // Start the formula:
+  var start = await formula.start();
+
+  //...
+  
+  // Uninstall the formula:
+  var uninstalled = await formula.uninstall();
+  
+}
+
+```
+
+
+-------------------------------------------------------------------------------
+
 ## Dart Usage
 
 ### Local Docker

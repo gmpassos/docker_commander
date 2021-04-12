@@ -1,3 +1,11 @@
+## 2.0.4
+
+- Formula repository (`DockerCommanderFormulaRepository`):
+  - Standard implementation: `DockerCommanderFormulaRepositoryStandard`:
+    - `formulas/apache_formula.dart`
+- Fix formula class name to `DockerCommanderFormula`
+- Adjust `README.md` to show a formula example.
+
 ## 2.0.3
 
 - Remove container: added `force` parameter.

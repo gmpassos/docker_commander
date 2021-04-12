@@ -1,6 +1,5 @@
 @Timeout(Duration(minutes: 2))
 import 'package:docker_commander/docker_commander_vm.dart';
-import 'package:docker_commander/src/docker_commander_formulas.dart';
 import 'package:logging/logging.dart';
 import 'package:test/test.dart';
 
@@ -14,6 +13,7 @@ void main() {
   group('DockerCommanderFormular', () {
     late DockerCommander dockerCommander;
     late DockerCommanderConsole dockerCommanderConsole;
+    late DockerCommanderFormulaRepositoryStandard formulaRepositoryStandard;
 
     setUp(() async {
       logTitle(_LOG, 'SETUP');
@@ -40,6 +40,8 @@ void main() {
       }, (line, output) async {
         print(output ? '>> $line' : line);
       });
+
+      formulaRepositoryStandard = DockerCommanderFormulaRepositoryStandard();
     });
 
     tearDown(() async {
@@ -52,34 +54,15 @@ void main() {
     });
 
     test('Apache Formula', () async {
-      var formula = DockerCommanderFormular('dart', '''
-      class ApacheFormula {
-      
-        String getVersion() {
-          return '1.0';
-        }
-      
-        void install() {
-          cmd('create-container apache httpd latest --port 80 --hostname apache');
-          start();
-        }
-        
-        void start() {
-          cmd('start apache');
-        }
-        
-        void stop() {
-          cmd('stop apache');
-        }
-        
-        void uninstall() {
-          stop();
-          cmd('remove-container apache --force');
-        }
-      }
-      ''');
+      var formulasNames = await formulaRepositoryStandard.listFormulasNames();
+      expect(formulasNames, equals(['apache']));
 
-      formula.setup(dockerCommanderConsole);
+      var formulaSource =
+          await formulaRepositoryStandard.getFormulaSource('apache');
+
+      var formula = formulaSource!.toFormula();
+
+      formula.setup(dockerCommanderConsole: dockerCommanderConsole);
 
       var psContainerNames0 = await dockerCommander.psContainerNames();
       _LOG.info('containerNames0: $psContainerNames0');
@@ -100,6 +83,11 @@ void main() {
 
       var className = await formula.getFormulaClassName();
       expect(className, equals('ApacheFormula'));
+
+      var functions = await formula.getFunctions();
+      functions.sort();
+      expect(functions,
+          equals(['getVersion', 'install', 'start', 'stop', 'uninstall']));
 
       var uninstalled = await formula.uninstall();
       expect(uninstalled, isTrue);

@@ -2,22 +2,40 @@ import 'dart:async';
 
 import 'package:apollovm/apollovm.dart';
 import 'package:docker_commander/docker_commander.dart';
+import 'package:docker_commander/src/formulas/apache_formula.dart';
 import 'package:swiss_knife/swiss_knife.dart';
 
 /// A `docker_commander` Formula:
-class DockerCommanderFormular {
-  /// The programming language of the formula,
-  /// to be parsed by [ApolloVM].
-  String language;
+class DockerCommanderFormula {
+  /// The formula source.
+  DockerCommanderFormulaSource source;
 
-  /// Source of the formula.
-  String source;
+  DockerCommanderFormula(this.source);
 
-  DockerCommanderFormular(this.language, this.source);
+  String get language => source.language;
 
   DockerCommanderConsole? _dockerCommanderConsole;
 
-  void setup(DockerCommanderConsole dockerCommanderConsole) {
+  /// Setups this formula to be used.
+  ///
+  /// A [dockerCommander] or [dockerCommanderConsole] parameter should be provided.
+  void setup(
+      {DockerCommander? dockerCommander,
+      DockerCommanderConsole? dockerCommanderConsole}) {
+    if (dockerCommanderConsole == null) {
+      if (dockerCommander == null) {
+        throw ArgumentError(
+            "A 'dockerCommander' or 'dockerCommanderConsole' parameter should be provided!");
+      }
+
+      dockerCommanderConsole = dockerCommanderConsole =
+          DockerCommanderConsole(dockerCommander, (name, description) async {
+        return '';
+      }, (line, output) async {
+        print(output ? '>> $line' : line);
+      });
+    }
+
     _dockerCommanderConsole = dockerCommanderConsole;
   }
 
@@ -72,15 +90,7 @@ class DockerCommanderFormular {
   /// Returns a [ApolloVM] loaded with the formula code.
   Future<ApolloVM?> getVM() async {
     if (_vm == null) {
-      var vm = ApolloVM();
-
-      var codeUnit = CodeUnit(language, source, 'docker_commander_formula');
-      var loaded = await vm.loadCodeUnit(codeUnit);
-
-      if (!loaded) {
-        throw StateError("Can't load source in VM");
-      }
-
+      var vm = await source.createVM();
       _vm = vm;
       return vm;
     } else {
@@ -111,29 +121,43 @@ class DockerCommanderFormular {
 
     var className = await getFormulaClassName();
 
+    if (className.isEmpty) {
+      throw StateError("A formula needs a class ending with 'Formula'.");
+    }
+
     FutureOr<ASTValue>? result;
 
-    if (className.isNotEmpty) {
-      if ((await runner.getClassMethod('', className, command, [parameters])) !=
-          null) {
-        result =
-            runner.executeClassMethod('', className, command, [parameters]);
-      } else if ((await runner.getClassMethod('', className, command)) !=
-          null) {
-        result = runner.executeClassMethod('', className, command);
-      }
-    } else {
-      if ((await runner.getFunction('', command, [parameters])) != null) {
-        result = runner.executeFunction('', command, [parameters]);
-      } else if ((await runner.getFunction('', command)) != null) {
-        result = runner.executeFunction('', command);
-      }
+    if ((await runner.getClassMethod('', className, command, [parameters])) !=
+        null) {
+      result = runner.executeClassMethod('', className, command, [parameters]);
+    } else if ((await runner.getClassMethod('', className, command)) != null) {
+      result = runner.executeClassMethod('', className, command);
     }
 
     if (result == null) return null;
 
     var resultValue = await result;
     return resultValue;
+  }
+
+  Future<List<String>> getFunctions() async {
+    var vm = (await getVM())!;
+
+    var runner = _createRunner(vm);
+
+    var className = await getFormulaClassName();
+
+    if (className.isEmpty) {
+      throw StateError(
+          "A formula needs a class with name ending in 'Formula'.");
+    }
+
+    var clazz = await runner.getClass('', className);
+    if (clazz == null) {
+      throw StateError("Can't find class: $className");
+    }
+
+    return clazz.functionsNames;
   }
 
   ApolloLanguageRunner _createRunner(ApolloVM vm) {
@@ -176,6 +200,12 @@ class DockerCommanderFormular {
     return result != null;
   }
 
+  /// Restarts this formula, calling `stop()` than `start()`.
+  Future<bool> restart() async {
+    await stop();
+    return start();
+  }
+
   /// When a formula calls `cmd('start container-x')`
   /// it will be mapped to this function.
   Future<bool> _mapped_dockerCommander_cmd(String cmdLine) async {
@@ -209,5 +239,106 @@ class DockerCommanderFormular {
     environmentProps['DOCKER_COMMANDER_FORMULA_NAME'] = formulaName;
 
     return environmentProps;
+  }
+}
+
+/// The source of a formula
+class DockerCommanderFormulaSource {
+  /// The programming language of the formula,
+  /// to be parsed by [ApolloVM].
+  String language;
+
+  /// Source code of the formula.
+  String source;
+
+  DockerCommanderFormulaSource(this.language, this.source);
+
+  /// Creates an [ApolloVM] loaded with this source.
+  Future<ApolloVM> createVM() async {
+    var vm = ApolloVM();
+
+    var codeUnit = CodeUnit(language, source, 'docker_commander_formula');
+    var loaded = await vm.loadCodeUnit(codeUnit);
+
+    if (!loaded) {
+      throw StateError("Can't load source in VM");
+    }
+
+    return vm;
+  }
+
+  String? _name;
+
+  /// The name of this formula.
+  ///
+  /// This will load an [ApolloVM] and parse the formula source,
+  /// than cache the formula name.
+  Future<String> getName() async {
+    if (_name == null) {
+      var formula = toFormula();
+      var name = await formula.getFormulaName();
+      _name = name;
+    }
+    return _name!;
+  }
+
+  DockerCommanderFormula toFormula() => DockerCommanderFormula(this);
+}
+
+abstract class DockerCommanderFormulaRepository {
+  DockerCommanderFormulaRepository? parent;
+
+  DockerCommanderFormulaRepository([this.parent]);
+
+  FutureOr<List<DockerCommanderFormulaSource>> listFormulasSources();
+
+  Map<String, DockerCommanderFormulaSource>? _formulasSourcesTable;
+
+  Future<Map<String, DockerCommanderFormulaSource>>
+      getFormulasSourcesTable() async {
+    if (_formulasSourcesTable == null) {
+      var sources = await listFormulasSources();
+
+      var entries = await Future.wait(
+          sources.map((e) async => MapEntry(await e.getName(), e)));
+      var map = Map<String, DockerCommanderFormulaSource>.fromEntries(entries);
+
+      _formulasSourcesTable = map;
+    }
+    return Map<String, DockerCommanderFormulaSource>.from(
+        _formulasSourcesTable!);
+  }
+
+  List<String>? _formulasNames;
+
+  FutureOr<List<String>> listFormulasNames() async {
+    if (_formulasNames == null) {
+      var formulasSources = await listFormulasSources();
+
+      var names = formulasSources.map((e) async {
+        var name = await e.getName();
+        return name;
+      }).toList();
+
+      _formulasNames = await Future.wait(names);
+    }
+    return _formulasNames!.toList();
+  }
+
+  Future<DockerCommanderFormulaSource?> getFormulaSource(
+      String formulaName) async {
+    var table = await getFormulasSourcesTable();
+    return table[formulaName];
+  }
+}
+
+class DockerCommanderFormulaRepositoryStandard
+    extends DockerCommanderFormulaRepository {
+  List<DockerCommanderFormulaSource>? _formulasSources;
+
+  @override
+  List<DockerCommanderFormulaSource> listFormulasSources() {
+    _formulasSources ??= <DockerCommanderFormulaSource>[ApacheFormulaSource()];
+    return _formulasSources!.toList();
   }
 }
