@@ -465,6 +465,7 @@ abstract class DockerCMD {
     var stdout = process.stdout!;
     await stdout.waitForDataMatch(RegExp(r'\w'), timeout: Duration(seconds: 1));
     var output = stdout.asString;
+    if (output.isEmpty) return <String>[];
     var names =
         output.replaceAll(RegExp(r'\s+'), ' ').trim().split(RegExp(r'\s+'));
     return names;
@@ -496,9 +497,11 @@ abstract class DockerCMD {
 
   /// Removes a container by [containerNameOrID].
   static Future<bool> removeContainer(
-      DockerCMDExecutor executor, String containerNameOrID) async {
+      DockerCMDExecutor executor, String containerNameOrID,
+      {bool force = false}) async {
     if (isEmptyString(containerNameOrID)) return false;
-    var process = await executor.command('rm', [containerNameOrID]);
+    var process =
+        await executor.command('rm', [if (force) '--force', containerNameOrID]);
     if (process == null) return false;
     return process.waitExitAndConfirm(0);
   }

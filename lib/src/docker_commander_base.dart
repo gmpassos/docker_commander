@@ -5,7 +5,8 @@ import 'docker_commander_host.dart';
 
 /// The Docker manager.
 class DockerCommander extends DockerCMDExecutor {
-  static final String VERSION = '2.0.1';
+  /// Current version of package `docker_commander`.
+  static final String VERSION = '2.0.3';
 
   /// Docker machine host.
   final DockerHost dockerHost;
@@ -83,8 +84,9 @@ class DockerCommander extends DockerCMDExecutor {
   }
 
   /// Removes a container by [containerNameOrID].
-  Future<bool> removeContainer(String containerNameOrID) =>
-      dockerHost.removeContainer(containerNameOrID);
+  Future<bool> removeContainer(String containerNameOrID,
+          {bool force = false}) =>
+      dockerHost.removeContainer(containerNameOrID, force: force);
 
   /// Starts a container by [containerNameOrID].
   Future<bool> startContainer(String containerNameOrID) =>

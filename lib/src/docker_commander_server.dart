@@ -581,6 +581,13 @@ class DockerHostServer {
     String? volumesLine = _getParameter(parameters, json, 'volumes');
     String? cleanContainer = _getParameter(parameters, json, 'cleanContainer');
 
+    String? healthCmd = _getParameter(parameters, json, 'healthCmd');
+    String? healthInterval = _getParameter(parameters, json, 'healthInterval');
+    String? healthRetries = _getParameter(parameters, json, 'healthRetries');
+    String? healthStartPeriod =
+        _getParameter(parameters, json, 'healthStartPeriod');
+    String? healthTimeout = _getParameter(parameters, json, 'healthTimeout');
+
     var ports = isNotEmptyString(portsLine) ? portsLine!.split(',') : null;
 
     var environment = decodeQueryString(environmentLine);
@@ -597,6 +604,11 @@ class DockerHostServer {
       environment: environment,
       volumes: volumes,
       cleanContainer: parseBool(cleanContainer)!,
+      healthCmd: healthCmd,
+      healthInterval: _parseDurationInMs(healthInterval),
+      healthRetries: parseInt(healthRetries),
+      healthStartPeriod: _parseDurationInMs(healthStartPeriod),
+      healthTimeout: _parseDurationInMs(healthTimeout),
     );
 
     if (containerInfos == null) return null;
@@ -609,6 +621,11 @@ class DockerHostServer {
       'network': network,
       'hostname': hostname,
     };
+  }
+
+  Duration? _parseDurationInMs(dynamic duration) {
+    var ms = parseInt(duration);
+    return ms != null ? Duration(milliseconds: ms) : null;
   }
 
   Future<Map?> _processRun(
@@ -625,6 +642,14 @@ class DockerHostServer {
     String? environmentLine = _getParameter(parameters, json, 'environment');
     String? volumesLine = _getParameter(parameters, json, 'volumes');
     String? cleanContainer = _getParameter(parameters, json, 'cleanContainer');
+
+    String? healthCmd = _getParameter(parameters, json, 'healthCmd');
+    String? healthInterval = _getParameter(parameters, json, 'healthInterval');
+    String? healthRetries = _getParameter(parameters, json, 'healthRetries');
+    String? healthStartPeriod =
+        _getParameter(parameters, json, 'healthStartPeriod');
+    String? healthTimeout = _getParameter(parameters, json, 'healthTimeout');
+
     String? outputAsLines = _getParameter(parameters, json, 'outputAsLines');
     String? outputLimit = _getParameter(parameters, json, 'outputLimit');
 
@@ -649,6 +674,11 @@ class DockerHostServer {
         environment: environment,
         volumes: volumes,
         cleanContainer: parseBool(cleanContainer)!,
+        healthCmd: healthCmd,
+        healthInterval: _parseDurationInMs(healthInterval),
+        healthRetries: parseInt(healthRetries),
+        healthStartPeriod: _parseDurationInMs(healthStartPeriod),
+        healthTimeout: _parseDurationInMs(healthTimeout),
         outputAsLines: parseBool(outputAsLines),
         outputLimit: parseInt(outputLimit));
 

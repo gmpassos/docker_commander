@@ -190,11 +190,17 @@ abstract class DockerHost extends DockerCMDExecutor {
     Map<String, String>? environment,
     Map<String, String>? volumes,
     bool cleanContainer = false,
+    String? healthCmd,
+    Duration? healthInterval,
+    int? healthRetries,
+    Duration? healthStartPeriod,
+    Duration? healthTimeout,
   });
 
   /// Removes a container by [containerNameOrID].
-  Future<bool> removeContainer(String containerNameOrID) =>
-      DockerCMD.removeContainer(this, containerNameOrID);
+  Future<bool> removeContainer(String containerNameOrID,
+          {bool force = false}) =>
+      DockerCMD.removeContainer(this, containerNameOrID, force: force);
 
   /// Starts a container by [containerNameOrID].
   Future<bool> startContainer(String? containerNameOrID) =>
@@ -212,6 +218,11 @@ abstract class DockerHost extends DockerCMDExecutor {
     Map<String, String>? environment,
     Map<String, String>? volumes,
     bool cleanContainer = true,
+    String? healthCmd,
+    Duration? healthInterval,
+    int? healthRetries,
+    Duration? healthStartPeriod,
+    Duration? healthTimeout,
     bool outputAsLines = true,
     int? outputLimit,
     OutputReadyFunction? stdoutReadyFunction,
@@ -255,6 +266,11 @@ abstract class DockerHost extends DockerCMDExecutor {
     Map<String, String>? environment,
     Map<String, String>? volumes,
     bool cleanContainer,
+    String? healthCmd,
+    Duration? healthInterval,
+    int? healthRetries,
+    Duration? healthStartPeriod,
+    Duration? healthTimeout,
   ) {
     var image = DockerHost.resolveImage(imageName, version);
 
@@ -325,6 +341,11 @@ abstract class DockerHost extends DockerCMDExecutor {
     String? hostname,
     Map<String, String>? environment,
     Map<String, String>? volumes,
+    String? healthCmd,
+    Duration? healthInterval,
+    int? healthRetries,
+    Duration? healthStartPeriod,
+    Duration? healthTimeout,
   }) async {
     if (isEmptyString(serviceName, trim: true)) {
       return null;
@@ -341,6 +362,11 @@ abstract class DockerHost extends DockerCMDExecutor {
       environment,
       volumes,
       false,
+      healthCmd,
+      healthInterval,
+      healthRetries,
+      healthStartPeriod,
+      healthTimeout,
     );
 
     var cmdArgs = containerInfos.args!;

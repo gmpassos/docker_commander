@@ -93,21 +93,30 @@ class DockerHostLocal extends DockerHost {
     String? hostname,
     Map<String, String>? environment,
     Map<String, String>? volumes,
-    bool cleanContainer, {
+    bool cleanContainer,
+    String? healthCmd,
+    Duration? healthInterval,
+    int? healthRetries,
+    Duration? healthStartPeriod,
+    Duration? healthTimeout, {
     bool addCIDFile = false,
   }) {
     var containerInfos = super.buildContainerArgs(
-      cmd,
-      imageName,
-      version,
-      containerName,
-      ports,
-      network,
-      hostname,
-      environment,
-      volumes,
-      cleanContainer,
-    );
+        cmd,
+        imageName,
+        version,
+        containerName,
+        ports,
+        network,
+        hostname,
+        environment,
+        volumes,
+        cleanContainer,
+        healthCmd,
+        healthInterval,
+        healthRetries,
+        healthStartPeriod,
+        healthTimeout);
 
     var args = containerInfos.args!;
     // Last parameter is the image.
@@ -162,6 +171,11 @@ class DockerHostLocal extends DockerHost {
     Map<String, String>? environment,
     Map<String, String>? volumes,
     bool cleanContainer = false,
+    String? healthCmd,
+    Duration? healthInterval,
+    int? healthRetries,
+    Duration? healthStartPeriod,
+    Duration? healthTimeout,
   }) async {
     if (isEmptyString(containerName, trim: true)) {
       return null;
@@ -178,6 +192,11 @@ class DockerHostLocal extends DockerHost {
       environment,
       volumes,
       cleanContainer,
+      healthCmd,
+      healthInterval,
+      healthRetries,
+      healthStartPeriod,
+      healthTimeout,
       addCIDFile: true,
     );
 
@@ -277,6 +296,11 @@ class DockerHostLocal extends DockerHost {
     Map<String, String>? environment,
     Map<String, String>? volumes,
     bool cleanContainer = true,
+    String? healthCmd,
+    Duration? healthInterval,
+    int? healthRetries,
+    Duration? healthStartPeriod,
+    Duration? healthTimeout,
     bool? outputAsLines = true,
     int? outputLimit,
     OutputReadyFunction? stdoutReadyFunction,
@@ -308,6 +332,11 @@ class DockerHostLocal extends DockerHost {
       environment,
       volumes,
       cleanContainer,
+      healthCmd,
+      healthInterval,
+      healthRetries,
+      healthStartPeriod,
+      healthTimeout,
       addCIDFile: true,
     );
 

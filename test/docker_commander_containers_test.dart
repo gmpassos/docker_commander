@@ -113,7 +113,7 @@ void main() {
 
       expect(
           await dockerContainer
-              .execAndWaitExit('/usr/bin/apt-get', ['install', 'curl']),
+              .execAndWaitExit('/usr/bin/apt-get', ['-y', 'install', 'curl']),
           equals(0));
 
       var curlBinPath = await dockerContainer.execWhich('curl');

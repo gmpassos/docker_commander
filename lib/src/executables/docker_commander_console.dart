@@ -48,8 +48,8 @@ void _printLine() {
       '------------------------------------------------------------------------------');
 }
 
-Future<void> _printToConsole(String? line, bool? output) async {
-  if (output ?? false) {
+Future<void> _printToConsole(String? line, bool output) async {
+  if (output) {
     print('>> $line');
   } else {
     print(line);

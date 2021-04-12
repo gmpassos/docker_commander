@@ -1,3 +1,13 @@
+## 2.0.3
+
+- Remove container: added `force` parameter.
+- Create/run container: added health check parameters.
+- `DockerCommanderConsole`:
+  - Added command remove-container:
+- Initial version of formulas: `DockerCommanderFormular`.
+- apollovm: ^0.0.14
+  - Parses and executes formulas.
+
 ## 2.0.2
 
 - `Dockerfile`: using AOT (native) compilation to execute the server,

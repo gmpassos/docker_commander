@@ -6,7 +6,14 @@ import 'package:swiss_knife/swiss_knife.dart';
 typedef ParameterProvider = Future<String> Function(
     String name, String? description);
 
-typedef ConsoleOutput = Future<void> Function(String? line, bool? output);
+typedef ConsoleOutput = Future<void> Function(String? line, bool output);
+
+typedef FilterPortsProperties = FutureOr<List<String>?> Function(
+    List<String>? ports);
+typedef FilterVolumesProperties = FutureOr<Map<String, String>?> Function(
+    Map<String, String>? volumesProps);
+typedef FilterEnvironmentProperties = FutureOr<Map<String, String>?> Function(
+    Map<String, String>? environmentProps);
 
 class DockerCommanderConsole {
   final DockerCommander dockerCommander;
@@ -35,6 +42,9 @@ class DockerCommanderConsole {
         '  - create-container %containerName %imageName %version %ports %volumes %hostname %network %environment --cleanContainer');
     await _printToConsole(
         '  - create-service %serviceName %imageName %version %replicas %ports %volumes %hostname %network %environment');
+    await _printToConsole('');
+    await _printToConsole(
+        '  - remove-container %containerName %force # Removes a Docker container.');
     await _printToConsole('');
     await _printToConsole(
         '  - start %containerName   # Starts a Docker container.');
@@ -89,23 +99,29 @@ class DockerCommanderConsole {
             'network': cmd.get(6, 'network'),
             'environment': cmd.get(7, 'environment', 'env'),
             'cleanContainer': cmd.getProperty('cleanContainer'),
+            'health-cmd': cmd.getProperty('health-cmd'),
+            'health-interval': cmd.getProperty('health-interval'),
+            'health-retries': cmd.getProperty('health-retries'),
+            'health-start-period': cmd.getProperty('health-start-period'),
+            'health-timeout': cmd.getProperty('health-timeout'),
           }, {
             'containerName',
             'imageName',
           }, cmd.askAllProperties);
 
+          var paramPorts = await _parsePortsProperties(parameters);
+          var paramVolumes = await _parseVolumesProperties(parameters);
+          var paramEnvironment = await _parseEnvironmentProperties(parameters);
+
           var containerInfos = await dockerCommander.createContainer(
             parameters['containerName']!,
             parameters['imageName']!,
             version: parameters['version'],
-            ports: parseStringFromInlineList(
-                parameters['ports'], RegExp(r'\s*,\s*')),
-            volumes: parseFromInlineMap(
-                parameters['volumes'], RegExp(r'[;|]'), RegExp(r'[:=]')),
+            ports: paramPorts,
+            volumes: paramVolumes,
             hostname: parameters['hostname'],
             network: parameters['network'],
-            environment: parseFromInlineMap(
-                parameters['environment'], RegExp(r'[|]'), RegExp(r'[:=]')),
+            environment: paramEnvironment,
             cleanContainer: parseBool(parameters['cleanContainer']) ?? false,
           );
 
@@ -133,19 +149,20 @@ class DockerCommanderConsole {
             'imageName',
           }, cmd.askAllProperties);
 
+          var paramPorts = await _parsePortsProperties(parameters);
+          var paramVolumes = await _parseVolumesProperties(parameters);
+          var paramEnvironment = await _parseEnvironmentProperties(parameters);
+
           var service = await dockerCommander.createService(
             parameters['serviceName']!,
             parameters['imageName']!,
             version: parameters['version'],
             replicas: parseInt(parameters['replicas']),
-            ports: parseStringFromInlineList(
-                parameters['ports'], RegExp(r'\s*,\s*')),
-            volumes: parseFromInlineMap(
-                parameters['volumes'], RegExp(r'[;|]'), RegExp(r'[:=]')),
+            ports: paramPorts,
+            volumes: paramVolumes,
             hostname: parameters['hostname'],
             network: parameters['network'],
-            environment: parseFromInlineMap(
-                parameters['environment'], RegExp(r'[|]'), RegExp(r'[:=]')),
+            environment: paramEnvironment,
           );
 
           if (service != null) {
@@ -154,6 +171,24 @@ class DockerCommanderConsole {
           }
 
           return false;
+        }
+      case 'removecontainer':
+        {
+          var parameters = await _requireParameters({
+            'containerName': cmd.get(0, 'containerOrServiceName',
+                'containerName', 'container', 'serviceName', 'service'),
+            'force': cmd.getProperty('force'),
+          }, {
+            'containerName',
+          }, cmd.askAllProperties);
+
+          var ok = await dockerCommander.removeContainer(
+              parameters['containerName']!,
+              force: parseBool(parameters['force']) ?? false);
+
+          await _printToConsole('STARTED CONTAINER: $ok');
+
+          return ok;
         }
       case 'start':
         {
@@ -284,6 +319,52 @@ class DockerCommanderConsole {
       default:
         return false;
     }
+  }
+
+  final List<FilterPortsProperties> filterPorts = <FilterPortsProperties>[];
+
+  Future<List<String>?> _parsePortsProperties(
+      Map<String, String> parameters) async {
+    var ports =
+        parseStringFromInlineList(parameters['ports'], RegExp(r'\s*,\s*'));
+
+    for (var filter in filterPorts) {
+      ports = await filter(ports);
+    }
+
+    return ports;
+  }
+
+  final List<FilterVolumesProperties> filterVolumesProperties =
+      <FilterVolumesProperties>[];
+
+  Future<Map<String, String>?> _parseVolumesProperties(
+      Map<String, String> parameters) async {
+    var volumesProps = parseFromInlineMap(
+            parameters['volumes'], RegExp(r'[;|]'), RegExp(r'[:=]'))
+        as Map<String, String>?;
+
+    for (var filter in filterVolumesProperties) {
+      volumesProps = await filter(volumesProps);
+    }
+
+    return volumesProps;
+  }
+
+  final List<FilterEnvironmentProperties> filterEnvironmentProperties =
+      <FilterVolumesProperties>[];
+
+  Future<Map<String, String>?> _parseEnvironmentProperties(
+      Map<String, String> parameters) async {
+    var environmentProps = parseFromInlineMap(
+            parameters['environment'], RegExp(r'[|]'), RegExp(r'[:=]'))
+        as Map<String, String>?;
+
+    for (var filter in filterEnvironmentProperties) {
+      environmentProps = await filter(environmentProps);
+    }
+
+    return environmentProps;
   }
 
   Future<bool> _processReturn(ConsoleCMD cmd, DockerProcess? process,
@@ -477,7 +558,7 @@ class DockerCommanderConsole {
 
   Future<void> _printToConsole(String? line,
           [bool? output, int? printID, String? from]) =>
-      consoleOutput(line, output);
+      consoleOutput(line, output ?? false);
 
   Future<void> _printLineToConsole() => _printToConsole(
       '------------------------------------------------------------------------------');
@@ -581,6 +662,12 @@ class ConsoleCMD {
             'env',
             'cleanContainer'
           });
+
+          return true;
+        }
+      case 'removecontainer':
+        {
+          parseSimpleProperties({'containerName', 'container', 'force'});
 
           return true;
         }

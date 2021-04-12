@@ -97,14 +97,21 @@ class DockerHostRemote extends DockerHost {
 
   @override
   Future<ContainerInfos?> createContainer(
-      String containerName, String imageName,
-      {String? version,
-      List<String>? ports,
-      String? network,
-      String? hostname,
-      Map<String, String>? environment,
-      Map<String, String>? volumes,
-      bool cleanContainer = false}) async {
+    String containerName,
+    String imageName, {
+    String? version,
+    List<String>? ports,
+    String? network,
+    String? hostname,
+    Map<String, String>? environment,
+    Map<String, String>? volumes,
+    bool cleanContainer = false,
+    String? healthCmd,
+    Duration? healthInterval,
+    int? healthRetries,
+    Duration? healthStartPeriod,
+    Duration? healthTimeout,
+  }) async {
     ports = DockerHost.normalizeMappedPorts(ports);
 
     var response = await _httpClient.getJSON('create', parameters: {
@@ -117,6 +124,14 @@ class DockerHostRemote extends DockerHost {
       if (environment != null) 'environment': encodeQueryString(environment),
       if (volumes != null) 'volumes': encodeQueryString(volumes),
       'cleanContainer': '$cleanContainer',
+      if (healthCmd != null) 'healthCmd': '$healthCmd',
+      if (healthInterval != null)
+        'healthInterval': '${healthInterval.inMilliseconds}',
+      if (healthRetries != null) 'healthRetries': '$healthRetries',
+      if (healthStartPeriod != null)
+        'healthStartPeriod': '${healthStartPeriod.inMilliseconds}',
+      if (healthTimeout != null)
+        'healthTimeout': '${healthTimeout.inMilliseconds}',
     }) as Map?;
 
     if (response == null) return null;
@@ -145,6 +160,11 @@ class DockerHostRemote extends DockerHost {
     Map<String, String>? environment,
     Map<String, String>? volumes,
     bool cleanContainer = true,
+    String? healthCmd,
+    Duration? healthInterval,
+    int? healthRetries,
+    Duration? healthStartPeriod,
+    Duration? healthTimeout,
     bool outputAsLines = true,
     int? outputLimit,
     OutputReadyFunction? stdoutReadyFunction,
@@ -168,6 +188,14 @@ class DockerHostRemote extends DockerHost {
       if (environment != null) 'environment': encodeQueryString(environment),
       if (volumes != null) 'volumes': encodeQueryString(volumes),
       'cleanContainer': '$cleanContainer',
+      if (healthCmd != null) 'healthCmd': '$healthCmd',
+      if (healthInterval != null)
+        'healthInterval': '${healthInterval.inMilliseconds}',
+      if (healthRetries != null) 'healthRetries': '$healthRetries',
+      if (healthStartPeriod != null)
+        'healthStartPeriod': '${healthStartPeriod.inMilliseconds}',
+      if (healthTimeout != null)
+        'healthTimeout': '${healthTimeout.inMilliseconds}',
       'outputAsLines': '$outputAsLines',
       'outputLimit': '$outputLimit',
     }) as Map?;
