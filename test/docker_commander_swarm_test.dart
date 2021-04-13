@@ -24,6 +24,8 @@ void main() {
       await dockerCommander.checkDaemon();
 
       _LOG.info('setUp>\tDockerCommander: $dockerCommander');
+
+      logTitle(_LOG, 'TEST');
     });
 
     tearDown(() async {

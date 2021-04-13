@@ -363,7 +363,7 @@ class DockerCommanderConsole {
   Future<List<String>?> _parsePortsProperties(
       Map<String, String> parameters) async {
     var ports =
-        parseStringFromInlineList(parameters['ports'], RegExp(r'\s*,\s*'));
+        parseStringFromInlineList(parameters['ports'], RegExp(r'\s*[,;|]\s*'));
 
     for (var filter in filterPorts) {
       ports = await filter(ports);
@@ -377,9 +377,8 @@ class DockerCommanderConsole {
 
   Future<Map<String, String>?> _parseVolumesProperties(
       Map<String, String> parameters) async {
-    var volumesProps = parseFromInlineMap(
-            parameters['volumes'], RegExp(r'[;|]'), RegExp(r'[:=]'))
-        as Map<String, String>?;
+    var volumesProps = parseFromInlineMap<String, String>(
+        parameters['volumes'], RegExp(r'[;|]'), RegExp(r'[:=]'));
 
     for (var filter in filterVolumesProperties) {
       volumesProps = await filter(volumesProps);
@@ -393,9 +392,8 @@ class DockerCommanderConsole {
 
   Future<Map<String, String>?> _parseEnvironmentProperties(
       Map<String, String> parameters) async {
-    var environmentProps = parseFromInlineMap(
-            parameters['environment'], RegExp(r'[|]'), RegExp(r'[:=]'))
-        as Map<String, String>?;
+    var environmentProps = parseFromInlineMap<String, String>(
+        parameters['environment'], RegExp(r'[|]'), RegExp(r'[:=]'));
 
     for (var filter in filterEnvironmentProperties) {
       environmentProps = await filter(environmentProps);

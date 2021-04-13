@@ -32,6 +32,8 @@ void main() {
 
       expect(dockerCommander.lastDaemonCheck, isNotNull);
       _LOG.info('setUp>\tDockerCommander.lastDaemonCheck: $dockerCommander');
+
+      logTitle(_LOG, 'TEST');
     });
 
     tearDown(() async {

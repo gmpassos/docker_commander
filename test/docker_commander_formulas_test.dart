@@ -38,10 +38,12 @@ void main() {
           DockerCommanderConsole(dockerCommander, (name, description) async {
         return '';
       }, (line, output) async {
-        print(output ? '>> $line' : line);
+        _LOG.info(output ? '>> $line' : line);
       });
 
       formulaRepositoryStandard = DockerCommanderFormulaRepositoryStandard();
+
+      logTitle(_LOG, 'TEST');
     });
 
     tearDown(() async {
@@ -53,10 +55,14 @@ void main() {
       _LOG.info('tearDown>\tDockerCommander: $dockerCommander');
     });
 
-    test('Apache Formula', () async {
+    test('DockerCommanderFormulaRepositoryStandard: listFormulasNames',
+        () async {
       var formulasNames = await formulaRepositoryStandard.listFormulasNames();
-      expect(formulasNames, equals(['apache']));
+      _LOG.info('formulasNames: $formulasNames');
+      expect(formulasNames, equals(['apache', 'gitlab']));
+    });
 
+    test('Apache Formula', () async {
       var formulaSource =
           await formulaRepositoryStandard.getFormulaSource('apache');
 
@@ -95,6 +101,45 @@ void main() {
       var psContainerNames2 = await dockerCommander.psContainerNames();
       _LOG.info('containerNames2: $psContainerNames2');
       expect(psContainerNames2, isEmpty);
+    });
+
+    test('GitLab Formula', () async {
+      var formulaSource =
+          await formulaRepositoryStandard.getFormulaSource('gitlab');
+
+      var formula = formulaSource!.toFormula();
+
+      formula.setup(dockerCommanderConsole: dockerCommanderConsole);
+
+      var psContainerNames0 = await dockerCommander.psContainerNames();
+      _LOG.info('containerNames0: $psContainerNames0');
+      expect(psContainerNames0, isEmpty);
+
+      var name = await formula.getFormulaName();
+      expect(name, equals('gitlab'));
+
+      var version = await formula.getFormulaVersion();
+      expect(version, equals('1.0'));
+
+      var className = await formula.getFormulaClassName();
+      expect(className, equals('GitLabFormula'));
+
+      var functions = await formula.getFunctions();
+      functions.sort();
+      expect(
+          functions,
+          equals([
+            'getVersion',
+            'install',
+            'installRunner',
+            'registerRunner',
+            'start',
+            'startRunner',
+            'stop',
+            'stopRunner',
+            'uninstall',
+            'uninstallRunner',
+          ]));
     });
   });
 }

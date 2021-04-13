@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:apollovm/apollovm.dart';
 import 'package:docker_commander/docker_commander.dart';
 import 'package:docker_commander/src/formulas/apache_formula.dart';
+import 'package:docker_commander/src/formulas/gitlab_formula.dart';
 import 'package:swiss_knife/swiss_knife.dart';
 
 /// A `docker_commander` Formula:
@@ -338,7 +339,10 @@ class DockerCommanderFormulaRepositoryStandard
 
   @override
   List<DockerCommanderFormulaSource> listFormulasSources() {
-    _formulasSources ??= <DockerCommanderFormulaSource>[ApacheFormulaSource()];
+    _formulasSources ??= <DockerCommanderFormulaSource>[
+      ApacheFormulaSource(),
+      GitLabFormulaSource(),
+    ];
     return _formulasSources!.toList();
   }
 }

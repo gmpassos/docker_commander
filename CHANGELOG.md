@@ -1,3 +1,8 @@
+## 2.0.6
+
+- Added GitLab Formula: `GitLabFormulaSource`
+- apollovm: ^0.0.16
+
 ## 2.0.5
 
 - Added `restart` to create/run container command.

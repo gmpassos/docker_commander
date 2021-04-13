@@ -1,7 +1,7 @@
 import 'package:docker_commander/docker_commander.dart';
 
 class ApacheFormulaSource extends DockerCommanderFormulaSource {
-  ApacheFormulaSource() : super('dart', '''
+  ApacheFormulaSource() : super('dart', r'''
   
   class ApacheFormula {
   
