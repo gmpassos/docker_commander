@@ -38,8 +38,10 @@ class DockerCommanderConsole {
     await _printToConsole(
         '  - cmd %command %args*    # Executes a Docker command.');
     await _printToConsole('');
+    await _printToConsole('  - create-network %networkName');
+    await _printToConsole('');
     await _printToConsole(
-        '  - create-container %containerName %imageName %version %ports %volumes %hostname %network %environment --cleanContainer');
+        '  - create-container %containerName %imageName %version %ports %volumes %hostname %network %environment --cleanContainer --restart alway --health-cmd "curl..." ');
     await _printToConsole(
         '  - create-service %serviceName %imageName %version %replicas %ports %volumes %hostname %network %environment');
     await _printToConsole('');
@@ -87,6 +89,25 @@ class DockerCommanderConsole {
           var exec = await dockerCommander.command('ps', ['-a']);
           return await _processReturn(cmd, exec);
         }
+      case 'createnetwork':
+        {
+          var parameters = await _requireParameters({
+            'networkName': cmd.get(0, 'networkName', 'network', 'name'),
+          }, {
+            'networkName',
+          }, cmd.askAllProperties);
+
+          var networkName = await dockerCommander.createNetwork(
+            parameters['networkName']!,
+          );
+
+          if (networkName != null) {
+            await _printToConsole('CREATED NETWORK> $networkName');
+            return true;
+          }
+
+          return false;
+        }
       case 'createcontainer':
         {
           var parameters = await _requireParameters({
@@ -104,6 +125,7 @@ class DockerCommanderConsole {
             'health-retries': cmd.getProperty('health-retries'),
             'health-start-period': cmd.getProperty('health-start-period'),
             'health-timeout': cmd.getProperty('health-timeout'),
+            'restart': cmd.getProperty('restart'),
           }, {
             'containerName',
             'imageName',
@@ -123,6 +145,13 @@ class DockerCommanderConsole {
             network: parameters['network'],
             environment: paramEnvironment,
             cleanContainer: parseBool(parameters['cleanContainer']) ?? false,
+            healthCmd: parameters['health-cmd'],
+            healthInterval: _parseDurationInMs(parameters['health-interval']),
+            healthRetries: parseInt(parameters['health-retries']),
+            healthStartPeriod:
+                _parseDurationInMs(parameters['health-start-period']),
+            healthTimeout: _parseDurationInMs(parameters['health-timeout']),
+            restart: parameters['restart'],
           );
 
           if (containerInfos != null) {
@@ -319,6 +348,14 @@ class DockerCommanderConsole {
       default:
         return false;
     }
+  }
+
+  Duration? _parseDurationInMs(String? duration) {
+    if (duration == null) return null;
+    duration = duration.trim();
+    if (duration.isEmpty) return null;
+    var ms = parseInt(duration)!;
+    return Duration(milliseconds: ms);
   }
 
   final List<FilterPortsProperties> filterPorts = <FilterPortsProperties>[];
@@ -638,7 +675,13 @@ class ConsoleCMD {
             'network',
             'environment',
             'env',
-            'cleanContainer'
+            'cleanContainer',
+            'health-cmd',
+            'health-interval',
+            'health-retries',
+            'health-start-period',
+            'health-timeout',
+            'restart',
           });
 
           return true;
@@ -742,6 +785,7 @@ class ConsoleCMD {
         var name = arg.substring(2).toLowerCase().trim();
 
         if (simpleProperties != null && !simpleProperties.contains(name)) {
+          ++i;
           continue;
         }
 

@@ -111,6 +111,7 @@ class DockerHostRemote extends DockerHost {
     int? healthRetries,
     Duration? healthStartPeriod,
     Duration? healthTimeout,
+    String? restart,
   }) async {
     ports = DockerHost.normalizeMappedPorts(ports);
 
@@ -132,6 +133,7 @@ class DockerHostRemote extends DockerHost {
         'healthStartPeriod': '${healthStartPeriod.inMilliseconds}',
       if (healthTimeout != null)
         'healthTimeout': '${healthTimeout.inMilliseconds}',
+      if (restart != null) 'restart': restart,
     }) as Map?;
 
     if (response == null) return null;
@@ -165,6 +167,7 @@ class DockerHostRemote extends DockerHost {
     int? healthRetries,
     Duration? healthStartPeriod,
     Duration? healthTimeout,
+    String? restart,
     bool outputAsLines = true,
     int? outputLimit,
     OutputReadyFunction? stdoutReadyFunction,
@@ -196,6 +199,7 @@ class DockerHostRemote extends DockerHost {
         'healthStartPeriod': '${healthStartPeriod.inMilliseconds}',
       if (healthTimeout != null)
         'healthTimeout': '${healthTimeout.inMilliseconds}',
+      if (restart != null) 'restart': restart,
       'outputAsLines': '$outputAsLines',
       'outputLimit': '$outputLimit',
     }) as Map?;

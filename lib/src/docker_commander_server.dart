@@ -588,6 +588,8 @@ class DockerHostServer {
         _getParameter(parameters, json, 'healthStartPeriod');
     String? healthTimeout = _getParameter(parameters, json, 'healthTimeout');
 
+    String? restart = _getParameter(parameters, json, 'restart');
+
     var ports = isNotEmptyString(portsLine) ? portsLine!.split(',') : null;
 
     var environment = decodeQueryString(environmentLine);
@@ -609,6 +611,7 @@ class DockerHostServer {
       healthRetries: parseInt(healthRetries),
       healthStartPeriod: _parseDurationInMs(healthStartPeriod),
       healthTimeout: _parseDurationInMs(healthTimeout),
+      restart: restart,
     );
 
     if (containerInfos == null) return null;
@@ -650,6 +653,8 @@ class DockerHostServer {
         _getParameter(parameters, json, 'healthStartPeriod');
     String? healthTimeout = _getParameter(parameters, json, 'healthTimeout');
 
+    String? restart = _getParameter(parameters, json, 'restart');
+
     String? outputAsLines = _getParameter(parameters, json, 'outputAsLines');
     String? outputLimit = _getParameter(parameters, json, 'outputLimit');
 
@@ -679,6 +684,7 @@ class DockerHostServer {
         healthRetries: parseInt(healthRetries),
         healthStartPeriod: _parseDurationInMs(healthStartPeriod),
         healthTimeout: _parseDurationInMs(healthTimeout),
+        restart: restart,
         outputAsLines: parseBool(outputAsLines),
         outputLimit: parseInt(outputLimit));
 

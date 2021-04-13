@@ -16,10 +16,11 @@
 
 [![License](https://img.shields.io/github/license/gmpassos/docker_commander?logo=open-source-initiative&logoColor=green)](https://github.com/gmpassos/docker_commander/blob/master/LICENSE)
 
-[Docker][docker] manager to easily automate a Docker Daemon:
-  - Supports personalized containers. 
+`docker_commander` is a [Docker][docker] manager to easily automate a Docker Daemon, or a Docker Swarm:
   - Helpers to build a Docker network.
   - Helpers to manipulate files inside a running container.
+  - Supports personalized containers.
+  - Formulas: pre-defined code to install/uninstall containers.
   - Built-in pre-configured popular containers:
     - [PostgreSQL][postgresql]
     - [Apache HTTPD][apache]
@@ -107,7 +108,7 @@ $> help
 
 ## Formulas
 
-Formulas are a very easy way to install/unistall and handle containers and services
+Formulas are a very easy way to install/uninstall and handle containers and services
 in `docker_commander`.
 
 You can use `docker_commander` formulas from a repository. Below there's a simple
@@ -157,6 +158,58 @@ void main() async {
 
 ```
 
+### Defining a Formula
+
+Formulas are pre-defined codes to handle install, uninstall, start, stop and other extra operations
+that a container, or group of containers, can have.
+
+Formulas are defined using a high level languages, like `Dart` or `Java`. Any language supported
+by [ApolloVM][ApolloVM] can be used.
+
+Here's a simple example of an `Apache` formula source code in `Dart`:
+
+```dart
+
+class ApacheFormula {
+
+  String getVersion() {
+    return '1.0';
+  }
+
+  void install() {
+    cmd('create-container apache httpd latest --port 80 --hostname apache');
+    start();
+  }
+
+  void start() {
+    cmd('start apache');
+  }
+
+  void stop() {
+    cmd('stop apache');
+  }
+
+  void uninstall() {
+    stop();
+    cmd('remove-container apache --force');
+  }
+
+}
+
+```
+
+A formula source code will be parsed and executed by [ApolloVM][ApolloVM],
+allowing dynamic loading and execution, in a sandbox, of any formula by `docker_commander`.
+
+-------------------------------------------------------------------------------
+
+## ApolloVM
+
+[ApolloVM][ApolloVM] is a simple and portable VM for `Dart` and `Java`,
+that can at runtime dynamically parse, execute and generate code in any
+platform (native, JS/Browser and Flutter).
+
+[ApolloVM]: https://pub.dev/packages/apollovm
 
 -------------------------------------------------------------------------------
 

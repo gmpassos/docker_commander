@@ -6,7 +6,7 @@ import 'docker_commander_host.dart';
 /// The Docker manager.
 class DockerCommander extends DockerCMDExecutor {
   /// Current version of package `docker_commander`.
-  static final String VERSION = '2.0.4';
+  static final String VERSION = '2.0.5';
 
   /// Docker machine host.
   final DockerHost dockerHost;
@@ -71,16 +71,31 @@ class DockerCommander extends DockerCMDExecutor {
     Map<String, String>? environment,
     Map<String, String>? volumes,
     bool cleanContainer = false,
+    String? healthCmd,
+    Duration? healthInterval,
+    int? healthRetries,
+    Duration? healthStartPeriod,
+    Duration? healthTimeout,
+    String? restart,
   }) async {
     await ensureInitialized();
-    return dockerHost.createContainer(containerName, imageName,
-        version: version,
-        ports: ports,
-        network: network,
-        hostname: hostname,
-        environment: environment,
-        volumes: volumes,
-        cleanContainer: cleanContainer);
+    return dockerHost.createContainer(
+      containerName,
+      imageName,
+      version: version,
+      ports: ports,
+      network: network,
+      hostname: hostname,
+      environment: environment,
+      volumes: volumes,
+      cleanContainer: cleanContainer,
+      healthCmd: healthCmd,
+      healthInterval: healthInterval,
+      healthRetries: healthRetries,
+      healthStartPeriod: healthStartPeriod,
+      healthTimeout: healthTimeout,
+      restart: restart,
+    );
   }
 
   /// Removes a container by [containerNameOrID].
@@ -108,6 +123,11 @@ class DockerCommander extends DockerCMDExecutor {
     Map<String, String>? environment,
     Map<String, String>? volumes,
     bool cleanContainer = true,
+    String? healthCmd,
+    Duration? healthInterval,
+    int? healthRetries,
+    Duration? healthStartPeriod,
+    Duration? healthTimeout,
     bool outputAsLines = true,
     int? outputLimit,
     OutputReadyFunction? stdoutReadyFunction,
@@ -127,6 +147,11 @@ class DockerCommander extends DockerCMDExecutor {
       environment: environment,
       volumes: volumes,
       cleanContainer: cleanContainer,
+      healthCmd: healthCmd,
+      healthInterval: healthInterval,
+      healthRetries: healthRetries,
+      healthStartPeriod: healthStartPeriod,
+      healthTimeout: healthTimeout,
       outputAsLines: outputAsLines,
       outputLimit: outputLimit,
       stdoutReadyFunction: stdoutReadyFunction,
@@ -276,16 +301,29 @@ class DockerCommander extends DockerCMDExecutor {
     String? hostname,
     Map<String, String>? environment,
     Map<String, String>? volumes,
+    String? healthCmd,
+    Duration? healthInterval,
+    int? healthRetries,
+    Duration? healthStartPeriod,
+    Duration? healthTimeout,
   }) async {
     await ensureInitialized();
-    return dockerHost.createService(serviceName, imageName,
-        version: version,
-        replicas: replicas,
-        ports: ports,
-        network: network,
-        hostname: hostname,
-        environment: environment,
-        volumes: volumes);
+    return dockerHost.createService(
+      serviceName,
+      imageName,
+      version: version,
+      replicas: replicas,
+      ports: ports,
+      network: network,
+      hostname: hostname,
+      environment: environment,
+      volumes: volumes,
+      healthCmd: healthCmd,
+      healthInterval: healthInterval,
+      healthRetries: healthRetries,
+      healthStartPeriod: healthStartPeriod,
+      healthTimeout: healthTimeout,
+    );
   }
 
   /// Closes this instances, and internal [dockerHost].

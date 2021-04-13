@@ -1,3 +1,9 @@
+## 2.0.5
+
+- Added `restart` to create/run container command.
+- Added command `create-network` to `docker_commander_console`.
+- Improve `README.md` Formulas section.
+
 ## 2.0.4
 
 - Formula repository (`DockerCommanderFormulaRepository`):

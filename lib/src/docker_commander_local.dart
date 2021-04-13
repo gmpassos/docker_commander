@@ -98,25 +98,28 @@ class DockerHostLocal extends DockerHost {
     Duration? healthInterval,
     int? healthRetries,
     Duration? healthStartPeriod,
-    Duration? healthTimeout, {
+    Duration? healthTimeout,
+    String? restart, {
     bool addCIDFile = false,
   }) {
     var containerInfos = super.buildContainerArgs(
-        cmd,
-        imageName,
-        version,
-        containerName,
-        ports,
-        network,
-        hostname,
-        environment,
-        volumes,
-        cleanContainer,
-        healthCmd,
-        healthInterval,
-        healthRetries,
-        healthStartPeriod,
-        healthTimeout);
+      cmd,
+      imageName,
+      version,
+      containerName,
+      ports,
+      network,
+      hostname,
+      environment,
+      volumes,
+      cleanContainer,
+      healthCmd,
+      healthInterval,
+      healthRetries,
+      healthStartPeriod,
+      healthTimeout,
+      restart,
+    );
 
     var args = containerInfos.args!;
     // Last parameter is the image.
@@ -176,6 +179,7 @@ class DockerHostLocal extends DockerHost {
     int? healthRetries,
     Duration? healthStartPeriod,
     Duration? healthTimeout,
+    String? restart,
   }) async {
     if (isEmptyString(containerName, trim: true)) {
       return null;
@@ -197,6 +201,7 @@ class DockerHostLocal extends DockerHost {
       healthRetries,
       healthStartPeriod,
       healthTimeout,
+      restart,
       addCIDFile: true,
     );
 
@@ -301,6 +306,7 @@ class DockerHostLocal extends DockerHost {
     int? healthRetries,
     Duration? healthStartPeriod,
     Duration? healthTimeout,
+    String? restart,
     bool? outputAsLines = true,
     int? outputLimit,
     OutputReadyFunction? stdoutReadyFunction,
@@ -337,6 +343,7 @@ class DockerHostLocal extends DockerHost {
       healthRetries,
       healthStartPeriod,
       healthTimeout,
+      restart,
       addCIDFile: true,
     );
 

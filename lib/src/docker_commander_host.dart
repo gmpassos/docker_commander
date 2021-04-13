@@ -195,6 +195,7 @@ abstract class DockerHost extends DockerCMDExecutor {
     int? healthRetries,
     Duration? healthStartPeriod,
     Duration? healthTimeout,
+    String? restart,
   });
 
   /// Removes a container by [containerNameOrID].
@@ -223,6 +224,7 @@ abstract class DockerHost extends DockerCMDExecutor {
     int? healthRetries,
     Duration? healthStartPeriod,
     Duration? healthTimeout,
+    String? restart,
     bool outputAsLines = true,
     int? outputLimit,
     OutputReadyFunction? stdoutReadyFunction,
@@ -271,6 +273,7 @@ abstract class DockerHost extends DockerCMDExecutor {
     int? healthRetries,
     Duration? healthStartPeriod,
     Duration? healthTimeout,
+    String? restart,
   ) {
     var image = DockerHost.resolveImage(imageName, version);
 
@@ -284,6 +287,12 @@ abstract class DockerHost extends DockerCMDExecutor {
 
     if (cleanContainer) {
       args.add('--rm');
+    }
+
+    if (isNotEmptyString(restart, trim: true)) {
+      restart = restart!.trim();
+      args.add('--restart');
+      args.add(restart);
     }
 
     if (ports != null) {
@@ -367,6 +376,7 @@ abstract class DockerHost extends DockerCMDExecutor {
       healthRetries,
       healthStartPeriod,
       healthTimeout,
+      null,
     );
 
     var cmdArgs = containerInfos.args!;
