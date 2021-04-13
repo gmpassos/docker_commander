@@ -129,7 +129,7 @@ void main() async {
   var repository = DockerCommanderFormulaRepositoryStandard();
 
   // Get the `apache` formula source:
-  var formulaSource = await formulaRepositoryStandard.getFormulaSource('apache');
+  var formulaSource = await repository.getFormulaSource('apache');
 
   // Get the formula instance and perform setup:
   var formula = formulaSource!.toFormula() ;
