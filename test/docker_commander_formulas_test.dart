@@ -1,6 +1,7 @@
 @Timeout(Duration(minutes: 2))
 import 'package:docker_commander/docker_commander_vm.dart';
 import 'package:logging/logging.dart';
+import 'package:swiss_knife/swiss_knife.dart';
 import 'package:test/test.dart';
 
 import 'logger_config.dart';
@@ -126,12 +127,15 @@ void main() {
 
       var functions = await formula.getFunctions();
       functions.sort();
+
       expect(
           functions,
           equals([
             'getVersion',
             'install',
             'installRunner',
+            'pull',
+            'pullRunner',
             'registerRunner',
             'start',
             'startRunner',
@@ -140,6 +144,29 @@ void main() {
             'uninstall',
             'uninstallRunner',
           ]));
+
+      var fields = await formula.getFields();
+
+      _LOG.info('fields: $fields');
+
+      var fieldsSorted = sortMapEntriesByKey<String, Object>(fields);
+
+      expect(
+          fieldsSorted,
+          equals(sortMapEntriesByKey<String, String>({
+            'hostGitlabConfigPath': '/srv/gitlab-runner/config',
+            'imageGitlab': 'gitlab/gitlab-ce',
+            'imageGitlabRunner': 'gitlab/gitlab-runner',
+            'imageRunner': 'google/dart',
+            'network': 'gitlab-net',
+          })));
+
+      formula.overwriteField('hostGitlabConfigPath', '/tmp/gitlab-config');
+
+      var fields2 = await formula.getFields();
+      _LOG.info('fields2: $fields2');
+
+      expect(fields2['hostGitlabConfigPath'], equals('/tmp/gitlab-config'));
     });
   });
 }

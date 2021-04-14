@@ -5,22 +5,40 @@ class GitLabFormulaSource extends DockerCommanderFormulaSource {
   
   class GitLabFormula {
   
+      String imageGitlab = 'gitlab/gitlab-ce';
+      String imageGitlabRunner = 'gitlab/gitlab-runner'; 
+      String imageRunner = 'google/dart';
+      
+      String network = 'gitlab-net';
+      String hostGitlabConfigPath = '/srv/gitlab-runner/config';
+      
       String getVersion() {
         return '1.0';
       }
     
+      void pull() {
+        cmd('docker pull $imageGitlab:latest');
+      }
+      
+      void pullRunner() {
+        cmd('docker pull $imageGitlabRunner:latest');
+        cmd('docker pull $imageRunner:latest');
+      }
+    
       void install() {
-        cmd('create-network gitlab-net');
-        cmd('create-container gitlab gitlab/gitlab-ce latest --ports 80,443 --hostname gitlab --network gitlab-net');
+        pull();
+        cmd('create-network $network');
+        cmd('create-container gitlab $imageGitlab latest --ports 80,443 --hostname gitlab --network $network');
         start();
       }
       
       void installRunner() {
-        cmd('create-container gitlab-runner gitlab/gitlab-runner latest --network gitlab-net --volumes /srv/gitlab-runner/config:/etc/gitlab-runner|/var/run/docker.sock:/var/run/docker.sock --restart always');
+        pullRunner();
+        cmd('create-container gitlab-runner $imageGitlabRunner latest --network $network --volumes $hostGitlabConfigPath:/etc/gitlab-runner|/var/run/docker.sock:/var/run/docker.sock --restart always');
       }
       
       void registerRunner(String gitlabHost, String token) {
-        cmd('docker run --rm -v /srv/gitlab-runner/config:/etc/gitlab-runner gitlab/gitlab-runner register --non-interactive --url http://$gitlabHost/ --registration-token $token --executor docker --docker-image google/dart:latest --description local --docker-network-mode gitlab-net');
+        cmd('docker run --rm -v $hostGitlabConfigPath:/etc/gitlab-runner $imageGitlabRunner register --non-interactive --url http://$gitlabHost/ --registration-token $token --executor docker --docker-image $imageRunner:latest --description local --docker-network-mode $network');
       }
       
       void start() {

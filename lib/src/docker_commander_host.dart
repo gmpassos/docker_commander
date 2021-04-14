@@ -143,8 +143,14 @@ abstract class DockerHost extends DockerCMDExecutor {
 
   DockerHost() : session = DateTime.now().millisecondsSinceEpoch;
 
+  /// Returns the [DockerCommander] used to initialize this instance.
+  DockerCommander get dockerCommander;
+
+  /// Returns true if this instance is initialized.
+  bool get isInitialized;
+
   /// Initializes instance.
-  Future<bool> initialize();
+  Future<bool> initialize(DockerCommander dockerCommander);
 
   static List<String>? normalizeMappedPorts(List<String>? ports) {
     if (ports == null) return null;
@@ -544,6 +550,19 @@ abstract class DockerHost extends DockerCMDExecutor {
 
     return image;
   }
+
+  /// List the current available formulas names.
+  Future<List<String>> listFormulasNames();
+
+  /// Returns the class name of a formula.
+  Future<String?> getFormulaClassName(String formulaName);
+
+  /// List the functions of a formula.
+  Future<List<String>> listFormulasFunctions(String formulaName);
+
+  /// Executes a formula function.
+  Future<dynamic> formulaExec(String formulaName, String functionName,
+      [List? arguments]);
 
   /// Closes this instance, cleaning any resource.
   Future<void> close();

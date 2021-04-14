@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:docker_commander/docker_commander.dart';
 import 'package:logging/logging.dart';
 import 'package:swiss_knife/swiss_knife.dart';
 
@@ -197,10 +198,15 @@ class DockerHostServer {
 
   void _acceptLoop() async {
     await for (HttpRequest request in _server!) {
-      if (request.method == 'OPTION') {
-        await _processOptionRequest(request);
-      } else {
-        await _processRequest(request);
+      try {
+        if (request.method == 'OPTION') {
+          await _processOptionRequest(request);
+        } else {
+          await _processRequest(request);
+        }
+      } catch (e, s) {
+        print(e);
+        print(s);
       }
     }
   }
@@ -258,7 +264,13 @@ class DockerHostServer {
     _started = null;
   }
 
-  Future _processRequest(HttpRequest request) async {
+  Future<void> _processRequest(HttpRequest request) async {
+    if (request.uri.pathSegments.isEmpty) {
+      request.response.statusCode = 404;
+      await request.response.close();
+      return;
+    }
+
     var operation = request.uri.pathSegments.last;
     var requestParameters = request.uri.queryParameters;
 
@@ -454,9 +466,49 @@ class DockerHostServer {
         return _processWaitExit(request, parameters, parseJSON(body));
       case 'stop':
         return _processStop(request, parameters, parseJSON(body));
+      case 'list-formulas':
+        return _processListFormulas(request, parameters);
+      case 'get-formulas-class-name':
+        return _processGetFormulaClassName(
+            request, parameters, parseJSON(body));
+      case 'list-formula-functions':
+        return _processListFormulaFunctions(
+            request, parameters, parseJSON(body));
+      case 'formula-exec':
+        return _processFormulaExec(request, parameters, parseJSON(body));
       default:
         return null;
     }
+  }
+
+  Future<List<String>> _processListFormulas(
+      HttpRequest request, Map<String, String> parameters) {
+    return _dockerHostLocal!.listFormulasNames();
+  }
+
+  Future<String?> _processGetFormulaClassName(
+      HttpRequest request, Map<String, String> parameters, json) async {
+    var formulaName = _getParameter(parameters, json, 'formula')!;
+    return _dockerHostLocal!.getFormulaClassName(formulaName);
+  }
+
+  Future<List<String>> _processListFormulaFunctions(
+      HttpRequest request, Map<String, String> parameters, json) async {
+    var formulaName = _getParameter(parameters, json, 'formula');
+    return _dockerHostLocal!.listFormulasFunctions(formulaName);
+  }
+
+  Future<dynamic> _processFormulaExec(
+      HttpRequest request, Map<String, String> parameters, json) async {
+    var formulaName = _getParameter(parameters, json, 'formula');
+    var fName = _getParameter(parameters, json, 'function');
+    String? argsEncoded = _getParameter(parameters, json, 'args');
+
+    var args = _decodeArgs(argsEncoded);
+
+    var ok = await _dockerHostLocal!.formulaExec(formulaName, fName, args);
+
+    return ok;
   }
 
   Future<Authentication> checkAuthentication(
@@ -538,7 +590,14 @@ class DockerHostServer {
   Future<bool> _processInitialize(
       HttpRequest request, Map<String, String> parameters, json) async {
     _dockerHostLocal ??= DockerHostLocal();
-    var ok = await _dockerHostLocal!.initialize();
+
+    var dockerHostLocal = _dockerHostLocal!;
+    if (dockerHostLocal.isInitialized) {
+      return true;
+    }
+
+    var dockerCommander = DockerCommander(dockerHostLocal);
+    var ok = await dockerHostLocal.initialize(dockerCommander);
     return ok;
   }
 

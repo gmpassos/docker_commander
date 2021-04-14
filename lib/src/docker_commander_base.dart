@@ -6,7 +6,7 @@ import 'docker_commander_host.dart';
 /// The Docker manager.
 class DockerCommander extends DockerCMDExecutor {
   /// Current version of package `docker_commander`.
-  static final String VERSION = '2.0.7';
+  static final String VERSION = '2.0.8';
 
   /// Docker machine host.
   final DockerHost dockerHost;
@@ -21,7 +21,7 @@ class DockerCommander extends DockerCMDExecutor {
   /// Initializes instance.
   Future<bool> initialize() async {
     if (_initialized > 0) return _initialized == 1;
-    var hostOk = await dockerHost.initialize();
+    var hostOk = await dockerHost.initialize(this);
     _initialized = hostOk ? 1 : 2;
     return hostOk;
   }
@@ -349,6 +349,22 @@ class DockerCommander extends DockerCMDExecutor {
   @override
   Future<bool> deleteTempFile(String filePath) =>
       dockerHost.deleteTempFile(filePath);
+
+  /// List the current available formulas names.
+  Future<List<String>> listFormulasNames() => dockerHost.listFormulasNames();
+
+  /// Returns the class name of a formula.
+  Future<String?> getFormulaClassName(String formulaName) =>
+      dockerHost.getFormulaClassName(formulaName);
+
+  /// List the functions of a formula.
+  Future<List<String>> listFormulasFunctions(String formulaName) =>
+      dockerHost.listFormulasFunctions(formulaName);
+
+  /// Executes a formula function.
+  Future<dynamic> formulaExec(String formulaName, String functionName,
+          [List? arguments]) =>
+      dockerHost.formulaExec(formulaName, functionName, arguments);
 }
 
 typedef DockerContainerInstantiator = DockerContainer? Function(

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:collection/collection.dart' show IterableExtension;
+import 'package:docker_commander/docker_commander.dart';
 import 'package:logging/logging.dart';
 import 'package:swiss_knife/swiss_knife.dart';
 
@@ -34,8 +35,19 @@ class DockerHostLocal extends DockerHost {
             ? dockerBinaryPath
             : null;
 
+  DockerCommander? _dockerCommander;
+
   @override
-  Future<bool> initialize() async {
+  DockerCommander get dockerCommander => _dockerCommander!;
+
+  @override
+  bool get isInitialized => _dockerCommander != null;
+
+  @override
+  Future<bool> initialize(DockerCommander dockerCommander) async {
+    if (isInitialized) return true;
+
+    _dockerCommander = dockerCommander;
     _dockerBinaryPath ??= await DockerHostLocal.resolveDockerBinaryPath();
     return true;
   }
@@ -617,6 +629,72 @@ class DockerHostLocal extends DockerHost {
   @override
   DockerProcessLocal? getProcessByInstanceID(int? instanceID) =>
       _processes[instanceID!];
+
+  DockerCommanderFormulaRepository? _formulaRepository;
+
+  DockerCommanderFormulaRepository get formulaRepository {
+    _formulaRepository ??= DockerCommanderFormulaRepositoryStandard();
+    return _formulaRepository!;
+  }
+
+  set formulaRepository(DockerCommanderFormulaRepository value) {
+    _formulaRepository = value;
+  }
+
+  @override
+  Future<List<String>> listFormulasNames() async {
+    var list = await formulaRepository.listFormulasNames();
+    return list;
+  }
+
+  final Map<String, DockerCommanderFormula> _formulasInstances =
+      <String, DockerCommanderFormula>{};
+
+  Future<DockerCommanderFormula?> _getFormula(String formulaName) async {
+    var formula = _formulasInstances[formulaName];
+    if (formula != null) return formula;
+
+    var formulaSource = await formulaRepository.getFormulaSource(formulaName);
+    if (formulaSource == null) {
+      return null;
+    }
+
+    formula = formulaSource.toFormula();
+    formula.setup(dockerCommander: dockerCommander);
+
+    _formulasInstances[formulaName] = formula;
+    return formula;
+  }
+
+  @override
+  Future<String?> getFormulaClassName(String formulaName) async {
+    var formula = await _getFormula(formulaName);
+    if (formula == null) {
+      return null;
+    }
+    return formula.getFormulaClassName();
+  }
+
+  @override
+  Future<List<String>> listFormulasFunctions(String formulaName) async {
+    var formula = await _getFormula(formulaName);
+    if (formula == null) {
+      return <String>[];
+    }
+    return formula.getFunctions();
+  }
+
+  @override
+  Future<dynamic> formulaExec(String formulaName, String functionName,
+      [List? arguments]) async {
+    var formula = await _getFormula(formulaName);
+    if (formula == null) {
+      return false;
+    }
+
+    var result = await formula.exec(functionName, arguments);
+    return result;
+  }
 
   Directory? _temporaryDirectory;
 

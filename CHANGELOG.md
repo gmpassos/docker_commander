@@ -1,3 +1,16 @@
+## 2.0.8
+
+- Add to `DockerCommander` formula commands: 
+  - `listFormulasNames`
+  - `getFormulaClassName`
+  - `listFormulasFunctions`
+  - `formulaExec`
+- `docker_commander_console`:
+  - Added formulas commands.
+- Improve GitLab formula with class fields.
+- Fix server issue with invalid request.
+- apollovm: ^0.0.20
+
 ## 2.0.7
 
 - apollovm: ^0.0.19

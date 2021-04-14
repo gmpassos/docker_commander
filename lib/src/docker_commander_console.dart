@@ -60,6 +60,18 @@ class DockerCommanderConsole {
         '  - close                  # Closes docker_commander server.');
     await _printToConsole('  - exit                   # Exits console.');
     await _printToConsole('');
+    await _printToConsole(
+        '  - list-formulas                         # List available formulas.');
+    await _printToConsole(
+        '  - get-formula-class-name %formulaName   # Show the formula class name.');
+    await _printToConsole(
+        '  - list-formula-functions %formulaName   # List formula functions.');
+    await _printToConsole(
+        '  - show-formula %formulaName             # Show formula information.');
+    await _printToConsole(
+        '  - formula-exec %formulaName %function %args*  # Execute a formula function.');
+
+    await _printToConsole('');
     await _printLineToConsole();
   }
 
@@ -344,6 +356,123 @@ class DockerCommanderConsole {
               parameters['command']!, cmd.argsSub(1));
 
           return await _processReturn(cmd, exec);
+        }
+      case 'listformula':
+      case 'listformulas':
+        {
+          var formulasNames = await dockerCommander.listFormulasNames();
+
+          await _printLineToConsole();
+          await _printToConsole('FORMULAS:');
+          await _printToConsole('');
+          await _printToConsole('  ${formulasNames.join(' ')}');
+          await _printToConsole('');
+          await _printLineToConsole();
+
+          return true;
+        }
+      case 'getformulaclassname':
+        {
+          var parameters = await _requireParameters({
+            'formulaName': cmd.get(0, 'formulaName', 'formula'),
+          }, {
+            'formulaName',
+          }, cmd.askAllProperties);
+
+          var formulaName = parameters['formulaName']!;
+
+          var className =
+              await dockerCommander.getFormulaClassName(formulaName);
+
+          await _printToConsole("'$formulaName' CLASS NAME: $className");
+
+          return true;
+        }
+      case 'listformulafunction':
+      case 'listformulafunctions':
+        {
+          var parameters = await _requireParameters({
+            'formulaName': cmd.get(0, 'formulaName', 'formula'),
+          }, {
+            'formulaName',
+          }, cmd.askAllProperties);
+
+          var formulaName = parameters['formulaName']!;
+
+          var functions =
+              await dockerCommander.listFormulasFunctions(formulaName);
+
+          await _printLineToConsole();
+          await _printToConsole("'$formulaName' FUNCTIONS:");
+          await _printToConsole('');
+
+          for (var f in functions) {
+            await _printToConsole('  - $f');
+          }
+
+          await _printToConsole('');
+          await _printLineToConsole();
+
+          return true;
+        }
+      case 'showformula':
+        {
+          var parameters = await _requireParameters({
+            'formulaName': cmd.get(0, 'formulaName', 'formula'),
+          }, {
+            'formulaName',
+          }, cmd.askAllProperties);
+
+          var formulaName = parameters['formulaName']!;
+
+          var className =
+              await dockerCommander.getFormulaClassName(formulaName);
+          var functions =
+              await dockerCommander.listFormulasFunctions(formulaName);
+
+          await _printLineToConsole();
+          await _printToConsole('FORMULA: $formulaName');
+          await _printToConsole('CLASS NAME: $className');
+          await _printToConsole('');
+          await _printToConsole('FUNCTIONS:');
+          await _printToConsole('');
+
+          for (var f in functions) {
+            await _printToConsole('  - $f');
+          }
+
+          await _printToConsole('');
+          await _printLineToConsole();
+
+          return true;
+        }
+      case 'formulaexec':
+        {
+          var parameters = await _requireParameters({
+            'formulaName': cmd.get(0, 'formulaName', 'formula'),
+            'function': cmd.get(1, 'function'),
+          }, {
+            'formulaName',
+            'function',
+          }, cmd.askAllProperties);
+
+          var formulaName = parameters['formulaName']!;
+          var fName = parameters['function']!;
+          var arguments = cmd.argsSub(2);
+
+          var result =
+              await dockerCommander.formulaExec(formulaName, fName, arguments);
+
+          await _printLineToConsole();
+          await _printToConsole(
+              'FORMULA EXEC: $formulaName.$fName( ${arguments.join(' , ')} )');
+          await _printToConsole('');
+          await _printToConsole('RESULT:');
+          await _printToConsole('$result');
+          await _printToConsole('');
+          await _printLineToConsole();
+
+          return true;
         }
       default:
         return false;

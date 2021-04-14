@@ -6,6 +6,7 @@ import 'package:logging/logging.dart';
 import 'package:mercury_client/mercury_client.dart';
 import 'package:swiss_knife/swiss_knife.dart';
 
+import 'docker_commander_base.dart';
 import 'docker_commander_host.dart';
 
 final _LOG = Logger('docker_commander/remote');
@@ -65,8 +66,19 @@ class DockerHostRemote extends DockerHost {
     return BearerCredential.fromJSONToken(response);
   }
 
+  DockerCommander? _dockerCommander;
+
   @override
-  Future<bool> initialize() async {
+  DockerCommander get dockerCommander => _dockerCommander!;
+
+  @override
+  bool get isInitialized => _dockerCommander != null;
+
+  @override
+  Future<bool> initialize(DockerCommander dockerCommander) async {
+    if (isInitialized) return true;
+
+    _dockerCommander = dockerCommander;
     var ok = await _httpClient.getJSON('initialize') as bool?;
     return ok ?? false;
   }
@@ -460,6 +472,43 @@ class DockerHostRemote extends DockerHost {
       if (timeout != null) 'timeout': '${timeout.inMilliseconds}',
     }) as int?;
     return code;
+  }
+
+  @override
+  Future<List<String>> listFormulasNames() async {
+    var list = await _httpClient.getJSON('list-formulas') as List?;
+    list ??= [];
+    return list.cast<String>().toList();
+  }
+
+  @override
+  Future<String?> getFormulaClassName(String formulaName) async {
+    var className = await _httpClient.getJSON('get-formulas-class-name',
+        parameters: {'formula': formulaName}) as String?;
+    return className;
+  }
+
+  @override
+  Future<List<String>> listFormulasFunctions(String formulaName) async {
+    var list = await _httpClient.getJSON('list-formula-functions',
+        parameters: {'formula': formulaName}) as List?;
+    list ??= [];
+    return list.cast<String>().toList();
+  }
+
+  @override
+  Future<dynamic> formulaExec(String formulaName, String functionName,
+      [List? arguments]) async {
+    var argsEncoded =
+        arguments != null && arguments.isNotEmpty ? encodeJSON(arguments) : '';
+
+    var result = await _httpClient.getJSON('formula-exec', parameters: {
+      'formula': formulaName,
+      'function': functionName,
+      'args': argsEncoded
+    });
+
+    return result;
   }
 
   @override

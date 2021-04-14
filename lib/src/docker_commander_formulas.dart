@@ -130,7 +130,8 @@ class DockerCommanderFormula {
 
     if ((await runner.getClassMethod('', className, command, [parameters])) !=
         null) {
-      result = runner.executeClassMethod('', className, command, [parameters]);
+      result = runner.executeClassMethod('', className, command,
+          positionalParameters: [parameters]);
     } else if ((await runner.getClassMethod('', className, command)) != null) {
       result = runner.executeClassMethod('', className, command);
     }
@@ -159,6 +160,33 @@ class DockerCommanderFormula {
     }
 
     return clazz.functionsNames;
+  }
+
+  Future<Map<String, Object>> getFields() async {
+    var vm = (await getVM())!;
+
+    var runner = _createRunner(vm);
+
+    var className = await getFormulaClassName();
+
+    if (className.isEmpty) {
+      throw StateError(
+          "A formula needs a class with name ending in 'Formula'.");
+    }
+
+    var clazz = await runner.getClass('', className);
+    if (clazz == null) {
+      throw StateError("Can't find class: $className");
+    }
+
+    var fields = await clazz.getFieldsMap(fieldOverwrite: _fieldOverwrite);
+    return fields;
+  }
+
+  final Map<String, ASTValue> _fieldOverwrite = {};
+  void overwriteField(String fieldName, dynamic value) {
+    var astValue = ASTValue.fromValue(value);
+    _fieldOverwrite[fieldName] = astValue;
   }
 
   ApolloLanguageRunner _createRunner(ApolloVM vm) {
@@ -240,6 +268,17 @@ class DockerCommanderFormula {
     environmentProps['DOCKER_COMMANDER_FORMULA_NAME'] = formulaName;
 
     return environmentProps;
+  }
+
+  /// Executes a formula function.
+  Future<dynamic> exec(String functionName, List? arguments) async {
+    arguments ??= [];
+    var result = await run(functionName, arguments);
+
+    if (result == null) return null;
+
+    var v = await result.getValueNoContext();
+    return v;
   }
 }
 
