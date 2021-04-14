@@ -1,3 +1,8 @@
+## 2.0.9
+
+- Improved formulas test.
+- apollovm: ^0.0.21
+
 ## 2.0.8
 
 - Add to `DockerCommander` formula commands: 

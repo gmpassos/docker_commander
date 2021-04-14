@@ -1,4 +1,6 @@
 @Timeout(Duration(minutes: 2))
+
+import 'package:apollovm/apollovm.dart';
 import 'package:docker_commander/docker_commander_vm.dart';
 import 'package:logging/logging.dart';
 import 'package:swiss_knife/swiss_knife.dart';
@@ -110,6 +112,12 @@ void main() {
 
       var formula = formulaSource!.toFormula();
 
+      var cmdLog = <String>[];
+      formula.overwriteFunctionCMD = (cmdLine, cmd) {
+        cmdLog.add(cmdLine);
+        return true;
+      };
+
       formula.setup(dockerCommanderConsole: dockerCommanderConsole);
 
       var psContainerNames0 = await dockerCommander.psContainerNames();
@@ -167,6 +175,20 @@ void main() {
       _LOG.info('fields2: $fields2');
 
       expect(fields2['hostGitlabConfigPath'], equals('/tmp/gitlab-config'));
+
+      expect(cmdLog, isEmpty);
+
+      cmdLog.clear();
+      var regRet =
+          await formula.run('registerRunner', ['10.0.0.1', 'TOKEN_XYZ']);
+      expect(regRet, equals(ASTValueVoid.INSTANCE));
+
+      for (var cmdLine in cmdLog) {
+        _LOG.info('FORMULA CMD> $cmdLine');
+      }
+
+      expect(cmdLog[0], contains('http://10.0.0.1/'));
+      expect(cmdLog[0], contains('--registration-token TOKEN_XYZ'));
     });
   });
 }

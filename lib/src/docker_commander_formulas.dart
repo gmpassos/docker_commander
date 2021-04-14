@@ -128,10 +128,10 @@ class DockerCommanderFormula {
 
     FutureOr<ASTValue>? result;
 
-    if ((await runner.getClassMethod('', className, command, [parameters])) !=
+    if ((await runner.getClassMethod('', className, command, parameters)) !=
         null) {
       result = runner.executeClassMethod('', className, command,
-          positionalParameters: [parameters]);
+          positionalParameters: parameters);
     } else if ((await runner.getClassMethod('', className, command)) != null) {
       result = runner.executeClassMethod('', className, command);
     }
@@ -235,12 +235,18 @@ class DockerCommanderFormula {
     return start();
   }
 
+  bool Function(String cmdLine, ConsoleCMD cmd)? overwriteFunctionCMD;
+
   /// When a formula calls `cmd('start container-x')`
   /// it will be mapped to this function.
   Future<bool> _mapped_dockerCommander_cmd(String cmdLine) async {
     var cmd = ConsoleCMD.parse(cmdLine);
     if (cmd == null) {
       throw StateError("Can't parse command: $cmdLine");
+    }
+
+    if (overwriteFunctionCMD != null) {
+      return overwriteFunctionCMD!(cmdLine, cmd);
     }
 
     var dockerCommanderConsole = _dockerCommanderConsole!;
