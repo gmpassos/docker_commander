@@ -1,3 +1,7 @@
+## 2.0.7
+
+- apollovm: ^0.0.19
+
 ## 2.0.6
 
 - Added GitLab Formula: `GitLabFormulaSource`
