@@ -189,6 +189,7 @@ void main() {
 
       expect(cmdLog[0], contains('http://10.0.0.1/'));
       expect(cmdLog[0], contains('--registration-token TOKEN_XYZ'));
+      expect(cmdLog[0], contains('--net gitlab-net'));
     });
   });
 }

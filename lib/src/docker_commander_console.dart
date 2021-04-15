@@ -460,8 +460,10 @@ class DockerCommanderConsole {
           var fName = parameters['function']!;
           var arguments = cmd.argsSub(2);
 
-          var result =
-              await dockerCommander.formulaExec(formulaName, fName, arguments);
+          var properties = cmd.properties;
+
+          var result = await dockerCommander.formulaExec(
+              formulaName, fName, arguments, properties);
 
           await _printLineToConsole();
           await _printToConsole(
@@ -894,15 +896,28 @@ class ConsoleCMD {
 
           return true;
         }
+      case 'formulaexec':
+        {
+          parseSimpleProperties({'*'});
+
+          return true;
+        }
+
       default:
         return false;
     }
   }
 
   void parseSimpleProperties([Set<String>? simpleProperties]) {
+    var allSimpleProperties = false;
+
     if (simpleProperties != null) {
       simpleProperties =
           simpleProperties.map((e) => e.toLowerCase().trim()).toSet();
+
+      allSimpleProperties = simpleProperties.remove('*');
+    } else {
+      simpleProperties = {};
     }
 
     for (var i = 0; i < _args.length;) {
@@ -911,7 +926,7 @@ class ConsoleCMD {
       if (arg.startsWith('--')) {
         var name = arg.substring(2).toLowerCase().trim();
 
-        if (simpleProperties != null && !simpleProperties.contains(name)) {
+        if (!allSimpleProperties && !simpleProperties.contains(name)) {
           ++i;
           continue;
         }

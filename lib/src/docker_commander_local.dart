@@ -686,13 +686,13 @@ class DockerHostLocal extends DockerHost {
 
   @override
   Future<dynamic> formulaExec(String formulaName, String functionName,
-      [List? arguments]) async {
+      [List? arguments, Map<String, dynamic>? fields]) async {
     var formula = await _getFormula(formulaName);
     if (formula == null) {
       return false;
     }
 
-    var result = await formula.exec(functionName, arguments);
+    var result = await formula.exec(functionName, arguments, fields);
     return result;
   }
 

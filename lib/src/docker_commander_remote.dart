@@ -498,14 +498,18 @@ class DockerHostRemote extends DockerHost {
 
   @override
   Future<dynamic> formulaExec(String formulaName, String functionName,
-      [List? arguments]) async {
+      [List? arguments, Map<String, dynamic>? fields]) async {
     var argsEncoded =
         arguments != null && arguments.isNotEmpty ? encodeJSON(arguments) : '';
+
+    var fieldsEncoded =
+        fields != null && fields.isNotEmpty ? encodeJSON(fields) : '';
 
     var result = await _httpClient.getJSON('formula-exec', parameters: {
       'formula': formulaName,
       'function': functionName,
-      'args': argsEncoded
+      'args': argsEncoded,
+      'fields': fieldsEncoded,
     });
 
     return result;

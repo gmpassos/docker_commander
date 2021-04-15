@@ -38,7 +38,7 @@ class GitLabFormulaSource extends DockerCommanderFormulaSource {
       }
       
       void registerRunner(String gitlabHost, String token) {
-        cmd('docker run --rm -v $hostGitlabConfigPath:/etc/gitlab-runner $imageGitlabRunner register --non-interactive --url http://$gitlabHost/ --registration-token $token --executor docker --docker-image $imageRunner:latest --description local --docker-network-mode $network');
+        cmd('docker run --rm --net $network -v $hostGitlabConfigPath:/etc/gitlab-runner $imageGitlabRunner register --non-interactive --url http://$gitlabHost/ --registration-token $token --executor docker --docker-image $imageRunner:latest --description local --docker-network-mode $network');
       }
       
       void start() {

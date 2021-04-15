@@ -115,7 +115,8 @@ class DockerCommanderFormula {
   }
 
   /// Runs a formula [command] with [parameters].
-  Future<ASTValue?> run(String command, List parameters) async {
+  Future<ASTValue?> run(String command, List parameters,
+      {Map<String, dynamic>? fields}) async {
     var vm = (await getVM())!;
 
     var runner = _createRunner(vm);
@@ -126,20 +127,31 @@ class DockerCommanderFormula {
       throw StateError("A formula needs a class ending with 'Formula'.");
     }
 
+    var classInstanceFields = _toClassInstanceFields(fields);
+
     FutureOr<ASTValue>? result;
 
     if ((await runner.getClassMethod('', className, command, parameters)) !=
         null) {
       result = runner.executeClassMethod('', className, command,
-          positionalParameters: parameters);
+          positionalParameters: parameters,
+          classInstanceFields: classInstanceFields);
     } else if ((await runner.getClassMethod('', className, command)) != null) {
-      result = runner.executeClassMethod('', className, command);
+      result = runner.executeClassMethod('', className, command,
+          classInstanceFields: classInstanceFields);
     }
 
     if (result == null) return null;
 
     var resultValue = await result;
     return resultValue;
+  }
+
+  Map<String, ASTValue>? _toClassInstanceFields(Map<String, dynamic>? fields) {
+    if (fields == null || fields.isEmpty) return null;
+    var map =
+        fields.map((key, value) => MapEntry(key, ASTValue.fromValue(value)));
+    return map;
   }
 
   Future<List<String>> getFunctions() async {
@@ -184,6 +196,7 @@ class DockerCommanderFormula {
   }
 
   final Map<String, ASTValue> _fieldOverwrite = {};
+
   void overwriteField(String fieldName, dynamic value) {
     var astValue = ASTValue.fromValue(value);
     _fieldOverwrite[fieldName] = astValue;
@@ -277,9 +290,10 @@ class DockerCommanderFormula {
   }
 
   /// Executes a formula function.
-  Future<dynamic> exec(String functionName, List? arguments) async {
+  Future<dynamic> exec(String functionName,
+      [List? arguments, Map<String, dynamic>? fields]) async {
     arguments ??= [];
-    var result = await run(functionName, arguments);
+    var result = await run(functionName, arguments, fields: fields);
 
     if (result == null) return null;
 

@@ -562,7 +562,7 @@ abstract class DockerHost extends DockerCMDExecutor {
 
   /// Executes a formula function.
   Future<dynamic> formulaExec(String formulaName, String functionName,
-      [List? arguments]);
+      [List? arguments, Map<String, dynamic>? fields]);
 
   /// Closes this instance, cleaning any resource.
   Future<void> close();

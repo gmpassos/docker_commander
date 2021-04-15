@@ -1,3 +1,9 @@
+## 2.0.10
+
+- `formulaExec`: added fields option.
+- Improve `gitlab` formula.
+- apollovm: ^0.0.22
+
 ## 2.0.9
 
 - Improved formulas test.

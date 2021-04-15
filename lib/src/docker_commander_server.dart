@@ -503,10 +503,13 @@ class DockerHostServer {
     var formulaName = _getParameter(parameters, json, 'formula');
     var fName = _getParameter(parameters, json, 'function');
     String? argsEncoded = _getParameter(parameters, json, 'args');
+    String? fieldsEncoded = _getParameter(parameters, json, 'fields');
 
     var args = _decodeArgs(argsEncoded);
+    var fields = _decodeProperties(fieldsEncoded);
 
-    var ok = await _dockerHostLocal!.formulaExec(formulaName, fName, args);
+    var ok =
+        await _dockerHostLocal!.formulaExec(formulaName, fName, args, fields);
 
     return ok;
   }
@@ -766,7 +769,7 @@ class DockerHostServer {
     String? outputAsLines = _getParameter(parameters, json, 'outputAsLines');
     String? outputLimit = _getParameter(parameters, json, 'outputLimit');
 
-    var args = _decodeArgs(argsEncoded)!;
+    var args = _decodeArgsOfStrings(argsEncoded)!;
 
     var dockerProcess = await _dockerHostLocal!.exec(
       containerName,
@@ -793,7 +796,7 @@ class DockerHostServer {
     String? outputAsLines = _getParameter(parameters, json, 'outputAsLines');
     String? outputLimit = _getParameter(parameters, json, 'outputLimit');
 
-    var args = _decodeArgs(argsEncoded)!;
+    var args = _decodeArgsOfStrings(argsEncoded)!;
 
     var dockerProcess = await _dockerHostLocal!.command(
       cmd,
@@ -805,10 +808,26 @@ class DockerHostServer {
     return {'instanceID': dockerProcess.instanceID};
   }
 
-  List<String>? _decodeArgs(String? argsEncoded) {
+  List? _decodeArgs(String? argsEncoded) {
+    if (isNotEmptyString(argsEncoded)) {
+      var list = parseJSON(argsEncoded) as List;
+      return list;
+    }
+    return null;
+  }
+
+  List<String>? _decodeArgsOfStrings(String? argsEncoded) {
     if (isNotEmptyString(argsEncoded)) {
       var list = parseJSON(argsEncoded) as List;
       return list.cast<String>().toList();
+    }
+    return null;
+  }
+
+  Map<String, dynamic>? _decodeProperties(String? argsEncoded) {
+    if (isNotEmptyString(argsEncoded)) {
+      var map = parseJSON(argsEncoded) as Map;
+      return map.map((key, value) => MapEntry('$key', value));
     }
     return null;
   }
