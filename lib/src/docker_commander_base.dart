@@ -357,6 +357,10 @@ class DockerCommander extends DockerCMDExecutor {
   Future<String?> getFormulaClassName(String formulaName) =>
       dockerHost.getFormulaClassName(formulaName);
 
+  /// Returns the formula fields/properties.
+  Future<Map<String, Object>> getFormulaFields(String formulaName) =>
+      dockerHost.getFormulaFields(formulaName);
+
   /// List the functions of a formula.
   Future<List<String>> listFormulasFunctions(String formulaName) =>
       dockerHost.listFormulasFunctions(formulaName);

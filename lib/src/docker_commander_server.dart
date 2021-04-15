@@ -471,6 +471,8 @@ class DockerHostServer {
       case 'get-formulas-class-name':
         return _processGetFormulaClassName(
             request, parameters, parseJSON(body));
+      case 'get-formulas-fields':
+        return _processGetFormulaFields(request, parameters, parseJSON(body));
       case 'list-formula-functions':
         return _processListFormulaFunctions(
             request, parameters, parseJSON(body));
@@ -490,6 +492,12 @@ class DockerHostServer {
       HttpRequest request, Map<String, String> parameters, json) async {
     var formulaName = _getParameter(parameters, json, 'formula')!;
     return _dockerHostLocal!.getFormulaClassName(formulaName);
+  }
+
+  Future<Map<String, Object>?> _processGetFormulaFields(
+      HttpRequest request, Map<String, String> parameters, json) async {
+    var formulaName = _getParameter(parameters, json, 'formula')!;
+    return _dockerHostLocal!.getFormulaFields(formulaName);
   }
 
   Future<List<String>> _processListFormulaFunctions(

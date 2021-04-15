@@ -2,6 +2,7 @@
 
 - `formulaExec`: added fields option.
 - Improve `gitlab` formula.
+- `docker_commander_console`: added get-formulas-fields.
 - apollovm: ^0.0.22
 
 ## 2.0.9

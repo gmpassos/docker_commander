@@ -489,6 +489,14 @@ class DockerHostRemote extends DockerHost {
   }
 
   @override
+  Future<Map<String, Object>> getFormulaFields(String formulaName) async {
+    var map = await _httpClient.getJSON('get-formulas-fields',
+        parameters: {'formula': formulaName}) as Map?;
+    map ??= {};
+    return map.map((key, value) => MapEntry('$key', value));
+  }
+
+  @override
   Future<List<String>> listFormulasFunctions(String formulaName) async {
     var list = await _httpClient.getJSON('list-formula-functions',
         parameters: {'formula': formulaName}) as List?;

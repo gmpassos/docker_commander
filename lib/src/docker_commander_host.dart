@@ -557,6 +557,9 @@ abstract class DockerHost extends DockerCMDExecutor {
   /// Returns the class name of a formula.
   Future<String?> getFormulaClassName(String formulaName);
 
+  /// Returns the formula fields/properties.
+  Future<Map<String, Object>> getFormulaFields(String formulaName);
+
   /// List the functions of a formula.
   Future<List<String>> listFormulasFunctions(String formulaName);
 

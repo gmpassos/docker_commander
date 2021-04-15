@@ -65,6 +65,8 @@ class DockerCommanderConsole {
     await _printToConsole(
         '  - get-formula-class-name %formulaName   # Show the formula class name.');
     await _printToConsole(
+        '  - get-formulas-fields %formulaName      # Show the formula fields.');
+    await _printToConsole(
         '  - list-formula-functions %formulaName   # List formula functions.');
     await _printToConsole(
         '  - show-formula %formulaName             # Show formula information.');
@@ -425,14 +427,30 @@ class DockerCommanderConsole {
 
           var formulaName = parameters['formulaName']!;
 
-          var className =
-              await dockerCommander.getFormulaClassName(formulaName);
-          var functions =
-              await dockerCommander.listFormulasFunctions(formulaName);
+          var fieldsFuture = dockerCommander.getFormulaFields(formulaName);
+
+          var functionsFuture =
+              dockerCommander.listFormulasFunctions(formulaName);
+
+          var classNameFuture =
+              dockerCommander.getFormulaClassName(formulaName);
+
+          var className = await classNameFuture;
+          var fields = await fieldsFuture;
+          var functions = await functionsFuture;
 
           await _printLineToConsole();
           await _printToConsole('FORMULA: $formulaName');
+          await _printToConsole('');
           await _printToConsole('CLASS NAME: $className');
+          await _printToConsole('');
+          await _printToConsole('FIELDS:');
+          await _printToConsole('');
+
+          for (var entry in fields.entries) {
+            await _printToConsole('  - ${entry.key}: ${entry.value}');
+          }
+
           await _printToConsole('');
           await _printToConsole('FUNCTIONS:');
           await _printToConsole('');

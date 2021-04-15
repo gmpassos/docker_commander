@@ -41,7 +41,7 @@ Pull the Docker image:
 docker pull gmpassos/docker_commander
 ```
 
-### SERVER MODE:
+### SERVER MODE (docker_commander_server):
 
 Run the `docker_commander` image in SERVER mode, mapping port `8099` and Docker Host Daemon socket file (`/var/run/docker.sock`).
 
@@ -64,7 +64,7 @@ To enable control of Docker Daemon from the `docker_commander` server container,
 to map the Docker Host Daemon socket file (`/var/run/docker.sock`). This won't require to run the
 container in a `--privileged` context or as root.*
 
-### CONSOLE MODE:
+### CONSOLE MODE (docker_commander_console):
 
 Run the `docker_commander` image in CONSOLE mode, passing `--console`:
 
@@ -200,6 +200,93 @@ class ApacheFormula {
 
 A formula source code will be parsed and executed by [ApolloVM][ApolloVM],
 allowing dynamic loading and execution, in a sandbox, of any formula by `docker_commander`.
+
+-------------------------------------------------------------------------------
+
+## Using a Formula through `docker_commander_console`:
+
+To list the available formulas in the server:
+
+```shell
+$> list-formulas
+
+------------------------------------------------------------------------------
+FORMULAS:
+
+  apache gitlab
+
+------------------------------------------------------------------------------
+```
+
+To show information of a formula:
+
+```shell
+$> show-formula gitlab
+------------------------------------------------------------------------------
+FORMULA: gitlab
+
+CLASS NAME: GitLabFormula
+
+FIELDS:
+
+  - imageGitlab: gitlab/gitlab-ce
+  - imageGitlabRunner: gitlab/gitlab-runner
+  - imageRunner: google/dart
+  - network: gitlab-net
+  - hostGitlabConfigPath: /srv/gitlab-runner/config
+
+FUNCTIONS:
+
+  - getVersion
+  - pull
+  - pullRunner
+  - install
+  - installRunner
+  - registerRunner
+  - start
+  - stop
+  - startRunner
+  - stopRunner
+  - uninstall
+  - uninstallRunner
+
+------------------------------------------------------------------------------
+```
+
+Using a formula.
+
+```shell
+## Pull images:
+$> formula-exec gitlab pull
+$> formula-exec gitlab pullRunner
+
+## Install images (create containers and start):
+$> formula-exec gitlab install
+
+## Install optional GitLab Runner,
+## personalizing field "hostGitlabConfigPath":
+$> formula-exec gitlab installRunner --hostGitlabConfigPath /host/path/to/gitlab-config-dir/
+
+## Register GitLab Runner,
+## passing the host and token of GitLab,
+## and the personalized field "hostGitlabConfigPath":
+$> formula-exec gitlab registerRunner 172.30.0.2 zysByxVr9tss18BvLFxj --hostGitlabConfigPath /host/path/to/gitlab-config-dir/
+
+## Starts the GitLab Runner, once it's registered.
+$> formula-exec gitlab startRunner
+```
+
+*NOTE: The function `installRunner` and `registerRunner`
+are personalizing the path of the GitLab config directory in
+the host machine using the field `hostGitlabConfigPath`.*
+
+Stopping and uninstalling a formula:
+
+```shell
+$> formula-exec gitlab stop
+
+$> formula-exec gitlab uninstall
+```
 
 -------------------------------------------------------------------------------
 

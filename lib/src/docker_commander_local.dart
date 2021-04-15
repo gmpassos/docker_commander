@@ -676,6 +676,16 @@ class DockerHostLocal extends DockerHost {
   }
 
   @override
+  Future<Map<String, Object>> getFormulaFields(String formulaName) async {
+    var formula = await _getFormula(formulaName);
+    if (formula == null) {
+      return <String, Object>{};
+    }
+    var fields = formula.getFields();
+    return fields;
+  }
+
+  @override
   Future<List<String>> listFormulasFunctions(String formulaName) async {
     var formula = await _getFormula(formulaName);
     if (formula == null) {
