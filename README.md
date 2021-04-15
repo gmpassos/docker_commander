@@ -16,12 +16,13 @@
 
 [![License](https://img.shields.io/github/license/gmpassos/docker_commander?logo=open-source-initiative&logoColor=green)](https://github.com/gmpassos/docker_commander/blob/master/LICENSE)
 
-`docker_commander` is a [Docker][docker] manager to easily automate a Docker Daemon, or a Docker Swarm:
-  - Helpers to build a Docker network.
+`docker_commander` is a [Docker][docker] manager to easily automate a
+Docker Daemon, or a Docker Swarm, with:
+  - Local and remote management.
+  - Helpers to build a Docker network and automatically configure running containers.
   - Helpers to manipulate files inside a running container.
-  - Supports personalized containers.
   - Formulas: pre-defined code to install/uninstall containers.
-  - Built-in pre-configured popular containers:
+  - Built-in pre-configured containers:
     - [PostgreSQL][postgresql]
     - [Apache HTTPD][apache]
     - [NGINX][nginx]
@@ -304,7 +305,7 @@ platform (native, JS/Browser and Flutter).
 
 ### Local Docker
 
-Here's a simple usage example for a local host machine:
+Here's a simple usage example in `Dart` for a local host machine:
 
 ```dart
 import 'package:docker_commander/docker_commander_vm.dart';
