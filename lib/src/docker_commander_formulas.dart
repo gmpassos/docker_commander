@@ -166,7 +166,7 @@ class DockerCommanderFormula {
           "A formula needs a class with name ending in 'Formula'.");
     }
 
-    var clazz = await runner.getClass('', className);
+    var clazz = await runner.getClass('', namespace: className);
     if (clazz == null) {
       throw StateError("Can't find class: $className");
     }
@@ -186,7 +186,7 @@ class DockerCommanderFormula {
           "A formula needs a class with name ending in 'Formula'.");
     }
 
-    var clazz = await runner.getClass('', className);
+    var clazz = await runner.getClass('', namespace: className);
     if (clazz == null) {
       throw StateError("Can't find class: $className");
     }
