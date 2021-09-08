@@ -61,7 +61,14 @@ class DockerHostLocal extends DockerHost {
   /// Resolves the full path of the Docker binary.
   /// If fails to resolve, returns `docker`.
   static Future<String> resolveDockerBinaryPath() async {
-    var processResult = await Process.run('which', <String>['docker'],
+    late final String findCmd;
+    if (Platform.isWindows) {
+      findCmd = 'where';
+    } else {
+      findCmd = 'which';
+    }
+
+    var processResult = await Process.run(findCmd, <String>['docker'],
         stdoutEncoding: systemEncoding);
 
     if (processResult.exitCode == 0) {
@@ -70,6 +77,13 @@ class DockerHostLocal extends DockerHost {
       output = output.trim();
 
       if (output.isNotEmpty) {
+        if (Platform.isWindows) {
+          output = output
+              .split('\n')
+              .where((element) => element.endsWith('exe'))
+              .first
+              .replaceAll(RegExp(r'/'), r'\'); // replace file separator
+        }
         return output;
       }
     }
