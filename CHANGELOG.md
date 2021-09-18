@@ -1,3 +1,16 @@
+## 2.0.11
+
+- `apollovm` compatibility.
+- Migrated from `pedantic` to `lints`.
+- Fixed issue with `Formula` and `overwriteField`.
+- Improved support for Docker on `Windows`.
+- Improved tests.
+- apollovm: ^0.0.30
+- swiss_knife: ^3.0.8
+- mercury_client: ^2.1.0
+- lints: ^1.0.1
+- dependency_validator: ^3.1.0
+
 ## 2.0.10
 
 - `formulaExec`: added fields option.

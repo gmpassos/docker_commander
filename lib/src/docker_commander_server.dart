@@ -10,7 +10,7 @@ import 'package:swiss_knife/swiss_knife.dart';
 import 'docker_commander_host.dart';
 import 'docker_commander_local.dart';
 
-final _LOG = Logger('docker_commander/server');
+final _log = Logger('docker_commander/server');
 
 typedef AuthenticationGrantor = Future<bool> Function(
     String username, String password);
@@ -66,20 +66,24 @@ class DockerHostServer {
       : authenticationTokenTimeout =
             authenticationTokenTimeout ?? Duration(hours: 1);
 
-  static const Set<String> WEAK_USERNAMES = {
+  static const Set<String> weakUsernames = {
     'user',
+    'user1',
+    'user2',
     'userx',
     'usery',
     'username',
     'usernamex',
     'usernamey',
+    'nick',
+    'nickname',
     'foo',
     'bar',
     'baz',
     'me',
   };
 
-  static const Set<String> WEAK_PASSWORDS = {
+  static const Set<String> weakPasswords = {
     '',
     '1',
     '12',
@@ -112,9 +116,9 @@ class DockerHostServer {
 
   Future<bool> checkAuthenticationBasicSecurity() async {
     var usernames =
-        WEAK_USERNAMES.expand((e) => [e, e.toLowerCase(), e.toUpperCase()]);
+        weakUsernames.expand((e) => [e, e.toLowerCase(), e.toUpperCase()]);
     var passwords =
-        WEAK_PASSWORDS.expand((e) => [e, e.toLowerCase(), e.toUpperCase()]);
+        weakPasswords.expand((e) => [e, e.toLowerCase(), e.toUpperCase()]);
 
     var all = <String>{...usernames, ...passwords};
 
@@ -133,7 +137,7 @@ class DockerHostServer {
     }
 
     if (weak) {
-      _LOG.warning(
+      _log.warning(
           'AUTHENTICATOR GRANTOR ACCEPTING WEAK CREDENTIALS!!! DO NOT DEPLOY THIS IN PRODUCTION OR PUBLIC NETWORKS!!!');
     }
 
@@ -161,7 +165,7 @@ class DockerHostServer {
   Future<void> start() async {
     if (_started != null) return;
 
-    _LOG.info('[SERVER]\tSTARTING...');
+    _log.info('[SERVER]\tSTARTING...');
 
     _started = Completer();
 
@@ -177,7 +181,7 @@ class DockerHostServer {
       listenPort!,
     );
 
-    _LOG.info('[SERVER]\tSTARTED> port: $listenPort ; server: $_server');
+    _log.info('[SERVER]\tSTARTED> port: $listenPort ; server: $_server');
 
     _started!.complete(true);
 
@@ -191,7 +195,7 @@ class DockerHostServer {
       try {
         _server!.close(force: true);
       } catch (e) {
-        _LOG.severe('Error closing server', e);
+        _log.severe('Error closing server', e);
       }
     });
   }
@@ -258,7 +262,7 @@ class DockerHostServer {
   }
 
   void close() async {
-    _LOG.info('[SERVER]\tCLOSE> $_server');
+    _log.info('[SERVER]\tCLOSE> $_server');
     await _server!.close(force: true);
     _server = null;
     _started = null;
@@ -284,7 +288,7 @@ class DockerHostServer {
       response = await _processOperation(request, operation, requestParameters,
           requestContentType, requestBody);
     } catch (e, s) {
-      _LOG.severe(
+      _log.severe(
           'Error processing request: $request > operation: $operation ; parameters: $requestParameters ; body: $requestBody',
           e,
           s);
@@ -374,10 +378,10 @@ class DockerHostServer {
     return ok;
   }
 
-  static final int _MAX_INT = 2147483647;
+  static final int _maxInt = 2147483647;
 
   final Random _random1 = Random();
-  final Random _random2 = Random(Random().nextInt(_MAX_INT));
+  final Random _random2 = Random(Random().nextInt(_maxInt));
 
   int _tokenCounter = 0;
 
@@ -385,14 +389,14 @@ class DockerHostServer {
     var count = ++_tokenCounter;
     var now = DateTime.now().millisecondsSinceEpoch;
 
-    var a = _random1.nextInt(_MAX_INT);
-    var b = _random1.nextInt(_MAX_INT);
+    var a = _random1.nextInt(_maxInt);
+    var b = _random1.nextInt(_maxInt);
 
-    var n1 = a ^ count ^ _random2.nextInt(_MAX_INT);
-    var n2 = b ^ now ^ _random2.nextInt(_MAX_INT);
+    var n1 = a ^ count ^ _random2.nextInt(_maxInt);
+    var n2 = b ^ now ^ _random2.nextInt(_maxInt);
 
-    var n3 = n1 ^ _random1.nextInt(_MAX_INT);
-    var n4 = n2 ^ _random2.nextInt(_MAX_INT);
+    var n3 = n1 ^ _random1.nextInt(_maxInt);
+    var n4 = n2 ^ _random2.nextInt(_maxInt);
 
     if (a % 2 == 0) {
       return b % 2 == 0 ? 'TK$n1$n2$n3$n4' : 'TK$n2$n1$n4$n3';
@@ -425,7 +429,7 @@ class DockerHostServer {
       ContentType? contentType,
       String body) async {
     if (operation != 'stdout' && operation != 'stderr') {
-      _LOG.info(
+      _log.info(
           '[SERVER]\tPROCESS OPERATION>\t operation: $operation ; parameters: $parameters ; body: $body');
     }
 
@@ -769,7 +773,7 @@ class DockerHostServer {
       HttpRequest request, Map<String, String> parameters, json) async {
     if (_dockerHostLocal == null) return null;
 
-    _LOG.info('_processExec> parameters: $parameters');
+    _log.info('_processExec> parameters: $parameters');
 
     String cmd = _getParameter(parameters, json, 'cmd');
     String? argsEncoded = _getParameter(parameters, json, 'args');

@@ -1,4 +1,6 @@
 @Timeout(Duration(minutes: 2))
+import 'dart:async';
+
 import 'package:docker_commander/docker_commander_vm.dart';
 import 'package:test/test.dart';
 
@@ -10,7 +12,7 @@ void main() async {
 
   var usedPorts = <int>{};
 
-  var preSetup = () async {
+  Future<int> preSetup() async {
     for (var listenPort = 8090; listenPort <= 8099; ++listenPort) {
       if (usedPorts.contains(listenPort)) continue;
 
@@ -35,7 +37,7 @@ void main() async {
     }
 
     return 0;
-  };
+  }
 
   doBasicTests(
       (listenPort) => DockerHostRemote('localhost', listenPort,

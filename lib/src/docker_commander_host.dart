@@ -8,7 +8,7 @@ import 'package:swiss_knife/swiss_knife.dart';
 import 'docker_commander_base.dart';
 import 'docker_commander_commands.dart';
 
-final _LOG = Logger('docker_commander/host');
+final _log = Logger('docker_commander/host');
 
 /// Basic infos of a Container.
 class ContainerInfos {
@@ -172,15 +172,15 @@ abstract class DockerHost extends DockerCMDExecutor {
   static OutputReadyType resolveOutputReadyType(
       OutputReadyFunction? stdoutReadyFunction,
       OutputReadyFunction? stderrReadyFunction) {
-    var outputReadyType = OutputReadyType.STDOUT;
+    var outputReadyType = OutputReadyType.stdout;
 
     if ((stdoutReadyFunction != null && stderrReadyFunction != null) ||
         (stdoutReadyFunction == null && stderrReadyFunction == null)) {
-      outputReadyType = OutputReadyType.ANY;
+      outputReadyType = OutputReadyType.any;
     } else if (stdoutReadyFunction != null) {
-      outputReadyType = OutputReadyType.STDOUT;
+      outputReadyType = OutputReadyType.stdout;
     } else if (stderrReadyFunction != null) {
-      outputReadyType = OutputReadyType.STDERR;
+      outputReadyType = OutputReadyType.stderr;
     }
     return outputReadyType;
   }
@@ -396,7 +396,7 @@ abstract class DockerHost extends DockerCMDExecutor {
 
     cmdArgs.add(containerInfos.image!);
 
-    _LOG.info('Service create[CMD]>\t${cmdArgs.join(' ')}');
+    _log.info('Service create[CMD]>\t${cmdArgs.join(' ')}');
 
     var process = await command('service', cmdArgs);
     if (process == null) return null;
@@ -611,7 +611,7 @@ abstract class DockerProcess {
 
   DockerProcess(this.dockerHost, this.instanceID, this.containerName);
 
-  static final int DEFAULT_OUTPUT_LIMIT = 1000;
+  static final int defaultOutputLimit = 1000;
 
   Output? _stdout;
 
@@ -645,13 +645,13 @@ abstract class DockerProcess {
     if (isReady) return true;
 
     switch (outputReadyType) {
-      case OutputReadyType.STDOUT:
+      case OutputReadyType.stdout:
         return stdout!.waitReady();
-      case OutputReadyType.STDERR:
+      case OutputReadyType.stderr:
         return stderr!.waitReady();
-      case OutputReadyType.ANY:
+      case OutputReadyType.any:
         return stdout!.waitAnyOutputReady();
-      case OutputReadyType.STARTS_READY:
+      case OutputReadyType.startsReady:
         return true;
       default:
         return stdout!.waitReady();
@@ -661,13 +661,13 @@ abstract class DockerProcess {
   /// Returns [true] if this container is started and ready.
   bool get isReady {
     switch (outputReadyType) {
-      case OutputReadyType.STDOUT:
+      case OutputReadyType.stdout:
         return stdout!.isReady;
-      case OutputReadyType.STDERR:
+      case OutputReadyType.stderr:
         return stderr!.isReady;
-      case OutputReadyType.ANY:
+      case OutputReadyType.any:
         return stdout!.isReady || stderr!.isReady;
-      case OutputReadyType.STARTS_READY:
+      case OutputReadyType.startsReady:
         return true;
       default:
         return stdout!.isReady;
@@ -809,7 +809,7 @@ typedef OutputReadyFunction = bool Function(
     OutputStream outputStream, dynamic data);
 
 /// Indicates which output should be ready.
-enum OutputReadyType { STDOUT, STDERR, ANY, STARTS_READY }
+enum OutputReadyType { stdout, stderr, any, startsReady }
 
 /// Handles the output stream of a Docker container.
 class OutputStream<T> {

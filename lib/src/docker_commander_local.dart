@@ -9,7 +9,7 @@ import 'package:swiss_knife/swiss_knife.dart';
 import 'docker_commander_commands.dart';
 import 'docker_commander_host.dart';
 
-final _LOG = Logger('docker_commander/io');
+final _log = Logger('docker_commander/io');
 
 class ContainerInfosLocal extends ContainerInfos {
   final File? idFile;
@@ -93,7 +93,7 @@ class DockerHostLocal extends DockerHost {
 
   @override
   Future<bool> checkDaemon() async {
-    _LOG.info('Check Docker Daemon: $dockerBinaryPath info');
+    _log.info('Check Docker Daemon: $dockerBinaryPath info');
 
     var process = Process.run(dockerBinaryPath!, <String>['info']);
     var result = await process;
@@ -101,8 +101,8 @@ class DockerHostLocal extends DockerHost {
     var ok = result.exitCode == 0;
 
     if (!ok) {
-      _LOG.warning('Error checking Docker Daemon:');
-      _LOG.warning(result.stdout);
+      _log.warning('Error checking Docker Daemon:');
+      _log.warning(result.stdout);
     }
 
     return ok;
@@ -233,7 +233,7 @@ class DockerHostLocal extends DockerHost {
 
     var cmdArgs = containerInfos.args!;
 
-    _LOG.info('create[CMD]>\t$dockerBinaryPath ${cmdArgs.join(' ')}');
+    _log.info('create[CMD]>\t$dockerBinaryPath ${cmdArgs.join(' ')}');
 
     var process = await Process.start(dockerBinaryPath!, cmdArgs);
     var exitCode = await process.exitCode;
@@ -274,7 +274,7 @@ class DockerHostLocal extends DockerHost {
     if (idFile != null) {
       var fileExists = await _waitFile(idFile);
       if (!fileExists) {
-        _LOG.warning("ID file doesn't exists: $idFile");
+        _log.warning("ID file doesn't exists: $idFile");
       }
       try {
         var id = idFile.readAsStringSync().trim();
@@ -283,7 +283,7 @@ class DockerHostLocal extends DockerHost {
         }
       } catch (e, s) {
         if (fileExists) {
-          _LOG.warning("Can't read ID File: $idFile", e, s);
+          _log.warning("Can't read ID File: $idFile", e, s);
         }
       }
     }
@@ -317,7 +317,7 @@ class DockerHostLocal extends DockerHost {
 
   @override
   Future<DockerRunner> run(
-    String imageName, {
+    String image, {
     String? version,
     List<String>? imageArgs,
     String? containerName,
@@ -355,7 +355,7 @@ class DockerHostLocal extends DockerHost {
 
     var containerInfos = buildContainerArgs(
       'run',
-      imageName,
+      image,
       version,
       containerName!,
       ports,
@@ -379,7 +379,7 @@ class DockerHostLocal extends DockerHost {
       cmdArgs.addAll(imageArgs);
     }
 
-    _LOG.info('run[CMD]>\t$dockerBinaryPath ${cmdArgs.join(' ')}');
+    _log.info('run[CMD]>\t$dockerBinaryPath ${cmdArgs.join(' ')}');
 
     var process = await Process.start(dockerBinaryPath!, cmdArgs);
 
@@ -411,7 +411,7 @@ class DockerHostLocal extends DockerHost {
     });
 
     if (ok) {
-      _LOG.info('Runner[$ok]: $runner');
+      _log.info('Runner[$ok]: $runner');
     }
 
     return runner;
@@ -425,10 +425,10 @@ class DockerHostLocal extends DockerHost {
     var oks =
         await DockerCMD.addContainersHostMapping(this, runnersHostsAndIPs);
 
-    var someFail = oks.values.contains('false');
+    var someFail = oks.values.contains(false);
 
     if (someFail) {
-      _LOG.warning(
+      _log.warning(
           'Error configuring containers host mapping> $runnersHostsAndIPs');
     }
   }
@@ -460,7 +460,7 @@ class DockerHostLocal extends DockerHost {
     stderrReadyFunction ??= (outputStream, data) => true;
 
     var cmdArgs = ['exec', containerName, command, ...args];
-    _LOG.info('docker exec [CMD]>\t$dockerBinaryPath ${cmdArgs.join(' ')}');
+    _log.info('docker exec [CMD]>\t$dockerBinaryPath ${cmdArgs.join(' ')}');
 
     var process = await Process.start(dockerBinaryPath!, cmdArgs);
 
@@ -479,7 +479,7 @@ class DockerHostLocal extends DockerHost {
 
     var ok = await _initializeAndWaitReady(dockerProcess);
     if (ok) {
-      _LOG.info('Exec[$ok]: $dockerProcess');
+      _log.info('Exec[$ok]: $dockerProcess');
     }
 
     return dockerProcess;
@@ -490,7 +490,7 @@ class DockerHostLocal extends DockerHost {
     var ok = await dockerProcess.initialize();
 
     if (!ok) {
-      _LOG.warning('Initialization issue for $dockerProcess');
+      _log.warning('Initialization issue for $dockerProcess');
       return false;
     }
 
@@ -503,7 +503,7 @@ class DockerHostLocal extends DockerHost {
 
     var ready = await dockerProcess.waitReady();
     if (!ready) {
-      _LOG.warning('Ready issue for $dockerProcess');
+      _log.warning('Ready issue for $dockerProcess');
       return false;
     }
 
@@ -529,7 +529,7 @@ class DockerHostLocal extends DockerHost {
     stderrReadyFunction ??= (outputStream, data) => true;
 
     var cmdArgs = [command, ...args];
-    _LOG.info('docker command [CMD]>\t$dockerBinaryPath ${cmdArgs.join(' ')}');
+    _log.info('docker command [CMD]>\t$dockerBinaryPath ${cmdArgs.join(' ')}');
 
     var process = await Process.start(dockerBinaryPath!, cmdArgs);
 
@@ -548,7 +548,7 @@ class DockerHostLocal extends DockerHost {
 
     var ok = await _initializeAndWaitReady(dockerProcess);
     if (ok) {
-      _LOG.info('Command[$ok]: $dockerProcess');
+      _log.info('Command[$ok]: $dockerProcess');
     }
 
     return dockerProcess;
@@ -567,7 +567,7 @@ class DockerHostLocal extends DockerHost {
     return result.exitCode == 0;
   }
 
-  static final Duration EXITED_PROCESS_EXPIRE_TIME =
+  static final Duration exitedProcessExpireTime =
       Duration(minutes: 1, seconds: 15);
 
   final Map<int, DockerProcessLocal> _processes = {};
@@ -577,8 +577,7 @@ class DockerHostLocal extends DockerHost {
   }
 
   void _cleanupExitedProcesses() {
-    DockerHost.cleanupExitedProcessesImpl(
-        EXITED_PROCESS_EXPIRE_TIME, _processes);
+    DockerHost.cleanupExitedProcessesImpl(exitedProcessExpireTime, _processes);
   }
 
   final Map<int, DockerRunnerLocal> _runners = {};
@@ -921,7 +920,7 @@ class DockerProcessLocal extends DockerProcess {
 
   void _setExitCode(int exitCode) {
     if (_exitCode != null) return;
-    _LOG.info('EXIT_CODE[instanceID: $instanceID]: $exitCode');
+    _log.info('EXIT_CODE[instanceID: $instanceID]: $exitCode');
 
     _exitCode = exitCode;
     _exitTime = DateTime.now();
@@ -991,13 +990,13 @@ class DockerProcessLocal extends DockerProcess {
     if (isReady) return true;
 
     switch (outputReadyType) {
-      case OutputReadyType.STDOUT:
+      case OutputReadyType.stdout:
         return this.stdout!.waitReady();
-      case OutputReadyType.STDERR:
+      case OutputReadyType.stderr:
         return this.stderr!.waitReady();
-      case OutputReadyType.ANY:
+      case OutputReadyType.any:
         return this.stdout!.waitAnyOutputReady();
-      case OutputReadyType.STARTS_READY:
+      case OutputReadyType.startsReady:
         return true;
       default:
         return this.stdout!.waitReady();
@@ -1007,13 +1006,13 @@ class DockerProcessLocal extends DockerProcess {
   @override
   bool get isReady {
     switch (outputReadyType) {
-      case OutputReadyType.STDOUT:
+      case OutputReadyType.stdout:
         return this.stdout!.isReady;
-      case OutputReadyType.STDERR:
+      case OutputReadyType.stderr:
         return this.stderr!.isReady;
-      case OutputReadyType.ANY:
+      case OutputReadyType.any:
         return this.stdout!.isReady || this.stderr!.isReady;
-      case OutputReadyType.STARTS_READY:
+      case OutputReadyType.startsReady:
         return true;
       default:
         return this.stdout!.isReady;

@@ -4,7 +4,7 @@ import 'package:docker_commander/docker_commander_vm.dart';
 import 'package:logging/logging.dart';
 import 'package:swiss_knife/swiss_knife.dart';
 
-const int DEFAULT_SERVER_PORT = 8099;
+const int defaultServerPort = 8099;
 
 bool _loggerConfigured = false;
 
@@ -38,7 +38,7 @@ void showHelp() {
   print(
       '  \$> docker_commander_server %username %password %port? --public/private? --ipv6?');
   print('');
-  print('## Default Server port: $DEFAULT_SERVER_PORT');
+  print('## Default Server port: $defaultServerPort');
   print('');
 }
 
@@ -82,8 +82,8 @@ void main(List<String> args) async {
   }
 
   var port = args.length > 2 && isInt(args[2])
-      ? parseInt(args[2], DEFAULT_SERVER_PORT)
-      : DEFAULT_SERVER_PORT;
+      ? parseInt(args[2], defaultServerPort)
+      : defaultServerPort;
 
   var authenticationTable = AuthenticationTable({username: password});
   print('\n$authenticationTable');

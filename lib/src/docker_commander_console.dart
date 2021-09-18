@@ -268,7 +268,7 @@ class DockerCommanderConsole {
       case 'log':
       case 'logs':
         {
-          cmd.defaultReturnType = ConsoleCMDReturnType.STDOUT;
+          cmd.defaultReturnType = ConsoleCMDReturnType.stdout;
 
           var parameters = await _requireParameters({
             'name': cmd.get(0, 'containerOrServiceName', 'containerName',
@@ -280,9 +280,9 @@ class DockerCommanderConsole {
           }, cmd.askAllProperties);
 
           if (parseBool(parameters['stdout'], false)!) {
-            cmd.returnType = ConsoleCMDReturnType.STDOUT;
+            cmd.returnType = ConsoleCMDReturnType.stdout;
           } else if (parseBool(parameters['stderr'], false)!) {
-            cmd.returnType = ConsoleCMDReturnType.STDERR;
+            cmd.returnType = ConsoleCMDReturnType.stderr;
           }
 
           var name = parameters['name'];
@@ -309,7 +309,7 @@ class DockerCommanderConsole {
         }
       case 'execwhich':
         {
-          cmd.returnType = ConsoleCMDReturnType.STDOUT;
+          cmd.returnType = ConsoleCMDReturnType.stdout;
 
           var parameters = await _requireParameters({
             'containerName': cmd.get(0, 'containerName', 'container'),
@@ -328,7 +328,7 @@ class DockerCommanderConsole {
         }
       case 'exec':
         {
-          cmd.defaultReturnType = ConsoleCMDReturnType.STDOUT;
+          cmd.defaultReturnType = ConsoleCMDReturnType.stdout;
 
           var parameters = await _requireParameters({
             'containerName': cmd.get(0, 'containerName', 'container'),
@@ -346,7 +346,7 @@ class DockerCommanderConsole {
       case 'cmd':
       case 'command':
         {
-          cmd.defaultReturnType = ConsoleCMDReturnType.STDOUT;
+          cmd.defaultReturnType = ConsoleCMDReturnType.stdout;
 
           var parameters = await _requireParameters({
             'command': cmd.get(0, 'command', 'cmd'),
@@ -558,22 +558,22 @@ class DockerCommanderConsole {
     }
 
     switch (cmd.returnType) {
-      case ConsoleCMDReturnType.STDERR:
-      case ConsoleCMDReturnType.STDOUT:
+      case ConsoleCMDReturnType.stderr:
+      case ConsoleCMDReturnType.stdout:
         {
-          var outputName = cmd.returnType == ConsoleCMDReturnType.STDERR
+          var outputName = cmd.returnType == ConsoleCMDReturnType.stderr
               ? 'STDERR'
               : 'STDOUT';
 
-          var output = cmd.returnType == ConsoleCMDReturnType.STDERR
+          var output = cmd.returnType == ConsoleCMDReturnType.stderr
               ? process.stderr!
               : process.stdout!;
 
           await _printLineToConsole();
 
           var printData0 = output.asString;
-          var printData0_entriesRemoved = output.entriesRemoved;
-          var printData0_contentRemoved = output.contentRemoved;
+          var printData0EntriesRemoved = output.entriesRemoved;
+          var printData0ContentRemoved = output.contentRemoved;
           _printData(printData0, allowPrintAsOutput, 'printData0');
 
           var anyDataReceived = Completer<int>();
@@ -614,9 +614,9 @@ class DockerCommanderConsole {
                 .waitData(timeout: Duration(milliseconds: 300));
 
             var printData1 = output.asStringFrom(
-                entriesRealOffset: printData0_entriesRemoved,
+                entriesRealOffset: printData0EntriesRemoved,
                 contentRealOffset:
-                    printData0_contentRemoved + printData0.length);
+                    printData0ContentRemoved + printData0.length);
 
             if (printData1.isNotEmpty) {
               _printData(printData1, allowPrintAsOutput, 'printData1');
@@ -649,7 +649,7 @@ class DockerCommanderConsole {
 
           return true;
         }
-      case ConsoleCMDReturnType.EXIT_CODE:
+      case ConsoleCMDReturnType.exitCode:
         {
           var exitCode = await process.waitExit();
           await _printToConsole('EXIT CODE: $exitCode');
@@ -660,8 +660,8 @@ class DockerCommanderConsole {
     }
   }
 
-  static final RegExp _REGEXP_LINE_BREAK = RegExp(r'\r?\n', multiLine: false);
-  static final RegExp _REGEXP_LINE_BREAK_ENDING =
+  static final RegExp _regexpLineBreak = RegExp(r'\r?\n', multiLine: false);
+  static final RegExp _regexpLineBreakEnding =
       RegExp(r'\r?\n$', multiLine: false);
 
   Future<void> _cancelStreamSubscription(StreamSubscription listener) async {
@@ -675,34 +675,31 @@ class DockerCommanderConsole {
   int _printID = 0;
 
   void _printData(data, bool allowPrintAsOutput, [String? from]) {
-    var lines;
+    Iterable<String>? lines;
 
     if (data is List<String>) {
       var s = data.join();
       if (data.isNotEmpty) {
-        lines = s
-            .replaceFirst(_REGEXP_LINE_BREAK_ENDING, '')
-            .split(_REGEXP_LINE_BREAK);
+        lines =
+            s.replaceFirst(_regexpLineBreakEnding, '').split(_regexpLineBreak);
       }
     } else if (data is String) {
       if (data.isNotEmpty) {
         lines = data
-            .replaceFirst(_REGEXP_LINE_BREAK_ENDING, '')
-            .split(_REGEXP_LINE_BREAK);
+            .replaceFirst(_regexpLineBreakEnding, '')
+            .split(_regexpLineBreak);
       }
     } else if (data is List<int>) {
       var s = String.fromCharCodes(data);
       if (s.isNotEmpty) {
-        lines = s
-            .replaceFirst(_REGEXP_LINE_BREAK_ENDING, '')
-            .split(_REGEXP_LINE_BREAK);
+        lines =
+            s.replaceFirst(_regexpLineBreakEnding, '').split(_regexpLineBreak);
       }
     } else if (data is int) {
       var s = String.fromCharCodes([data]);
       if (s.isNotEmpty) {
-        lines = s
-            .replaceFirst(_REGEXP_LINE_BREAK_ENDING, '')
-            .split(_REGEXP_LINE_BREAK);
+        lines =
+            s.replaceFirst(_regexpLineBreakEnding, '').split(_regexpLineBreak);
       }
     }
 
@@ -1001,20 +998,20 @@ class ConsoleCMD {
       getProperty(propertyKey4);
 
   set returnType(ConsoleCMDReturnType type) {
-    var typeStr;
+    String? typeStr;
 
     switch (type) {
-      case ConsoleCMDReturnType.STDOUT:
+      case ConsoleCMDReturnType.stdout:
         {
           typeStr = 'stdout';
           break;
         }
-      case ConsoleCMDReturnType.STDERR:
+      case ConsoleCMDReturnType.stderr:
         {
           typeStr = 'stderr';
           break;
         }
-      case ConsoleCMDReturnType.EXIT_CODE:
+      case ConsoleCMDReturnType.exitCode:
         {
           typeStr = 'exit_code';
           break;
@@ -1034,23 +1031,23 @@ class ConsoleCMD {
   ConsoleCMDReturnType get returnType {
     var ret = getProperty('return');
     if (isEmptyString(ret, trim: true)) {
-      return ConsoleCMDReturnType.STDOUT;
+      return ConsoleCMDReturnType.stdout;
     }
     ret = ret!.trim().toLowerCase();
 
     switch (ret) {
       case 'stdout':
-        return ConsoleCMDReturnType.STDOUT;
+        return ConsoleCMDReturnType.stdout;
       case 'err':
       case 'error':
       case 'stderr':
-        return ConsoleCMDReturnType.STDERR;
+        return ConsoleCMDReturnType.stderr;
       case 'exit':
       case 'exitcode':
       case 'exit_code':
-        return ConsoleCMDReturnType.EXIT_CODE;
+        return ConsoleCMDReturnType.exitCode;
       default:
-        return ConsoleCMDReturnType.STDOUT;
+        return ConsoleCMDReturnType.stdout;
     }
   }
 
@@ -1062,4 +1059,4 @@ class ConsoleCMD {
   }
 }
 
-enum ConsoleCMDReturnType { STDOUT, STDERR, EXIT_CODE }
+enum ConsoleCMDReturnType { stdout, stderr, exitCode }

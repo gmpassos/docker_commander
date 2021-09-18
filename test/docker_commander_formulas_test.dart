@@ -1,5 +1,4 @@
 @Timeout(Duration(minutes: 2))
-
 import 'package:apollovm/apollovm.dart';
 import 'package:docker_commander/docker_commander_vm.dart';
 import 'package:logging/logging.dart';
@@ -8,7 +7,7 @@ import 'package:test/test.dart';
 
 import 'logger_config.dart';
 
-final _LOG = Logger('docker_commander/test');
+final _log = Logger('docker_commander/test');
 
 void main() {
   configureLogger();
@@ -17,51 +16,79 @@ void main() {
     late DockerCommander dockerCommander;
     late DockerCommanderConsole dockerCommanderConsole;
     late DockerCommanderFormulaRepositoryStandard formulaRepositoryStandard;
+    late List<String> nonTestContainersNames;
+
+    void removeNonTestContainersNames(List<String>? names) {
+      if (names == null) return;
+      names.removeWhere((e) => nonTestContainersNames.contains(e));
+    }
+
+    String createContainerName(String prefix) {
+      if (!nonTestContainersNames.contains(prefix)) {
+        return prefix;
+      }
+
+      for (var i = 1; i <= 1000; ++i) {
+        var name = '${prefix}_$i';
+
+        if (!nonTestContainersNames.contains(name)) {
+          return name;
+        }
+      }
+
+      throw StateError(
+          "Can't create container name> prefix: $prefix ; nonTestContainersNames: $nonTestContainersNames");
+    }
 
     setUp(() async {
-      logTitle(_LOG, 'SETUP');
+      logTitle(_log, 'SETUP');
 
       var dockerHost = DockerHostLocal();
       dockerCommander = DockerCommander(dockerHost);
-      _LOG.info('setUp>\tDockerCommander: $dockerCommander');
+      _log.info('setUp>\tDockerCommander: $dockerCommander');
 
-      _LOG.info('setUp>\tDockerCommander.initialize()');
+      _log.info('setUp>\tDockerCommander.initialize()');
       await dockerCommander.initialize();
       expect(dockerCommander.isSuccessfullyInitialized, isTrue);
-      _LOG.info('setUp>\tDockerCommander: $dockerCommander');
+      _log.info('setUp>\tDockerCommander: $dockerCommander');
 
-      _LOG.info('setUp>\tDockerCommander.checkDaemon()');
+      _log.info('setUp>\tDockerCommander.checkDaemon()');
       await dockerCommander.checkDaemon();
-      _LOG.info('setUp>\tDockerCommander: $dockerCommander');
+      _log.info('setUp>\tDockerCommander: $dockerCommander');
 
       expect(dockerCommander.lastDaemonCheck, isNotNull);
-      _LOG.info('setUp>\tDockerCommander.lastDaemonCheck: $dockerCommander');
+      _log.info('setUp>\tDockerCommander.lastDaemonCheck: $dockerCommander');
 
       dockerCommanderConsole =
           DockerCommanderConsole(dockerCommander, (name, description) async {
         return '';
       }, (line, output) async {
-        _LOG.info(output ? '>> $line' : line);
+        _log.info(output ? '>> $line' : line);
       });
 
       formulaRepositoryStandard = DockerCommanderFormulaRepositoryStandard();
 
-      logTitle(_LOG, 'TEST');
+      nonTestContainersNames =
+          (await dockerCommander.psContainerNames()) ?? <String>[];
+
+      _log.info('setUp> nonTestContainersNames: $nonTestContainersNames');
+
+      logTitle(_log, 'TEST');
     });
 
     tearDown(() async {
-      logTitle(_LOG, 'TEARDOWN');
+      logTitle(_log, 'TEARDOWN');
 
-      _LOG.info('tearDown>\tDockerCommander: $dockerCommander');
-      _LOG.info('tearDown>\tDockerCommander.close()');
+      _log.info('tearDown>\tDockerCommander: $dockerCommander');
+      _log.info('tearDown>\tDockerCommander.close()');
       await dockerCommander.close();
-      _LOG.info('tearDown>\tDockerCommander: $dockerCommander');
+      _log.info('tearDown>\tDockerCommander: $dockerCommander');
     });
 
     test('DockerCommanderFormulaRepositoryStandard: listFormulasNames',
         () async {
       var formulasNames = await formulaRepositoryStandard.listFormulasNames();
-      _LOG.info('formulasNames: $formulasNames');
+      _log.info('formulasNames: $formulasNames');
       expect(formulasNames, equals(['apache', 'gitlab']));
     });
 
@@ -73,22 +100,32 @@ void main() {
 
       formula.setup(dockerCommanderConsole: dockerCommanderConsole);
 
+      var containerName = createContainerName('dc_test_apache');
+
       var psContainerNames0 = await dockerCommander.psContainerNames();
-      _LOG.info('containerNames0: $psContainerNames0');
+      removeNonTestContainersNames(psContainerNames0);
+      _log.info('containerNames0: $psContainerNames0');
       expect(psContainerNames0, isEmpty);
+
+      formula.overwriteField('name', containerName);
+
+      var formulaFields = await formula.getFields();
+      expect(formulaFields,
+          equals({'name': containerName, 'hostname': 'apache', 'port': 80}));
 
       var installed = await formula.install();
       expect(installed, isTrue);
 
       var psContainerNames1 = await dockerCommander.psContainerNames();
-      _LOG.info('containerNames1: $psContainerNames1');
-      expect(psContainerNames1, contains('apache'));
+      removeNonTestContainersNames(psContainerNames1);
+      _log.info('containerNames1: $psContainerNames1');
+      expect(psContainerNames1, contains(containerName));
 
       var name = await formula.getFormulaName();
       expect(name, equals('apache'));
 
       var version = await formula.getFormulaVersion();
-      expect(version, equals('1.0'));
+      expect(version, equals('1.1'));
 
       var className = await formula.getFormulaClassName();
       expect(className, equals('ApacheFormula'));
@@ -102,7 +139,8 @@ void main() {
       expect(uninstalled, isTrue);
 
       var psContainerNames2 = await dockerCommander.psContainerNames();
-      _LOG.info('containerNames2: $psContainerNames2');
+      removeNonTestContainersNames(psContainerNames2);
+      _log.info('containerNames2: $psContainerNames2');
       expect(psContainerNames2, isEmpty);
     });
 
@@ -121,7 +159,8 @@ void main() {
       formula.setup(dockerCommanderConsole: dockerCommanderConsole);
 
       var psContainerNames0 = await dockerCommander.psContainerNames();
-      _LOG.info('containerNames0: $psContainerNames0');
+      removeNonTestContainersNames(psContainerNames0);
+      _log.info('containerNames0: $psContainerNames0');
       expect(psContainerNames0, isEmpty);
 
       var name = await formula.getFormulaName();
@@ -155,7 +194,7 @@ void main() {
 
       var fields = await formula.getFields();
 
-      _LOG.info('fields: $fields');
+      _log.info('fields: $fields');
 
       var fieldsSorted = sortMapEntriesByKey<String, Object>(fields);
 
@@ -172,7 +211,7 @@ void main() {
       formula.overwriteField('hostGitlabConfigPath', '/tmp/gitlab-config');
 
       var fields2 = await formula.getFields();
-      _LOG.info('fields2: $fields2');
+      _log.info('fields2: $fields2');
 
       expect(fields2['hostGitlabConfigPath'], equals('/tmp/gitlab-config'));
 
@@ -181,10 +220,10 @@ void main() {
       cmdLog.clear();
       var regRet =
           await formula.run('registerRunner', ['10.0.0.1', 'TOKEN_XYZ']);
-      expect(regRet, equals(ASTValueVoid.INSTANCE));
+      expect(regRet, equals(ASTValueVoid.instance));
 
       for (var cmdLine in cmdLog) {
-        _LOG.info('FORMULA CMD> $cmdLine');
+        _log.info('FORMULA CMD> $cmdLine');
       }
 
       expect(cmdLog[0], contains('http://10.0.0.1/'));

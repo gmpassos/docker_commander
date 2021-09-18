@@ -718,7 +718,7 @@ abstract class DockerCMD {
           containerNameOrID,
           if (follow) '-f',
         ],
-        outputReadyType: OutputReadyType.STARTS_READY,
+        outputReadyType: OutputReadyType.startsReady,
       );
 
   /// Opens a Service logs, by [serviceNameOrTask]:
@@ -732,7 +732,7 @@ abstract class DockerCMD {
             serviceNameOrTask,
             if (follow) '-f',
           ],
-          outputReadyType: OutputReadyType.STARTS_READY);
+          outputReadyType: OutputReadyType.startsReady);
 
   /// Returns the Container logs as [String].
   static Future<String?> catContainerLogs(

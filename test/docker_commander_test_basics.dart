@@ -5,7 +5,7 @@ import 'package:test/test.dart';
 
 import 'logger_config.dart';
 
-final _LOG = Logger('docker_commander/test');
+final _log = Logger('docker_commander/test');
 
 typedef DockerHostLocalInstantiator = DockerHost Function(int listenPort);
 
@@ -17,7 +17,7 @@ void doBasicTests(DockerHostLocalInstantiator dockerHostLocalInstantiator,
     var listenPort = 8099;
 
     setUp(() async {
-      logTitle(_LOG, 'SETUP');
+      logTitle(_log, 'SETUP');
 
       if (preSetup != null) {
         listenPort = await preSetup();
@@ -25,30 +25,30 @@ void doBasicTests(DockerHostLocalInstantiator dockerHostLocalInstantiator,
 
       var dockerHost = dockerHostLocalInstantiator(listenPort);
       dockerCommander = DockerCommander(dockerHost);
-      _LOG.info('setUp>\tDockerCommander: $dockerCommander');
+      _log.info('setUp>\tDockerCommander: $dockerCommander');
 
-      _LOG.info('setUp>\tDockerCommander.initialize()');
+      _log.info('setUp>\tDockerCommander.initialize()');
       await dockerCommander!.initialize();
       expect(dockerCommander!.isSuccessfullyInitialized, isTrue);
-      _LOG.info('setUp>\tDockerCommander: $dockerCommander');
+      _log.info('setUp>\tDockerCommander: $dockerCommander');
 
-      _LOG.info('setUp>\tDockerCommander.checkDaemon()');
+      _log.info('setUp>\tDockerCommander.checkDaemon()');
       await dockerCommander!.checkDaemon();
-      _LOG.info('setUp>\tDockerCommander: $dockerCommander');
+      _log.info('setUp>\tDockerCommander: $dockerCommander');
 
       expect(dockerCommander!.lastDaemonCheck, isNotNull);
-      _LOG.info('setUp>\tDockerCommander.lastDaemonCheck: $dockerCommander');
+      _log.info('setUp>\tDockerCommander.lastDaemonCheck: $dockerCommander');
 
-      logTitle(_LOG, 'TEST');
+      logTitle(_log, 'TEST');
     });
 
     tearDown(() async {
-      logTitle(_LOG, 'TEAR DOWN');
+      logTitle(_log, 'TEAR DOWN');
 
-      _LOG.info('tearDown>\tDockerCommander: $dockerCommander');
-      _LOG.info('tearDown>\tDockerCommander.close()');
+      _log.info('tearDown>\tDockerCommander: $dockerCommander');
+      _log.info('tearDown>\tDockerCommander.close()');
       await dockerCommander!.close();
-      _LOG.info('tearDown>\tDockerCommander: $dockerCommander');
+      _log.info('tearDown>\tDockerCommander: $dockerCommander');
 
       dockerCommander = null;
     });
@@ -56,7 +56,7 @@ void doBasicTests(DockerHostLocalInstantiator dockerHostLocalInstantiator,
     test('Image: hello-world', () async {
       var dockerContainer = await dockerCommander!.run('hello-world');
 
-      _LOG.info(dockerContainer);
+      _log.info(dockerContainer);
 
       expect(dockerContainer!.instanceID > 0, isTrue);
       expect(dockerContainer.name.isNotEmpty, isTrue);
@@ -67,9 +67,9 @@ void doBasicTests(DockerHostLocalInstantiator dockerHostLocalInstantiator,
       var output = dockerContainer.stdout!.asString;
       expect(output, contains('Hello from Docker!'));
 
-      _LOG.info('<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<');
-      _LOG.info(output);
-      _LOG.info('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>');
+      _log.info('<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<');
+      _log.info(output);
+      _log.info('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>');
 
       expect(dockerContainer.id!.isNotEmpty, isTrue);
     });
@@ -81,7 +81,7 @@ void doBasicTests(DockerHostLocalInstantiator dockerHostLocalInstantiator,
       var containerInfos =
           await dockerCommander!.createContainer(containerName, 'hello-world');
 
-      _LOG.info(containerInfos);
+      _log.info(containerInfos);
 
       expect(containerInfos, isNotNull);
       expect(containerInfos!.containerName, isNotNull);
@@ -102,12 +102,12 @@ void doBasicTests(DockerHostLocalInstantiator dockerHostLocalInstantiator,
     test('ApacheHttpdContainer', () async {
       var apachePort = listenPort - 4000;
 
-      _LOG.info('Starting Apache HTTP at port $apachePort');
+      _log.info('Starting Apache HTTP at port $apachePort');
 
       var dockerContainer = await ApacheHttpdContainer()
           .run(dockerCommander!, hostPorts: [apachePort]);
 
-      _LOG.info(dockerContainer);
+      _log.info(dockerContainer);
 
       expect(dockerContainer.instanceID > 0, isTrue);
       expect(dockerContainer.name.isNotEmpty, isTrue);
@@ -122,7 +122,7 @@ void doBasicTests(DockerHostLocalInstantiator dockerHostLocalInstantiator,
       var getURLResponse =
           await HttpClient('http://localhost:$hostPort/').get('');
       var getURLContent = getURLResponse.bodyAsString;
-      _LOG.info(getURLContent);
+      _log.info(getURLContent);
       expect(getURLContent, contains('<html>'));
 
       await dockerContainer.stop(timeout: Duration(seconds: 5));
@@ -130,9 +130,9 @@ void doBasicTests(DockerHostLocalInstantiator dockerHostLocalInstantiator,
       var output = dockerContainer.stderr!.asString;
       expect(output, contains('Apache'));
 
-      _LOG.info('<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<');
-      _LOG.info(output);
-      _LOG.info('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>');
+      _log.info('<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<');
+      _log.info(output);
+      _log.info('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>');
 
       expect(dockerContainer.id!.isNotEmpty, isTrue);
     });

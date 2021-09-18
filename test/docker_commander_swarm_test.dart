@@ -6,7 +6,7 @@ import 'package:test/test.dart';
 
 import 'logger_config.dart';
 
-final _LOG = Logger('docker_commander/test');
+final _log = Logger('docker_commander/test');
 
 void main() {
   configureLogger();
@@ -15,7 +15,7 @@ void main() {
     late DockerCommander dockerCommander;
 
     setUp(() async {
-      logTitle(_LOG, 'SETUP');
+      logTitle(_log, 'SETUP');
 
       var dockerHost = DockerHostLocal();
       dockerCommander = DockerCommander(dockerHost);
@@ -23,15 +23,15 @@ void main() {
       await dockerCommander.initialize();
       await dockerCommander.checkDaemon();
 
-      _LOG.info('setUp>\tDockerCommander: $dockerCommander');
+      _log.info('setUp>\tDockerCommander: $dockerCommander');
 
-      logTitle(_LOG, 'TEST');
+      logTitle(_log, 'TEST');
     });
 
     tearDown(() async {
-      logTitle(_LOG, 'TEARDOWN');
+      logTitle(_log, 'TEARDOWN');
       await dockerCommander.close();
-      _LOG.info('tearDown>\tDockerCommander: $dockerCommander');
+      _log.info('tearDown>\tDockerCommander: $dockerCommander');
     });
 
     test('Swarm 1', () async {
@@ -51,13 +51,13 @@ void main() {
       expect(swarmInfos.advertiseAddress, isNotEmpty);
       expect(swarmInfos.managerToken == swarmInfos.workerToken, isFalse);
 
-      _LOG.info('SwarmInfos: $swarmInfos');
+      _log.info('SwarmInfos: $swarmInfos');
 
       myNodeID = await dockerCommander.swarmSelfNodeID();
       expect(myNodeID, matches(RegExp(r'\w+')));
       expect(myNodeID, equals(swarmInfos.nodeID));
 
-      _LOG.info('My swarm node ID: $myNodeID');
+      _log.info('My swarm node ID: $myNodeID');
       expect(myNodeID, matches(RegExp(r'\w+')));
 
       var service = await dockerCommander.createService(
@@ -65,33 +65,33 @@ void main() {
           replicas: 2, ports: ['4083:80']);
       expect(service, isNotNull);
 
-      _LOG.info('Service: $service');
+      _log.info('Service: $service');
 
       var tasks = await service!.listTasks();
 
-      _LOG.info('Tasks[${tasks!.length}]:');
+      _log.info('Tasks[${tasks!.length}]:');
       for (var task in tasks) {
-        _LOG.info('[${task.isCurrentlyRunning ? 'RUNNING' : '...'}] - $task');
+        _log.info('[${task.isCurrentlyRunning ? 'RUNNING' : '...'}] - $task');
       }
 
       var apacheContent =
           (await HttpClient('http://localhost:4083/').get('')).bodyAsString;
 
-      _LOG.info('<<<<<<<<<<<<<<<<<<<<<<<<<<<');
-      _LOG.info('Apache content:');
-      _LOG.info(apacheContent);
-      _LOG.info('>>>>>>>>>>>>>>>>>>>>>>>>>>>');
+      _log.info('<<<<<<<<<<<<<<<<<<<<<<<<<<<');
+      _log.info('Apache content:');
+      _log.info(apacheContent);
+      _log.info('>>>>>>>>>>>>>>>>>>>>>>>>>>>');
 
       expect(apacheContent, contains('<html>'));
 
       var apacheLogs = await service.catLogs(
           waitDataMatcher: 'GET /', waitDataTimeout: Duration(seconds: 1));
 
-      _LOG.info(
+      _log.info(
           '------------------------------------------------------------ Apache logs:');
-      _LOG.info(apacheLogs);
+      _log.info(apacheLogs);
       expect(apacheLogs, contains('GET /'));
-      _LOG.info('------------------------------------------------------------');
+      _log.info('------------------------------------------------------------');
 
       var removed = await service.remove();
       expect(removed, isTrue);

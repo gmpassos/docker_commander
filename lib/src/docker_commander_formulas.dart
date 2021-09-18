@@ -45,7 +45,7 @@ class DockerCommanderFormula {
   /// Returns the formula name, calling `getName`.
   Future<String> getFormulaName() async {
     if (_formulaName == null) {
-      var astValue = await run('getName', []);
+      var astValue = await run('getName', [], fields: _fieldOverwrite);
 
       if (astValue != null) {
         var name = parseString(await astValue.getValueNoContext(), '')!.trim();
@@ -70,7 +70,7 @@ class DockerCommanderFormula {
   /// Returns the formula version, calling `getVersion`.
   Future<String> getFormulaVersion() async {
     if (_formulaVersion == null) {
-      var astValue = await run('getVersion', []);
+      var astValue = await run('getVersion', [], fields: _fieldOverwrite);
 
       if (astValue != null) {
         var ver = parseString(await astValue.getValueNoContext(), '')!.trim();
@@ -166,7 +166,7 @@ class DockerCommanderFormula {
           "A formula needs a class with name ending in 'Formula'.");
     }
 
-    var clazz = await runner.getClass('', namespace: className);
+    var clazz = await runner.getClass(className);
     if (clazz == null) {
       throw StateError("Can't find class: $className");
     }
@@ -186,7 +186,7 @@ class DockerCommanderFormula {
           "A formula needs a class with name ending in 'Formula'.");
     }
 
-    var clazz = await runner.getClass('', namespace: className);
+    var clazz = await runner.getClass(className);
     if (clazz == null) {
       throw StateError("Can't find class: $className");
     }
@@ -209,36 +209,36 @@ class DockerCommanderFormula {
     }
 
     runner.externalFunctionMapper!.mapExternalFunction1(
-        ASTTypeVoid.INSTANCE,
+        ASTTypeVoid.instance,
         'cmd',
-        ASTTypeString.INSTANCE,
+        ASTTypeString.instance,
         'cmd',
-        (String cmd) => _mapped_dockerCommander_cmd(cmd));
+        (String cmd) => _mappedDockerCommanderCMD(cmd));
 
     return runner;
   }
 
   /// Install this formula, calling `install()`.
   Future<bool> install([List parameters = const []]) async {
-    var result = await run('install', parameters);
+    var result = await run('install', parameters, fields: _fieldOverwrite);
     return result != null;
   }
 
   /// Uninstall this formula, calling `uninstall()`.
   Future<bool> uninstall([List parameters = const []]) async {
-    var result = await run('uninstall', parameters);
+    var result = await run('uninstall', parameters, fields: _fieldOverwrite);
     return result != null;
   }
 
   /// Starts this formula, calling `start()`.
   Future<bool> start() async {
-    var result = await run('start', []);
+    var result = await run('start', [], fields: _fieldOverwrite);
     return result != null;
   }
 
   /// Stops this formula, calling `stop()`.
   Future<bool> stop() async {
-    var result = await run('stop', []);
+    var result = await run('stop', [], fields: _fieldOverwrite);
     return result != null;
   }
 
@@ -252,7 +252,7 @@ class DockerCommanderFormula {
 
   /// When a formula calls `cmd('start container-x')`
   /// it will be mapped to this function.
-  Future<bool> _mapped_dockerCommander_cmd(String cmdLine) async {
+  Future<bool> _mappedDockerCommanderCMD(String cmdLine) async {
     var cmd = ConsoleCMD.parse(cmdLine);
     if (cmd == null) {
       throw StateError("Can't parse command: $cmdLine");
@@ -293,7 +293,8 @@ class DockerCommanderFormula {
   Future<dynamic> exec(String functionName,
       [List? arguments, Map<String, dynamic>? fields]) async {
     arguments ??= [];
-    var result = await run(functionName, arguments, fields: fields);
+    var result =
+        await run(functionName, arguments, fields: fields ?? _fieldOverwrite);
 
     if (result == null) return null;
 
@@ -345,11 +346,14 @@ class DockerCommanderFormulaSource {
   DockerCommanderFormula toFormula() => DockerCommanderFormula(this);
 }
 
+/// Base class for formula repositories.
 abstract class DockerCommanderFormulaRepository {
+  /// The optional parent [DockerCommanderFormulaRepository] of this instance.
   DockerCommanderFormulaRepository? parent;
 
   DockerCommanderFormulaRepository([this.parent]);
 
+  /// Lists the [DockerCommanderFormulaSource] of this repository.
   FutureOr<List<DockerCommanderFormulaSource>> listFormulasSources();
 
   Map<String, DockerCommanderFormulaSource>? _formulasSourcesTable;
@@ -371,6 +375,7 @@ abstract class DockerCommanderFormulaRepository {
 
   List<String>? _formulasNames;
 
+  /// Lists the formulas names in this repository.
   FutureOr<List<String>> listFormulasNames() async {
     if (_formulasNames == null) {
       var formulasSources = await listFormulasSources();
@@ -385,13 +390,22 @@ abstract class DockerCommanderFormulaRepository {
     return _formulasNames!.toList();
   }
 
+  /// Returns a [DockerCommanderFormulaSource] for [formulaName].
   Future<DockerCommanderFormulaSource?> getFormulaSource(
       String formulaName) async {
     var table = await getFormulasSourcesTable();
     return table[formulaName];
   }
+
+  /// Returns a [DockerCommanderFormula] for [formulaName].
+  Future<DockerCommanderFormula?> getFormula(String formulaName) async {
+    var formulaSource = await getFormulaSource(formulaName);
+    var formula = formulaSource?.toFormula();
+    return formula;
+  }
 }
 
+/// The standard [DockerCommanderFormulaRepository].
 class DockerCommanderFormulaRepositoryStandard
     extends DockerCommanderFormulaRepository {
   List<DockerCommanderFormulaSource>? _formulasSources;

@@ -5,7 +5,7 @@ import 'docker_commander_base.dart';
 import 'docker_commander_containers.dart';
 import 'docker_commander_host.dart';
 
-final _LOG = Logger('docker_commander/NginxContainer');
+final _log = Logger('docker_commander/NginxContainer');
 
 class DockerContainerNginx extends DockerContainer {
   final NginxContainer containerConfig;
@@ -60,21 +60,21 @@ class NginxContainer extends DockerContainerConfig<DockerContainerNginx> {
     var putOK =
         await dockerContainer.putFileContent(configPath, config, sudo: true);
     if (!putOK) {
-      _LOG.severe(
+      _log.severe(
           "Can't put int container `${dockerContainer.name}` config file at: $configPath");
       return false;
     }
 
     var testOK = await dockerContainer.testConfiguration();
     if (!testOK) {
-      _LOG.severe(
+      _log.severe(
           'Nginx configuration test failed! container: `${dockerContainer.name}` ; path: $configPath');
       return false;
     }
 
     var reloadOK = await dockerContainer.reloadConfiguration();
     if (!reloadOK) {
-      _LOG.severe(
+      _log.severe(
           'Error reloading NGINX configuration! container: `${dockerContainer.name}` ; path: $configPath');
       return false;
     }

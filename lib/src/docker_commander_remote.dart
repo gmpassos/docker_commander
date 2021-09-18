@@ -9,7 +9,7 @@ import 'package:swiss_knife/swiss_knife.dart';
 import 'docker_commander_base.dart';
 import 'docker_commander_host.dart';
 
-final _LOG = Logger('docker_commander/remote');
+final _log = Logger('docker_commander/remote');
 
 class DockerHostRemote extends DockerHost {
   final String serverHost;
@@ -29,11 +29,11 @@ class DockerHostRemote extends DockerHost {
   DockerHostRemote(
     this.serverHost,
     this.serverPort, {
-    bool secure = false,
+    this.secure = false,
     this.username,
     this.password,
     this.token,
-  }) : secure = secure {
+  }) {
     _httpClient = HttpClient(baseURL)
       ..autoChangeAuthorizationToBearerToken('X-Access-Token')
       ..authorization = Authorization.fromProvider(_authenticate);
@@ -95,7 +95,7 @@ class DockerHostRemote extends DockerHost {
     ok ??= false;
 
     if (!ok) {
-      _LOG.severe("Server operation 'close' returned: $ok");
+      _log.severe("Server operation 'close' returned: $ok");
     }
   }
 
@@ -137,7 +137,7 @@ class DockerHostRemote extends DockerHost {
       if (environment != null) 'environment': encodeQueryString(environment),
       if (volumes != null) 'volumes': encodeQueryString(volumes),
       'cleanContainer': '$cleanContainer',
-      if (healthCmd != null) 'healthCmd': '$healthCmd',
+      if (healthCmd != null) 'healthCmd': healthCmd,
       if (healthInterval != null)
         'healthInterval': '${healthInterval.inMilliseconds}',
       if (healthRetries != null) 'healthRetries': '$healthRetries',
@@ -157,14 +157,14 @@ class DockerHostRemote extends DockerHost {
     network = response['network'] as String?;
     hostname = response['hostname'] as String?;
 
-    ports = portsList != null ? portsList.cast<String>().toList() : null;
+    ports = portsList?.cast<String>().toList();
 
     return ContainerInfos(containerName, id, image, ports, network, hostname);
   }
 
   @override
   Future<DockerRunner?> run(
-    String imageName, {
+    String image, {
     String? version,
     List<String>? imageArgs,
     String? containerName,
@@ -193,7 +193,7 @@ class DockerHostRemote extends DockerHost {
         : null;
 
     var response = await _httpClient.getJSON('run', parameters: {
-      'image': imageName,
+      'image': image,
       if (version != null) 'version': version,
       if (imageArgsEncoded != null) 'imageArgs': imageArgsEncoded,
       if (containerName != null) 'name': containerName,
@@ -203,7 +203,7 @@ class DockerHostRemote extends DockerHost {
       if (environment != null) 'environment': encodeQueryString(environment),
       if (volumes != null) 'volumes': encodeQueryString(volumes),
       'cleanContainer': '$cleanContainer',
-      if (healthCmd != null) 'healthCmd': '$healthCmd',
+      if (healthCmd != null) 'healthCmd': healthCmd,
       if (healthInterval != null)
         'healthInterval': '${healthInterval.inMilliseconds}',
       if (healthRetries != null) 'healthRetries': '$healthRetries',
@@ -228,13 +228,13 @@ class DockerHostRemote extends DockerHost {
     stdoutReadyFunction ??= (outputStream, data) => true;
     stderrReadyFunction ??= (outputStream, data) => true;
 
-    var image = DockerHost.resolveImage(imageName, version);
+    var imageResolved = DockerHost.resolveImage(image, version);
 
     var runner = DockerRunnerRemote(
         this,
         instanceID,
         containerName!,
-        image,
+        imageResolved,
         ports,
         outputLimit,
         outputAsLines,
@@ -248,7 +248,7 @@ class DockerHostRemote extends DockerHost {
     var ok = await _initializeAndWaitReady(runner);
 
     if (ok) {
-      _LOG.info('Runner[$ok]: $runner');
+      _log.info('Runner[$ok]: $runner');
     }
 
     return runner;
@@ -259,7 +259,7 @@ class DockerHostRemote extends DockerHost {
     var ok = await dockerProcess.initialize();
 
     if (!ok) {
-      _LOG.warning('Initialization issue for $dockerProcess');
+      _log.warning('Initialization issue for $dockerProcess');
       return false;
     }
 
@@ -272,7 +272,7 @@ class DockerHostRemote extends DockerHost {
 
     var ready = await dockerProcess.waitReady();
     if (!ready) {
-      _LOG.warning('Ready issue for $dockerProcess');
+      _log.warning('Ready issue for $dockerProcess');
       return false;
     }
 
@@ -326,7 +326,7 @@ class DockerHostRemote extends DockerHost {
     var ok = await _initializeAndWaitReady(dockerProcess);
 
     if (ok) {
-      _LOG.info('Exec[$ok]: $dockerProcess');
+      _log.info('Exec[$ok]: $dockerProcess');
     }
 
     return dockerProcess;
@@ -376,7 +376,7 @@ class DockerHostRemote extends DockerHost {
     var ok = await _initializeAndWaitReady(dockerProcess);
 
     if (ok) {
-      _LOG.info('Command[$ok]: $dockerProcess');
+      _log.info('Command[$ok]: $dockerProcess');
     }
 
     return dockerProcess;
@@ -406,7 +406,7 @@ class DockerHostRemote extends DockerHost {
     return OutputSync(length, removed, entries, exitCode);
   }
 
-  static final Duration EXITED_PROCESS_EXPIRE_TIME =
+  static final Duration exitedProcessExpireTime =
       Duration(minutes: 2, seconds: 15);
 
   final Map<int, DockerProcessRemote> _processes = {};
@@ -416,8 +416,7 @@ class DockerHostRemote extends DockerHost {
   }
 
   void _cleanupExitedProcesses() {
-    DockerHost.cleanupExitedProcessesImpl(
-        EXITED_PROCESS_EXPIRE_TIME, _processes);
+    DockerHost.cleanupExitedProcessesImpl(exitedProcessExpireTime, _processes);
   }
 
   final Map<int, DockerRunnerRemote> _runners = {};
@@ -454,7 +453,7 @@ class DockerHostRemote extends DockerHost {
   @override
   Future<bool> stopByName(String? name, {Duration? timeout}) async {
     var ok = await _httpClient.getJSON('stop', parameters: {
-      'name': '$name',
+      'name': name ?? '',
       if (timeout != null) 'timeout': '${timeout.inSeconds}',
     }) as bool?;
     return ok!;
@@ -677,7 +676,7 @@ class DockerProcessRemote extends DockerProcess {
     stdout!.getOutputStream().markReady();
     stderr!.getOutputStream().markReady();
 
-    _LOG.info('EXIT_CODE[instanceID: $instanceID]: $exitCode');
+    _log.info('EXIT_CODE[instanceID: $instanceID]: $exitCode');
     Future.delayed(Duration(seconds: 60), () => dispose());
 
     dockerHost._notifyProcessExited(this);
@@ -767,7 +766,7 @@ class OutputClient {
         _running = false;
       }
       if (process.isRunning) {
-        _LOG.warning('Error synching output: $process', e);
+        _log.warning('Error synching output: $process', e);
       }
       return false;
     }
