@@ -67,5 +67,23 @@ ff02::2	ip6-allrouters
       expect(parse4['172.25.0.2'], equals(['apache']));
       expect(parse4['10.0.0.1'], isNull);
     });
+
+    test('inlineShellScript', () async {
+      var script = '''#!/bin/bash
+      
+  export PGPASSWORD="123456";
+  echo "psql..."
+  psql -U postgre -d postgre -c 'CREATE TABLE IF NOT EXISTS "address" ( "id" serial, "state" text, "city" text, "street" text, "number" integer, PRIMARY KEY( id ) )'
+  sleep 1
+  
+      ''';
+
+      expect(
+          DockerCMD.inlineShellScript(script),
+          equals('export PGPASSWORD="123456" ; '
+              'echo "psql..." ; '
+              'psql -U postgre -d postgre -c \'CREATE TABLE IF NOT EXISTS "address" ( "id" serial, "state" text, "city" text, "street" text, "number" integer, PRIMARY KEY( id ) )\' ; '
+              'sleep 1'));
+    });
   });
 }

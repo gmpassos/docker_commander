@@ -104,7 +104,7 @@ void doBasicTests(DockerHostLocalInstantiator dockerHostLocalInstantiator,
 
       _log.info('Starting Apache HTTP at port $apachePort');
 
-      var dockerContainer = await ApacheHttpdContainer()
+      var dockerContainer = await ApacheHttpdContainerConfig()
           .run(dockerCommander!, hostPorts: [apachePort]);
 
       _log.info(dockerContainer);

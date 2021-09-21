@@ -1054,3 +1054,66 @@ class DockerProcessLocal extends DockerProcess {
     return _exitCode;
   }
 }
+
+/// Returns a [ServerSocket] port free to listen.
+///
+/// - [ports] is a [List] of ports to test.
+/// - [startPort] and [endPort] defines a range of ports to check.
+/// - If [shufflePorts] is `true` the ports order will be random.
+Future<int?> getFreeListenPort(
+    {Iterable<int>? ports,
+    Iterable<int>? skipPort,
+    int? startPort,
+    int? endPort,
+    bool shufflePorts = false,
+    Duration? testTimeout}) async {
+  var checkPortsSet = <int>{};
+  if (ports != null) {
+    checkPortsSet.addAll(ports);
+  }
+
+  if (startPort != null && endPort != null) {
+    if (startPort <= endPort) {
+      for (var p = startPort; p <= endPort; ++p) {
+        checkPortsSet.add(p);
+      }
+    } else {
+      for (var p = endPort; p <= startPort; ++p) {
+        checkPortsSet.add(p);
+      }
+    }
+  }
+
+  var checkPorts = checkPortsSet.toList();
+
+  if (skipPort != null) {
+    checkPorts.removeWhere((p) => skipPort.contains(p));
+  }
+
+  if (shufflePorts) {
+    checkPorts.shuffle();
+  }
+
+  for (var port in checkPorts) {
+    if (await isFreeListenPort(port, testTimeout: testTimeout)) {
+      return port;
+    }
+  }
+
+  return null;
+}
+
+/// Returns `true` if [port] is free to listen.
+Future<bool> isFreeListenPort(int port, {Duration? testTimeout}) async {
+  testTimeout ??= Duration(seconds: 1);
+
+  try {
+    var socket = await Socket.connect('localhost', port, timeout: testTimeout);
+    try {
+      socket.close();
+    } catch (_) {}
+    return false;
+  } catch (_) {
+    return true;
+  }
+}

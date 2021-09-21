@@ -82,7 +82,7 @@ void main(List<String> args) async {
   }
 
   var port = args.length > 2 && isInt(args[2])
-      ? parseInt(args[2], defaultServerPort)
+      ? parseInt(args[2], defaultServerPort)!
       : defaultServerPort;
 
   var authenticationTable = AuthenticationTable({username: password});

@@ -10,7 +10,7 @@ void main() async {
   var network = await dockerCommander.createNetwork();
 
   // Start Apache HTTPD, mapping port 80 to 4081.
-  var apacheContainer = await ApacheHttpdContainer().run(dockerCommander,
+  var apacheContainer = await ApacheHttpdContainerConfig().run(dockerCommander,
       hostPorts: [4081], network: network, hostname: 'apache');
 
   // Generate a NGINX configuration, mapping domain `localhost` to
@@ -19,7 +19,7 @@ void main() async {
       [NginxServerConfig('localhost', 'apache', 80, false)]).build();
 
   // Start a NGINX container using generated configuration.
-  var nginxContainer = await NginxContainer(nginxConfig, hostPorts: [4082])
+  var nginxContainer = await NginxContainerConfig(nginxConfig, hostPort: 4082)
       .run(dockerCommander, network: network, hostname: 'nginx');
 
   // Request apache:80 (mapped in the host machine to localhost:4081)

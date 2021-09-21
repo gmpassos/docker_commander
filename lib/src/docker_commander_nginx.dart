@@ -8,7 +8,7 @@ import 'docker_commander_host.dart';
 final _log = Logger('docker_commander/NginxContainer');
 
 class DockerContainerNginx extends DockerContainer {
-  final NginxContainer containerConfig;
+  final NginxContainerConfig containerConfig;
 
   DockerContainerNginx(DockerRunner runner, this.containerConfig)
       : super(runner);
@@ -32,17 +32,17 @@ class DockerContainerNginx extends DockerContainer {
 }
 
 /// NGINX pre-configured container.
-class NginxContainer extends DockerContainerConfig<DockerContainerNginx> {
+class NginxContainerConfig extends DockerContainerConfig<DockerContainerNginx> {
   final String config;
 
   final String configPath;
 
-  NginxContainer(this.config, {List<int>? hostPorts, String? configPath})
+  NginxContainerConfig(this.config, {int? hostPort, String? configPath})
       : configPath = configPath ?? '/etc/nginx/nginx.conf',
         super(
           'nginx',
           version: 'latest',
-          hostPorts: hostPorts,
+          hostPorts: hostPort != null ? [hostPort] : null,
           containerPorts: [80],
           outputAsLines: true,
           stdoutReadyFunction: (output, line) =>

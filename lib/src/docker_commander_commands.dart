@@ -338,7 +338,7 @@ abstract class DockerCMD {
   }
 
   /// Executes a shell [script]. Tries to use `bash` or `sh`.
-  /// Note that [script] should be inline, without line breaks (`\n`).
+  /// Note that [script] should be inline, without line breaks (`\n`) or comments (`#`).
   static Future<DockerProcess?> execShell(
       DockerCMDExecutor executor, String containerName, String script,
       {bool sudo = false}) async {
@@ -354,8 +354,7 @@ abstract class DockerCMD {
 
     if (bin == null) return null;
 
-    script =
-        script.replaceAll(RegExp(r'(?:\r\n|\r|\n)', multiLine: false), ' ');
+    script = inlineShellScript(script);
 
     if (sudo) {
       var sudoBin =
@@ -365,6 +364,24 @@ abstract class DockerCMD {
     } else {
       return executor.exec(containerName, bin, ['-c', script]);
     }
+  }
+
+  /// Normalizes [script] to a inline script, without line-breaks.
+  static String inlineShellScript(String script) {
+    script =
+        script.replaceAll(RegExp(r'#+[^\r\n]*[\r\n]+', multiLine: false), '\n');
+
+    script = script.replaceAll(
+        RegExp(r'[ \t]*[\r\n]+[ \t]*', multiLine: false), '\n');
+
+    script = script.replaceAll(RegExp(r'\n+', multiLine: false), '\n');
+
+    script = script.trim();
+
+    script =
+        script.replaceAll(RegExp(r'(?:\s*;\s*)?\n+', multiLine: false), ' ; ');
+
+    return script;
   }
 
   /// Save the file [containerFilePath] with [content], inside [containerName].

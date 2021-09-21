@@ -46,8 +46,12 @@ void main() {
     });
 
     test('PostgreSQL', () async {
+      var freeListenPort =
+          await getFreeListenPort(startPort: 4032, endPort: 4132);
+
       var dockerContainer =
-          await PostgreSQLContainer().run(dockerCommander, hostPorts: [4032]);
+          await PostgreSQLContainerConfig(hostPort: freeListenPort)
+              .run(dockerCommander);
 
       _log.info(dockerContainer);
 
@@ -80,6 +84,25 @@ void main() {
       expect(execPsql.stdout!.asString, contains('List of databases'));
       expect(execPsql.stderr!.asString.isEmpty, isTrue);
 
+      {
+        var sqlCreateAddress = '''
+        CREATE TABLE IF NOT EXISTS "address" (
+          "id" serial,
+          "state" text,
+          "city" text,
+          "street" text,
+          "number" integer,
+          PRIMARY KEY( id )
+        )
+      ''';
+
+        var runSQL = await dockerContainer.runSQL(sqlCreateAddress);
+        expect(runSQL, contains('CREATE TABLE'));
+
+        var psqlCMD = await dockerContainer.psqlCMD('\\d');
+        expect(psqlCMD, contains(RegExp(r'\Waddress\W')));
+      }
+
       _log.info('Stopping PostgreSQL...');
       await dockerContainer.stop(timeout: Duration(seconds: 5));
 
@@ -91,8 +114,12 @@ void main() {
     });
 
     test('Apache Httpd', () async {
+      var freeListenPort =
+          await getFreeListenPort(startPort: 4081, endPort: 4181);
+
       var dockerContainer =
-          await ApacheHttpdContainer().run(dockerCommander, hostPorts: [4081]);
+          await ApacheHttpdContainerConfig(hostPort: freeListenPort)
+              .run(dockerCommander);
 
       _log.info(dockerContainer);
 
@@ -143,12 +170,15 @@ void main() {
     });
 
     test('NGINX', () async {
+      var apachePort = await getFreeListenPort(startPort: 4071, endPort: 4171);
+
       var network = await dockerCommander.createNetwork();
 
       expect(network, isNotEmpty);
 
-      var apacheContainer = await ApacheHttpdContainer().run(dockerCommander,
-          hostPorts: [4081], network: network, hostname: 'apache');
+      var apacheContainer =
+          await ApacheHttpdContainerConfig(hostPort: apachePort)
+              .run(dockerCommander, network: network, hostname: 'apache');
       expect(await apacheContainer.waitReady(), isTrue);
 
       _log.info('Started Apache HTTPD... $apacheContainer');
@@ -163,8 +193,11 @@ void main() {
       var nginxConfig = NginxReverseProxyConfigurer(
           [NginxServerConfig('localhost', 'apache', 80, false)]).build();
 
-      var nginxContainer = await NginxContainer(nginxConfig, hostPorts: [4082])
-          .run(dockerCommander, network: network, hostname: 'nginx');
+      var nginxPort = await getFreeListenPort(startPort: 4091, endPort: 4191);
+
+      var nginxContainer =
+          await NginxContainerConfig(nginxConfig, hostPort: nginxPort)
+              .run(dockerCommander, network: network, hostname: 'nginx');
 
       _log.info(nginxContainer);
 
@@ -203,7 +236,8 @@ void main() {
       expect(reloadOK, isTrue);
 
       var apacheContent =
-          (await HttpClient('http://localhost:4081/').get('')).bodyAsString;
+          (await HttpClient('http://localhost:$apachePort/').get(''))
+              .bodyAsString;
       expect(apacheContent, contains('<html>'));
 
       _log.info(
@@ -212,7 +246,8 @@ void main() {
       _log.info('------------------------------------------------------------');
 
       var nginxContent =
-          (await HttpClient('http://localhost:4082/').get('')).bodyAsString;
+          (await HttpClient('http://localhost:$nginxPort/').get(''))
+              .bodyAsString;
       expect(nginxContent, contains('<html>'));
 
       _log.info(

@@ -45,7 +45,7 @@ class Authentication {
 /// A [DockerHost] Server, to be used by [DockerHostRemote].
 class DockerHostServer {
   /// The [HttpServer] port.
-  final int? listenPort;
+  final int listenPort;
 
   /// If [true] will accept connections from any hostname.
   final bool public;
@@ -178,7 +178,7 @@ class DockerHostServer {
 
     _server = await HttpServer.bind(
       address,
-      listenPort!,
+      listenPort,
     );
 
     _log.info('[SERVER]\tSTARTED> port: $listenPort ; server: $_server');

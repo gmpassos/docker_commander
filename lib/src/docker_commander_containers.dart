@@ -138,35 +138,109 @@ class DockerContainerConfig<D extends DockerContainer> {
 }
 
 /// PostgreSQL pre-configured container.
-class PostgreSQLContainer extends DockerContainerConfig<DockerContainer> {
-  PostgreSQLContainer(
-      {String? pgUser,
-      String? pgPassword,
-      String? pgDatabase,
-      List<int>? hostPorts})
+class PostgreSQLContainerConfig
+    extends DockerContainerConfig<PostgreSQLContainer> {
+  String pgUser;
+
+  String pgPassword;
+
+  String pgDatabase;
+
+  PostgreSQLContainerConfig(
+      {this.pgUser = 'postgres',
+      this.pgPassword = 'postgres',
+      this.pgDatabase = 'postgres',
+      int? hostPort})
       : super(
           'postgres',
           version: 'latest',
-          hostPorts: hostPorts,
+          hostPorts: hostPort != null ? [hostPort] : null,
           containerPorts: [5432],
           environment: {
-            if (pgUser != null) 'POSTGRES_USER': pgUser,
-            'POSTGRES_PASSWORD': pgPassword ?? 'postgres',
-            if (pgDatabase != null) 'POSTGRES_DB': pgDatabase,
+            'POSTGRES_USER': pgUser,
+            'POSTGRES_PASSWORD': pgPassword,
+            'POSTGRES_DB': pgDatabase,
           },
           outputAsLines: true,
           stdoutReadyFunction: (output, line) =>
               line.contains('database system is ready to accept connections'),
-        );
+        ) {
+    if (pgUser.trim().isEmpty) {
+      throw ArgumentError('Invalid pgUser: $pgUser');
+    }
+
+    if (pgDatabase.trim().isEmpty) {
+      throw ArgumentError('Invalid pgDatabase: $pgDatabase');
+    }
+
+    if (pgPassword.isEmpty) {
+      throw ArgumentError('Invalid pgPassword: $pgUser');
+    }
+  }
+
+  @override
+  PostgreSQLContainer? instantiateDockerContainer(DockerRunner runner) =>
+      PostgreSQLContainer(this, runner);
+}
+
+class PostgreSQLContainer extends DockerContainer {
+  final PostgreSQLContainerConfig config;
+
+  PostgreSQLContainer(this.config, DockerRunner runner) : super(runner);
+
+  /// Runs a SQL. Note that [sqlInline] should be a inline [String], without line-breaks (`\n`).
+  ///
+  /// Calls [psqlCMD].
+  Future<String?> runSQL(String sqlInline) => _psqlSQL(sqlInline);
+
+  Future<String?> _psqlSQL(String sql) {
+    sql = _normalizeSQL(sql);
+    return psqlCMD(sql);
+  }
+
+  /// Runs a psql command. Note that [cmdInline] should be a inline [String], without line-breaks (`\n`).
+  ///
+  /// Calls [execShell] executing `psql` inside the container.
+  Future<String?> psqlCMD(String cmdInline) => _psqlCMD(cmdInline);
+
+  Future<String?> _psqlCMD(String cmd) async {
+    var cmdQuoted = !cmd.contains('"') ? '"$cmd"' : "'$cmd'";
+
+    if (!cmd.contains('"')) {
+      cmdQuoted = '"$cmd"';
+    } else if (!cmd.contains("'")) {
+      cmdQuoted = "'$cmd'";
+    } else {
+      var cmd2 = cmd.replaceAll('"', '\\"');
+      cmdQuoted = '"$cmd2"';
+    }
+
+    var script = '''#!/bin/bash
+export PGPASSWORD="${config.pgPassword}";
+psql -U ${config.pgUser} -d ${config.pgDatabase} -c $cmdQuoted
+''';
+
+    var process = await execShell(script);
+    if (process == null) return null;
+
+    var stdout = await process.waitStdout(desiredExitCode: 0);
+    if (stdout == null) return null;
+
+    return stdout.asString;
+  }
+
+  String _normalizeSQL(String sql) =>
+      sql.trim().replaceAll(RegExp(r'(?:[ \t]*\n+[ \t]*)+'), ' ');
 }
 
 /// Apache HTTPD pre-configured container.
-class ApacheHttpdContainer extends DockerContainerConfig<DockerContainer> {
-  ApacheHttpdContainer({List<int>? hostPorts})
+class ApacheHttpdContainerConfig
+    extends DockerContainerConfig<DockerContainer> {
+  ApacheHttpdContainerConfig({int? hostPort})
       : super(
           'httpd',
           version: 'latest',
-          hostPorts: hostPorts,
+          hostPorts: hostPort != null ? [hostPort] : null,
           containerPorts: [80],
           outputAsLines: true,
           stderrReadyFunction: (output, line) =>

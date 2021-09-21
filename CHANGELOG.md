@@ -1,3 +1,13 @@
+## 2.0.12
+
+- `DockerCMD.execShell`: improved inline script normalization.
+- Added `getFreeListenPort`.
+- Classes that extends `DockerContainerConfig` now have a suffix `config`:
+  - `NginxContainerConfig`, `PostgreSQLContainerConfig`, `ApacheHttpdContainerConfig`.
+- `PostgreSQLContainer`:
+  - Added `runSQL` and `psqlCMD`.
+- Improved containers tests.
+
 ## 2.0.11
 
 - `apollovm` compatibility.
