@@ -26,6 +26,8 @@ jobs:
       run: dart analyze --fatal-infos --fatal-warnings .
     - name: dependency_validator
       run: dart run dependency_validator
+    - name: dart test -t no_docker
+      run : dart test -t no_docker
     - name: dart pub publish --dry-run
       run: dart pub publish --dry-run
 

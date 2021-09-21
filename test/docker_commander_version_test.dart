@@ -1,4 +1,5 @@
 @TestOn('vm')
+@Tags(['no_docker'])
 
 import 'package:pubspec/pubspec.dart';
 import 'package:swiss_knife/swiss_knife_vm.dart';

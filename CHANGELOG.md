@@ -7,6 +7,7 @@
 - `PostgreSQLContainer`:
   - Added `runSQL` and `psqlCMD`.
 - Improved containers tests.
+- Added test tag `no_docker`, for tests that won't use the Docker Daemon.
 
 ## 2.0.11
 

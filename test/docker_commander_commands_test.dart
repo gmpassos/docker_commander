@@ -1,3 +1,5 @@
+@Tags(['no_docker'])
+
 import 'package:docker_commander/src/docker_commander_commands.dart';
 import 'package:test/test.dart';
 
