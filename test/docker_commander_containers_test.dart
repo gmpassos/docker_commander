@@ -113,6 +113,76 @@ void main() {
       expect(exitCode == 0 || exitCode == 137, isTrue);
     });
 
+    test('MySQL', () async {
+      var freeListenPort =
+          await getFreeListenPort(startPort: 3106, endPort: 3206);
+
+      var config = MySQLContainerConfig(hostPort: freeListenPort);
+      var dockerContainer = await config.run(dockerCommander);
+
+      _log.info(dockerContainer);
+
+      expect(dockerContainer.instanceID > 0, isTrue);
+      expect(dockerContainer.name.isNotEmpty, isTrue);
+
+      var output = dockerContainer.stdout!.asString;
+      expect(output, contains('Database files initialized'));
+
+      _log.info('<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<');
+      _log.info(output);
+      _log.info('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>');
+
+      expect(dockerContainer.id!.isNotEmpty, isTrue);
+
+      var execMySql = await dockerContainer.exec('/usr/bin/mysql', [
+        '-D',
+        config.dbName,
+        '--password=${config.dbPassword}',
+        '-e',
+        'SELECT TABLE_NAME FROM information_schema.tables'
+      ]);
+
+      var execMysqlExitCode = await execMySql!.waitExit();
+
+      _log.info(
+          '<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MYSQL[exitCode: $execMysqlExitCode]:');
+      _log.info(execMySql.stdout!.asString);
+      _log.info('-------------------------------');
+      _log.info(execMySql.stderr!.asString);
+      _log.info('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>');
+
+      expect(execMysqlExitCode, equals(0));
+      expect(execMySql.stdout!.asString, contains('TABLE_NAME'));
+
+      {
+        var sqlCreateAddress = '''
+        CREATE TABLE IF NOT EXISTS `address` (
+          `id` serial,
+          `state` text,
+          `city` text,
+          `street` text,
+          `number` integer,
+          PRIMARY KEY( `id` )
+        )
+        ''';
+
+        var runSQL = await dockerContainer.runSQL(sqlCreateAddress);
+        expect(runSQL, anyOf(isNull, isEmpty));
+
+        var cmd = await dockerContainer.mysqlCMD('SHOW TABLES');
+        expect(cmd, contains(RegExp(r'\Waddress\W')));
+      }
+
+      _log.info('Stopping MySQL...');
+      await dockerContainer.stop(timeout: Duration(seconds: 5));
+
+      _log.info('Wsit exit...');
+      var exitCode = await dockerContainer.waitExit();
+      _log.info('exitCode: $exitCode');
+
+      expect(exitCode == 0, isTrue);
+    });
+
     test('Apache Httpd', () async {
       var freeListenPort =
           await getFreeListenPort(startPort: 4081, endPort: 4181);

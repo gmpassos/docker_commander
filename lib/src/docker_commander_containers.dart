@@ -204,6 +204,8 @@ class PostgreSQLContainer extends DockerContainer {
   Future<String?> psqlCMD(String cmdInline) => _psqlCMD(cmdInline);
 
   Future<String?> _psqlCMD(String cmd) async {
+    cmd = cmd.replaceAll(r'`', r'\`');
+
     var cmdQuoted = !cmd.contains('"') ? '"$cmd"' : "'$cmd'";
 
     if (!cmd.contains('"')) {
@@ -218,6 +220,136 @@ class PostgreSQLContainer extends DockerContainer {
     var script = '''#!/bin/bash
 export PGPASSWORD="${config.pgPassword}";
 psql -U ${config.pgUser} -d ${config.pgDatabase} -c $cmdQuoted
+''';
+
+    var process = await execShell(script);
+    if (process == null) return null;
+
+    var stdout = await process.waitStdout(desiredExitCode: 0);
+    if (stdout == null) return null;
+
+    return stdout.asString;
+  }
+
+  String _normalizeSQL(String sql) =>
+      sql.trim().replaceAll(RegExp(r'(?:[ \t]*\n+[ \t]*)+'), ' ');
+}
+
+/// MySQL pre-configured container.
+class MySQLContainerConfig extends DockerContainerConfig<MySQLContainer> {
+  String dbUser;
+
+  String dbPassword;
+
+  String dbName;
+
+  MySQLContainerConfig({
+    this.dbUser = 'myuser',
+    this.dbPassword = 'mypass',
+    this.dbName = 'mydb',
+    int? hostPort,
+    bool forceNativePasswordAuthentication = false,
+    List<String>? daemonArguments,
+  }) : super(
+          'mysql',
+          version: 'latest',
+          hostPorts: hostPort != null ? [hostPort] : null,
+          containerPorts: [3306],
+          imageArgs: _buildImageArgs(
+              forceNativePasswordAuthentication, daemonArguments),
+          environment: {
+            'MYSQL_USER': dbUser,
+            'MYSQL_PASSWORD': dbPassword,
+            'MYSQL_ROOT_PASSWORD': dbPassword,
+            'MYSQL_DATABASE': dbName,
+          },
+          outputAsLines: true,
+          //stdoutReadyFunction: (output, line) => line.contains('MySQL init process done.'),
+          stderrReadyFunction: (output, line) =>
+              line.contains('mysqld: ready for connections') &&
+              !line.contains('port: 0'),
+        ) {
+    if (dbUser.trim().isEmpty) {
+      throw ArgumentError('Invalid dbUser: $dbUser');
+    }
+
+    if (dbName.trim().isEmpty) {
+      throw ArgumentError('Invalid dbName: $dbName');
+    }
+
+    if (dbPassword.isEmpty) {
+      throw ArgumentError('Invalid dbPassword: $dbPassword');
+    }
+  }
+
+  static List<String>? _buildImageArgs(
+      bool forceNativePasswordAuthentication, List<String>? daemonArguments) {
+    var args = <String>[];
+
+    if (forceNativePasswordAuthentication) {
+      args.add('--default-authentication-plugin=mysql_native_password');
+    }
+
+    if (daemonArguments != null) {
+      args.addAll(daemonArguments);
+    }
+
+    return args.isNotEmpty ? args : null;
+  }
+
+  @override
+  MySQLContainer? instantiateDockerContainer(DockerRunner runner) =>
+      MySQLContainer(this, runner);
+
+  @override
+  Future<bool> initializeContainer(MySQLContainer dockerContainer) async {
+    var cmd =
+        " GRANT ALL PRIVILEGES ON `$dbName`.* TO '$dbUser'@'%' WITH GRANT OPTION ;"
+        " GRANT ALL ON *.* TO '$dbUser'@'%' WITH GRANT OPTION ;"
+        " FLUSH PRIVILEGES ;";
+
+    await dockerContainer.mysqlCMD(cmd);
+
+    return true;
+  }
+}
+
+class MySQLContainer extends DockerContainer {
+  final MySQLContainerConfig config;
+
+  MySQLContainer(this.config, DockerRunner runner) : super(runner);
+
+  /// Runs a SQL. Note that [sqlInline] should be a inline [String], without line-breaks (`\n`).
+  ///
+  /// Calls [mysqlCMD].
+  Future<String?> runSQL(String sqlInline) => _mysqlSQL(sqlInline);
+
+  Future<String?> _mysqlSQL(String sql) {
+    sql = _normalizeSQL(sql);
+    return mysqlCMD(sql);
+  }
+
+  /// Runs a mysql command. Note that [cmdInline] should be a inline [String], without line-breaks (`\n`).
+  ///
+  /// Calls [execShell] executing `mysql` client inside the container.
+  Future<String?> mysqlCMD(String cmdInline) => _mysqlCMD(cmdInline);
+
+  Future<String?> _mysqlCMD(String cmd) async {
+    cmd = cmd.replaceAll(r'`', r'\`');
+
+    var cmdQuoted = !cmd.contains('"') ? '"$cmd"' : "'$cmd'";
+
+    if (!cmd.contains('"')) {
+      cmdQuoted = '"$cmd"';
+    } else if (!cmd.contains("'")) {
+      cmdQuoted = "'$cmd'";
+    } else {
+      var cmd2 = cmd.replaceAll('"', '\\"');
+      cmdQuoted = '"$cmd2"';
+    }
+
+    var script = '''#!/bin/bash
+/usr/bin/mysql -D ${config.dbName} --password=${config.dbPassword} -e $cmdQuoted
 ''';
 
     var process = await execShell(script);

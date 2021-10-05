@@ -1,3 +1,7 @@
+## 2.0.13
+
+- Added `MySQLContainer`.
+
 ## 2.0.12
 
 - `DockerCMD.execShell`: improved inline script normalization.
