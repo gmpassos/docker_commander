@@ -1,4 +1,5 @@
 @Timeout(Duration(minutes: 2))
+@TestOn('vm')
 import 'package:docker_commander/docker_commander_vm.dart';
 import 'package:swiss_knife/swiss_knife.dart';
 import 'package:test/test.dart';

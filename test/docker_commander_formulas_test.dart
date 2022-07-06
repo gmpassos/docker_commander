@@ -1,4 +1,5 @@
 @Timeout(Duration(minutes: 2))
+@TestOn('vm')
 import 'package:apollovm/apollovm.dart';
 import 'package:docker_commander/docker_commander_vm.dart';
 import 'package:logging/logging.dart';

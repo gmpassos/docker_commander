@@ -5,3 +5,5 @@ tags:
   # Tests that won't use Docker Daemon
   no_docker:
     timeout: 20s
+  swarm:
+    timeout: 120s
