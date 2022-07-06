@@ -604,21 +604,23 @@ class DockerProcessRemote extends DockerProcess {
   Future<bool> initialize() async {
     var anyOutputReadyCompleter = Completer<bool>();
 
-    setupStdout(_buildOutputStream(
-        false, _stdoutReadyFunction, anyOutputReadyCompleter));
-    setupStderr(_buildOutputStream(
-        true, _stderrReadyFunction, anyOutputReadyCompleter));
+    setupStdout(_buildOutputStream(OutputStreamType.stdout, false,
+        _stdoutReadyFunction, anyOutputReadyCompleter));
+    setupStderr(_buildOutputStream(OutputStreamType.stderr, true,
+        _stderrReadyFunction, anyOutputReadyCompleter));
     setupOutputReadyType(_outputReadyType);
 
     return true;
   }
 
   OutputStream _buildOutputStream(
+      OutputStreamType outputStreamType,
       bool stderr,
       OutputReadyFunction outputReadyFunction,
       Completer<bool> anyOutputReadyCompleter) {
     if (outputAsLines) {
       var outputStream = OutputStream<String>(
+        outputStreamType,
         utf8,
         true,
         outputLimit ?? 1000,
@@ -629,7 +631,7 @@ class DockerProcessRemote extends DockerProcess {
       var outputClient =
           OutputClient(dockerHost, this, stderr, outputStream, (entries) {
         for (var e in entries) {
-          outputStream.add(e);
+          outputStream.addLines(e);
         }
       });
       outputClient.start();
@@ -639,6 +641,7 @@ class DockerProcessRemote extends DockerProcess {
       return outputStream;
     } else {
       var outputStream = OutputStream<int>(
+        outputStreamType,
         utf8,
         false,
         outputLimit ?? 1024 * 128,

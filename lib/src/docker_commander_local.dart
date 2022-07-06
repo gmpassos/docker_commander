@@ -910,10 +910,10 @@ class DockerProcessLocal extends DockerProcess {
 
     var anyOutputReadyCompleter = Completer<bool>();
 
-    setupStdout(_buildOutputStream(
-        process.stdout, _stdoutReadyFunction, anyOutputReadyCompleter));
-    setupStderr(_buildOutputStream(
-        process.stderr, _stderrReadyFunction, anyOutputReadyCompleter));
+    setupStdout(_buildOutputStream(OutputStreamType.stdout, process.stdout,
+        _stdoutReadyFunction, anyOutputReadyCompleter));
+    setupStderr(_buildOutputStream(OutputStreamType.stderr, process.stderr,
+        _stderrReadyFunction, anyOutputReadyCompleter));
     setupOutputReadyType(_outputReadyType);
 
     return true;
@@ -938,11 +938,13 @@ class DockerProcessLocal extends DockerProcess {
   }
 
   OutputStream _buildOutputStream(
-      Stream<List<int>> stdout,
+      OutputStreamType outputStreamType,
+      Stream<List<int>> output,
       OutputReadyFunction outputReadyFunction,
       Completer<bool> anyOutputReadyCompleter) {
     if (outputAsLines!) {
       var outputStream = OutputStream<String>(
+        outputStreamType,
         systemEncoding,
         true,
         _outputLimit ?? 1000,
@@ -950,9 +952,9 @@ class DockerProcessLocal extends DockerProcess {
         anyOutputReadyCompleter,
       );
 
-      var listenSubscription = stdout
+      var listenSubscription = output
           .transform(systemEncoding.decoder)
-          .listen((s) => outputStream.add(s));
+          .listen((s) => outputStream.addLines(s));
 
       outputStream.onDispose.listen((_) {
         try {
@@ -965,6 +967,7 @@ class DockerProcessLocal extends DockerProcess {
       return outputStream;
     } else {
       var outputStream = OutputStream<int>(
+        outputStreamType,
         systemEncoding,
         false,
         _outputLimit ?? 1024 * 128,
@@ -972,7 +975,7 @@ class DockerProcessLocal extends DockerProcess {
         anyOutputReadyCompleter,
       );
 
-      var listenSubscription = stdout.listen((b) => outputStream.addAll(b));
+      var listenSubscription = output.listen((b) => outputStream.addAll(b));
 
       outputStream.onDispose.listen((_) {
         try {

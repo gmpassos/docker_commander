@@ -162,8 +162,35 @@ class PostgreSQLContainerConfig
             'POSTGRES_DB': pgDatabase,
           },
           outputAsLines: true,
-          stdoutReadyFunction: (output, line) =>
-              line.contains('database system is ready to accept connections'),
+          stdoutReadyFunction: (output, data) {
+            var lines = data is List ? data : [data];
+
+            var readyForConnections = lines.any((l) =>
+                l.contains('database system is ready to accept connections'));
+            if (!readyForConnections) return false;
+
+            var allLines = output.dataAsListOfStrings;
+
+            var initComplete = allLines.indexWhere(
+                (l) => l.contains('PostgreSQL init process complete;'));
+            if (initComplete < 0) return false;
+
+            var afterComplete = allLines.sublist(initComplete);
+
+            readyForConnections = afterComplete.any((l) =>
+                l.contains('database system is ready to accept connections'));
+
+            print(readyForConnections);
+
+            return readyForConnections;
+          },
+          stderrReadyFunction: (output, data) {
+            var lines = data is List ? data : [data];
+
+            var readyForConnections = lines.any((l) =>
+                l.contains('database system is ready to accept connections'));
+            return readyForConnections;
+          },
         ) {
     if (pgUser.trim().isEmpty) {
       throw ArgumentError('Invalid pgUser: $pgUser');
@@ -264,10 +291,13 @@ class MySQLContainerConfig extends DockerContainerConfig<MySQLContainer> {
             'MYSQL_DATABASE': dbName,
           },
           outputAsLines: true,
-          //stdoutReadyFunction: (output, line) => line.contains('MySQL init process done.'),
-          stderrReadyFunction: (output, line) =>
-              line.contains('mysqld: ready for connections') &&
-              !line.contains('port: 0'),
+          stdoutReadyFunction: (output, line) => false,
+          stderrReadyFunction: (output, data) {
+            var lines = data is List ? data : [data];
+            return lines.any((l) =>
+                l.contains('mysqld: ready for connections') &&
+                !l.contains('port: 0'));
+          },
         ) {
     if (dbUser.trim().isEmpty) {
       throw ArgumentError('Invalid dbUser: $dbUser');
@@ -375,7 +405,11 @@ class ApacheHttpdContainerConfig
           hostPorts: hostPort != null ? [hostPort] : null,
           containerPorts: [80],
           outputAsLines: true,
-          stderrReadyFunction: (output, line) =>
-              line.contains('Apache') && line.contains('configured'),
+          stderrReadyFunction: (output, data) {
+            var lines = data is List ? data : [data];
+            var ready = lines
+                .any((l) => l.contains('Apache') && l.contains('configured'));
+            return ready;
+          },
         );
 }

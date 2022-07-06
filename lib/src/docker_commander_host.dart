@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 
 import 'package:logging/logging.dart';
@@ -810,8 +811,12 @@ typedef OutputReadyFunction = bool Function(
 /// Indicates which output should be ready.
 enum OutputReadyType { stdout, stderr, any, startsReady }
 
+/// The type of an [OutputStream].
+enum OutputStreamType { stdout, stderr }
+
 /// Handles the output stream of a Docker container.
 class OutputStream<T> {
+  final OutputStreamType type;
   final Encoding _encoding;
   final bool stringData;
 
@@ -824,7 +829,7 @@ class OutputStream<T> {
 
   final Completer<bool> anyOutputReadyCompleter;
 
-  OutputStream(this._encoding, this.stringData, this.limit,
+  OutputStream(this.type, this._encoding, this.stringData, this.limit,
       this.outputReadyFunction, this.anyOutputReadyCompleter);
 
   bool _ready = false;
@@ -860,6 +865,24 @@ class OutputStream<T> {
 
   /// The data buffer;
   final List<T> _data = <T>[];
+
+  /// The output data [List].
+  UnmodifiableListView<T> get data => UnmodifiableListView<T>(_data);
+
+  /// Returns [data] as a [List] of [String].
+  UnmodifiableListView<String> get dataAsListOfStrings =>
+      UnmodifiableListView<String>(_data is List<String>
+          ? _data as List<String>
+          : _data.map((e) => e.toString()).toList());
+
+  /// Returns [data] as bytes.
+  UnmodifiableListView<int> get dataAsBytes =>
+      UnmodifiableListView<int>(_data is List<int>
+          ? _data as List<int>
+          : _data
+              .expand((e) => (e is String) ? _encoding.encode(e) : [e])
+              .map((e) => e is int ? e : int.tryParse(e.toString()) ?? 0)
+              .toList());
 
   int _dataRemoved = 0;
   int _contentRemoved = 0;
@@ -907,11 +930,45 @@ class OutputStream<T> {
     _notifyWaitingData(entry);
   }
 
+  void addLines(String data) {
+    var lines = _splitLinesInclusive(data);
+    addAll(lines as Iterable<T>);
+  }
+
+  static List<String> _splitLinesInclusive(String data) {
+    var lng = data.length;
+    var lines = <String>[];
+
+    var init = 0;
+    while (init < lng) {
+      var idx = data.indexOf('\n', init);
+      if (idx >= 0) {
+        if (init == 0 && idx == data.length - 1) {
+          lines.add(data);
+          break;
+        } else {
+          var s = data.substring(init, idx + 1);
+          lines.add(s);
+          init = idx + 1;
+        }
+      } else {
+        var s = data.substring(init);
+        lines.add(s);
+        break;
+      }
+    }
+
+    return lines;
+  }
+
   /// Adds all [entries] to the [_data] buffer.
   void addAll(Iterable<T> entries) {
-    _data.addAll(entries);
+    var entriesList =
+        entries is List<T> ? entries : entries.toList(growable: false);
 
-    if (outputReadyFunction(this, entries)) {
+    _data.addAll(entriesList);
+
+    if (outputReadyFunction(this, entriesList)) {
       markReady();
     }
 

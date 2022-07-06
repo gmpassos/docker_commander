@@ -45,8 +45,13 @@ class NginxContainerConfig extends DockerContainerConfig<DockerContainerNginx> {
           hostPorts: hostPort != null ? [hostPort] : null,
           containerPorts: [80],
           outputAsLines: true,
-          stdoutReadyFunction: (output, line) =>
-              line.contains('Configuration complete; ready for start up'),
+          stdoutReadyFunction: (output, data) {
+            var lines = data is List ? data : [data];
+            var ready = lines.any((l) =>
+                l.contains('Configuration complete; ready for start up'));
+            return ready;
+          },
+          stderrReadyFunction: (output, data) => false,
         );
 
   @override

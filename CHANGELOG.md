@@ -1,5 +1,13 @@
 ## 2.0.14
 
+- `OutputStream`:
+  - Improve handling of multiple lines. 
+- `DockerContainerConfig`:
+  - Improved ready functions:
+    - `MySQLContainerConfig`
+    - `PostgreSQLContainerConfig` (updated)
+    - `ApacheHttpdContainerConfig`
+    - `NginxContainerConfig`
 - Organize imports.
 - Improve GitHub CI.
 - sdk: '>=2.15.0 <3.0.0'
