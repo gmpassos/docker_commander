@@ -26,15 +26,15 @@ jobs:
       - name: dependency_validator
         run: dart run dependency_validator
       - name: Run tests (VM)
-        run: dart test --platform vm
+        run: dart test --platform vm -x swarm
       - name: Run tests (Chrome)
-        run: dart test --platform chrome
+        run: dart test --platform chrome -x swarm
       #      - name: dartdoc
       #        run: dartdoc --no-generate-docs
       - name: Generate coverage report
         run: |
           dart pub global activate coverage
-          dart run test --coverage=./coverage
+          dart run test --coverage=./coverage -x swarm
           dart pub global run coverage:format_coverage --packages=.dart_tool/package_config.json --report-on=lib --lcov -o ./coverage/lcov.info -i ./coverage
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v1
@@ -46,4 +46,3 @@ jobs:
           verbose: true
       - name: dart pub publish --dry-run
         run: dart pub publish --dry-run
-
