@@ -1,6 +1,7 @@
 ## 2.0.14
 
 - Organize imports.
+- Improve GitHub CI.
 - sdk: '>=2.15.0 <3.0.0'
 - swiss_knife: ^3.1.1
 - mercury_client: ^2.1.6
