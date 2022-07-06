@@ -1,4 +1,4 @@
-import 'package:docker_commander/docker_commander.dart';
+import '../docker_commander_formulas.dart';
 
 class GitLabFormulaSource extends DockerCommanderFormulaSource {
   GitLabFormulaSource() : super('dart', r'''

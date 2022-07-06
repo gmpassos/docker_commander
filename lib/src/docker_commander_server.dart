@@ -3,10 +3,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
-import 'package:docker_commander/docker_commander.dart';
 import 'package:logging/logging.dart';
 import 'package:swiss_knife/swiss_knife.dart';
 
+import 'docker_commander_base.dart';
 import 'docker_commander_host.dart';
 import 'docker_commander_local.dart';
 
@@ -326,13 +326,12 @@ class DockerHostServer {
     if (response == null || response is int || response is bool) {
       responseBody = '$response';
     } else if (response is String) {
-      responseBody = response.length <= 10
-          ? response
-          : 'String#' + response.length.toString();
+      responseBody =
+          response.length <= 10 ? response : 'String#${response.length}';
     } else if (response is List) {
-      responseBody = 'List#' + response.length.toString();
+      responseBody = 'List#${response.length}';
     } else if (response is Map) {
-      responseBody = 'Map#' + response.length.toString();
+      responseBody = 'Map#${response.length}';
     } else {
       responseBody = responseBody.runtimeType.toString();
     }

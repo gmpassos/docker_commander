@@ -1,3 +1,16 @@
+## 2.0.14
+
+- Organize imports.
+- sdk: '>=2.15.0 <3.0.0'
+- swiss_knife: ^3.1.1
+- mercury_client: ^2.1.6
+- collection: ^1.16.0
+- lints: ^2.0.0
+- test: ^1.21.3
+- dependency_validator: ^3.2.0
+- pubspec: ^2.3.0
+- path: ^1.8.2
+
 ## 2.0.13
 
 - Added `MySQLContainer`.

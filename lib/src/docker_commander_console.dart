@@ -1,7 +1,9 @@
 import 'dart:async';
 
-import 'package:docker_commander/docker_commander.dart';
 import 'package:swiss_knife/swiss_knife.dart';
+
+import 'docker_commander_base.dart';
+import 'docker_commander_host.dart';
 
 typedef ParameterProvider = Future<String> Function(
     String name, String? description);

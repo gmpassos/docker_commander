@@ -2,11 +2,12 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:collection/collection.dart' show IterableExtension;
-import 'package:docker_commander/docker_commander.dart';
 import 'package:logging/logging.dart';
 import 'package:swiss_knife/swiss_knife.dart';
 
+import 'docker_commander_base.dart';
 import 'docker_commander_commands.dart';
+import 'docker_commander_formulas.dart';
 import 'docker_commander_host.dart';
 
 final _log = Logger('docker_commander/io');

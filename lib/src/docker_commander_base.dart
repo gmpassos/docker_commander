@@ -7,7 +7,7 @@ import 'docker_commander_host.dart';
 class DockerCommander extends DockerCMDExecutor {
   /// The current version of `docker_commander` package.
   // ignore: non_constant_identifier_names
-  static final String VERSION = '2.0.13';
+  static final String VERSION = '2.0.14';
 
   /// Docker machine host.
   final DockerHost dockerHost;

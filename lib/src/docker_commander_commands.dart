@@ -271,13 +271,12 @@ abstract class DockerCMD {
     hostIPMapping.removeWhere((host, ip) => mappedIPHosts.containsKey(ip));
     if (hostIPMapping.isEmpty) return true;
 
-    var hostMap = '\n#### docker_commander host mapping:\n' +
-        hostIPMapping.entries.map((e) {
-          var host = e.key;
-          var ip = e.value;
-          return '$ip\t$host';
-        }).join('\n') +
-        '\n####\n';
+    var hostMap =
+        '\n#### docker_commander host mapping:\n${hostIPMapping.entries.map((e) {
+      var host = e.key;
+      var ip = e.value;
+      return '$ip\t$host';
+    }).join('\n')}\n####\n';
 
     return appendFileContent(executor, containerName, '/etc/hosts', hostMap,
         sudo: true);
@@ -603,7 +602,7 @@ abstract class DockerCMD {
     // docker swarm join --token SWMTKN-1-1ziutumyd8sw7tkpi698tygcpdezmm7nsr3maehkcijiermv1z-9ng8kp24g7zi168egu2xshfve 192.168.65.3:2377'
 
     var token = RegExp(r'-token\s+(\S+)\s').allMatches(output).first.group(1);
-    var address = RegExp(r'\s([\w\.]{4,}:\d+)\s', multiLine: false)
+    var address = RegExp(r'\s([\w.]{4,}:\d+)\s', multiLine: false)
         .allMatches(output)
         .first
         .group(1);

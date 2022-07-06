@@ -1,10 +1,10 @@
-import 'dart:async';
-
 import 'package:apollovm/apollovm.dart';
-import 'package:docker_commander/docker_commander.dart';
-import 'package:docker_commander/src/formulas/apache_formula.dart';
-import 'package:docker_commander/src/formulas/gitlab_formula.dart';
 import 'package:swiss_knife/swiss_knife.dart';
+
+import 'docker_commander_base.dart';
+import 'docker_commander_console.dart';
+import 'formulas/apache_formula.dart';
+import 'formulas/gitlab_formula.dart';
 
 /// A `docker_commander` Formula:
 class DockerCommanderFormula {

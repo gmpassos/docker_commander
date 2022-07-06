@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:docker_commander/docker_commander.dart';
 import 'package:logging/logging.dart';
 import 'package:swiss_knife/swiss_knife.dart';
 
@@ -514,12 +513,12 @@ abstract class DockerHost extends DockerCMDExecutor {
       DockerCMD.removeService(this, name);
 
   static void cleanupExitedProcessesImpl(
-      Duration exitedProcessExpireTime, Map<int, DockerProcess> _processes) {
+      Duration exitedProcessExpireTime, Map<int, DockerProcess> processes) {
     var expireTime = exitedProcessExpireTime.inMilliseconds;
     var now = DateTime.now().millisecondsSinceEpoch;
 
-    for (var instanceID in _processes.keys.toList()) {
-      var process = _processes[instanceID]!;
+    for (var instanceID in processes.keys.toList()) {
+      var process = processes[instanceID]!;
       assert(process.instanceID == instanceID);
 
       var exitTime = process.exitTime;
@@ -530,7 +529,7 @@ abstract class DockerHost extends DockerCMDExecutor {
       var exitElapsedTime = now - exitTime.millisecondsSinceEpoch;
 
       if (exitElapsedTime > expireTime) {
-        _processes.remove(instanceID);
+        processes.remove(instanceID);
       }
     }
   }
