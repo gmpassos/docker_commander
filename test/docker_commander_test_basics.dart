@@ -9,8 +9,9 @@ final _log = Logger('docker_commander/test');
 
 typedef DockerHostLocalInstantiator = DockerHost Function(int listenPort);
 
-void doBasicTests(DockerHostLocalInstantiator dockerHostLocalInstantiator,
-    [dynamic Function()? preSetup]) {
+Future<void> doBasicTests(
+    bool dockerRunning, DockerHostLocalInstantiator dockerHostLocalInstantiator,
+    [dynamic Function()? preSetup]) async {
   group('DockerCommander basics', () {
     DockerCommander? dockerCommander;
 
@@ -136,5 +137,5 @@ void doBasicTests(DockerHostLocalInstantiator dockerHostLocalInstantiator,
 
       expect(dockerContainer.id!.isNotEmpty, isTrue);
     });
-  });
+  }, skip: !dockerRunning);
 }

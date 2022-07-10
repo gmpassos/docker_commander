@@ -1,3 +1,9 @@
+## 2.0.15
+
+- Fix `DockerHost` initialization concurrence issue.
+- `DockerHost`.
+  - Added `isDaemonRunning`.
+
 ## 2.0.14
 
 - `OutputStream`:

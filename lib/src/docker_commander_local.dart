@@ -42,15 +42,33 @@ class DockerHostLocal extends DockerHost {
   DockerCommander get dockerCommander => _dockerCommander!;
 
   @override
-  bool get isInitialized => _dockerCommander != null;
+  bool get isInitialized => _initialized != null;
+
+  @override
+  bool get isSuccessfullyInitialized => _initialized ?? false;
+
+  bool? _initialized;
+  Future<bool>? _initializing;
 
   @override
   Future<bool> initialize(DockerCommander dockerCommander) async {
-    if (isInitialized) return true;
+    var initialized = _initialized;
+    if (initialized != null) return initialized;
 
     _dockerCommander = dockerCommander;
-    _dockerBinaryPath ??= await DockerHostLocal.resolveDockerBinaryPath();
-    return true;
+
+    return _initializing ??=
+        DockerHostLocal.resolveDockerBinaryPath().then((path) {
+      var ok = path.isNotEmpty;
+
+      if (ok) {
+        _dockerBinaryPath = path;
+      }
+
+      _initialized = ok;
+      _initializing = null;
+      return ok;
+    });
   }
 
   /// The Docker binary path.

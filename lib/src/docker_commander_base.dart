@@ -7,7 +7,7 @@ import 'docker_commander_host.dart';
 class DockerCommander extends DockerCMDExecutor {
   /// The current version of `docker_commander` package.
   // ignore: non_constant_identifier_names
-  static final String VERSION = '2.0.14';
+  static final String VERSION = '2.0.15';
 
   /// Docker machine host.
   final DockerHost dockerHost;
@@ -17,27 +17,31 @@ class DockerCommander extends DockerCMDExecutor {
   /// Returns [dockerHost.session]
   int get session => dockerHost.session;
 
-  int _initialized = 0;
+  bool? _initialized;
+  Future<bool>? _initializing;
 
   /// Initializes instance.
   Future<bool> initialize() async {
-    if (_initialized > 0) return _initialized == 1;
-    var hostOk = await dockerHost.initialize(this);
-    _initialized = hostOk ? 1 : 2;
-    return hostOk;
+    var initialized = _initialized;
+    if (initialized != null) return initialized;
+
+    return _initializing ??= dockerHost.initialize(this).then((hostOk) {
+      _initialized = hostOk;
+      _initializing = null;
+      return hostOk;
+    });
   }
 
   /// Returns [true] if is initialized, even if is initialized with errors.
-  bool get isInitialized => _initialized > 0;
+  bool get isInitialized => _initialized != null;
 
   /// Returns [true] if is successfully initialized.
-  bool get isSuccessfullyInitialized => _initialized == 1;
+  bool get isSuccessfullyInitialized => _initialized ?? false;
 
   /// Ensures that this instance is initialized.
-  Future<void> ensureInitialized() async {
-    if (!isInitialized) {
-      await initialize();
-    }
+  Future<bool> ensureInitialized() async {
+    if (isInitialized) return true;
+    return initialize();
   }
 
   DateTime? _lastDaemonCheck;

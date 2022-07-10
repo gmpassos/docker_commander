@@ -72,15 +72,29 @@ class DockerHostRemote extends DockerHost {
   DockerCommander get dockerCommander => _dockerCommander!;
 
   @override
-  bool get isInitialized => _dockerCommander != null;
+  bool get isInitialized => _initialized != null;
+
+  @override
+  bool get isSuccessfullyInitialized => _initialized ?? false;
+
+  bool? _initialized;
+  Future<bool>? _initializing;
 
   @override
   Future<bool> initialize(DockerCommander dockerCommander) async {
-    if (isInitialized) return true;
+    var initialized = _initialized;
+    if (initialized != null) return initialized;
 
     _dockerCommander = dockerCommander;
-    var ok = await _httpClient.getJSON('initialize') as bool?;
-    return ok ?? false;
+
+    return _initializing ??= _httpClient.getJSON('initialize').then((ret) {
+      var ok = ret as bool?;
+      ok ??= false;
+
+      _initialized = ok;
+      _initializing = null;
+      return ok;
+    });
   }
 
   @override

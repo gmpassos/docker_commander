@@ -8,8 +8,10 @@ import 'package:test/test.dart';
 import 'docker_commander_test_basics.dart';
 import 'logger_config.dart';
 
-void main() async {
+Future<void> main() async {
   configureLogger();
+
+  var dockerRunning = await DockerHost.isDaemonRunning(DockerHostLocal());
 
   var usedPorts = <int>{};
 
@@ -41,6 +43,7 @@ void main() async {
   }
 
   doBasicTests(
+      dockerRunning,
       (listenPort) => DockerHostRemote('localhost', listenPort,
           username: 'admin', password: '123'),
       preSetup);

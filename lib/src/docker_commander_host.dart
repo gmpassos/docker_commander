@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:logging/logging.dart';
 import 'package:swiss_knife/swiss_knife.dart';
@@ -139,15 +140,65 @@ class ServiceTaskInfos {
 
 /// Base class for Docker machine host.
 abstract class DockerHost extends DockerCMDExecutor {
+  static final Map<DockerHost, bool> _daemonRunning = <DockerHost, bool>{};
+
+  /// Resets the cache for [isDaemonRunning].
+  /// - if [dockerHost] is provided it will reset the cached result only for [dockerHost].
+  static void resetIsDaemonRunningCache([DockerHost? dockerHost]) async {
+    if (dockerHost != null) {
+      _daemonRunning.remove(dockerHost);
+    } else {
+      _daemonRunning.clear();
+    }
+  }
+
+  /// Returns `true` if the Docker Daemon is running.
+  /// The result is cached for the [dockerHost]. See [resetIsDaemonRunningCache].
+  /// - if [allowCache] is `true`, it will cache the result.
+  static FutureOr<bool> isDaemonRunning(DockerHost dockerHost,
+      {bool allowCache = true}) {
+    if (allowCache) {
+      var cached = _daemonRunning[dockerHost];
+      if (cached != null) return cached;
+    }
+
+    return _isDaemonRunningImpl(dockerHost).then((running) {
+      _daemonRunning[dockerHost] = running;
+      return running;
+    });
+  }
+
+  static Future<bool> _isDaemonRunningImpl(DockerHost dockerHost) async {
+    var dockerCommander = DockerCommander(dockerHost);
+    await dockerCommander.ensureInitialized();
+    try {
+      return await dockerCommander.isDaemonRunning();
+    } catch (e) {
+      _log.severe("Docker Daemon NOT running! $dockerHost");
+      return false;
+    }
+  }
+
   final int session;
 
-  DockerHost() : session = DateTime.now().millisecondsSinceEpoch;
+  DockerHost() : session = _newSession();
+
+  static int _newSession() {
+    var now = DateTime.now().millisecondsSinceEpoch;
+    var rand = Random();
+    var n = rand.nextInt(2147483647);
+    var session = now ^ n;
+    return session;
+  }
 
   /// Returns the [DockerCommander] used to initialize this instance.
   DockerCommander get dockerCommander;
 
   /// Returns true if this instance is initialized.
   bool get isInitialized;
+
+  /// Returns true if this instance is successfully initialized.
+  bool get isSuccessfullyInitialized;
 
   /// Initializes instance.
   Future<bool> initialize(DockerCommander dockerCommander);

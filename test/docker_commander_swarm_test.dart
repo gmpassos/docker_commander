@@ -10,8 +10,10 @@ import 'logger_config.dart';
 
 final _log = Logger('docker_commander/test');
 
-void main() {
+Future<void> main() async {
   configureLogger();
+
+  var dockerRunning = await DockerHost.isDaemonRunning(DockerHostLocal());
 
   group('DockerContainerConfig', () {
     late DockerCommander dockerCommander;
@@ -101,5 +103,5 @@ void main() {
       var leaveOK = await dockerCommander.swarmLeave(force: true);
       expect(leaveOK, isTrue);
     });
-  });
+  }, skip: !dockerRunning);
 }

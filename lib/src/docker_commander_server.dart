@@ -607,7 +607,7 @@ class DockerHostServer {
 
     var dockerHostLocal = _dockerHostLocal!;
     if (dockerHostLocal.isInitialized) {
-      return true;
+      return dockerHostLocal.isSuccessfullyInitialized;
     }
 
     var dockerCommander = DockerCommander(dockerHostLocal);

@@ -10,8 +10,10 @@ import 'logger_config.dart';
 
 final _log = Logger('docker_commander/test');
 
-void main() {
+Future<void> main() async {
   configureLogger();
+
+  var dockerRunning = await DockerHost.isDaemonRunning(DockerHostLocal());
 
   group('DockerCommanderFormular', () {
     late DockerCommander dockerCommander;
@@ -231,5 +233,5 @@ void main() {
       expect(cmdLog[0], contains('--registration-token TOKEN_XYZ'));
       expect(cmdLog[0], contains('--net gitlab-net'));
     });
-  });
+  }, skip: !dockerRunning);
 }

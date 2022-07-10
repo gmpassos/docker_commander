@@ -6,8 +6,11 @@ import 'package:test/test.dart';
 import 'docker_commander_test_basics.dart';
 import 'logger_config.dart';
 
-void main() {
+Future<void> main() async {
   configureLogger();
 
-  doBasicTests((listenPort) => DockerHostLocal());
+  var dockerHostLocal = DockerHostLocal();
+  var dockerRunning = await DockerHost.isDaemonRunning(dockerHostLocal);
+
+  doBasicTests(dockerRunning, (listenPort) => dockerHostLocal);
 }
