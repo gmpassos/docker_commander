@@ -16,6 +16,9 @@ RUN \
   apt-get -q update && \
   apt-get install -y -q docker-ce docker-ce-cli containerd.io
 
+RUN apt-get -q update && \
+    apt-get upgrade -y -q dart
+
 RUN \
   usermod -aG docker $(/bin/whoami)
 
