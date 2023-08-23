@@ -1,24 +1,28 @@
 name: docker_commander
 description: A Docker manager for local and remote host machines. Works with personalized containers and pre-configured popular containers, like PostgreSQL, Apache HTTPD and NGINX.
-version: 2.0.15
+version: 2.1.0
 homepage: https://github.com/gmpassos/docker_commander
 
 environment:
-  sdk: '>=2.15.0 <3.0.0'
+  sdk: '>=3.0.0 <4.0.0'
+
+executables:
+  docker_commander_server:
+  docker_commander_console:
 
 dependencies:
-  swiss_knife: ^3.1.1
-  mercury_client: ^2.1.6
-  logging: ^1.0.1
-  collection: ^1.16.0
-  apollovm: ^0.0.30
+  swiss_knife: ^3.1.5
+  mercury_client: ^2.1.8
+  logging: ^1.2.0
+  collection: ^1.18.0
+  apollovm: ^0.0.31
 
 dev_dependencies:
-  lints: ^2.0.0
-  test: ^1.21.3
-  dependency_validator: ^3.2.0
+  lints: ^2.1.1
+  test: ^1.24.6
+  dependency_validator: ^3.2.2
   pubspec: ^2.3.0
-  path: ^1.8.2
+  path: ^1.8.3
 
 #dependency_overrides:
 #  swiss_knife:
@@ -27,9 +31,3 @@ dev_dependencies:
 #    path: ../mercury_client
 #  apollovm:
 #    path: ../apollovm_dart
-
-executables:
-  docker_commander_server:
-  docker_commander_console:
-
-

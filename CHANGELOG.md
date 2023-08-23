@@ -1,3 +1,17 @@
+## 2.1.0
+
+- sdk: '>=3.0.0 <4.0.0'
+
+- swiss_knife: ^3.1.5
+- mercury_client: ^2.1.8
+- logging: ^1.2.0
+- collection: ^1.18.0
+- apollovm: ^0.0.31
+- lints: ^2.1.1
+- test: ^1.24.6
+- dependency_validator: ^3.2.2
+- path: ^1.8.3
+
 ## 2.0.15
 
 - Fix `DockerHost` initialization concurrence issue.
