@@ -7,7 +7,8 @@
 [![Docker puuls](https://img.shields.io/docker/pulls/gmpassos/docker_commander)](https://hub.docker.com/r/gmpassos/docker_commander)
 [![Docker build](https://img.shields.io/docker/cloud/build/gmpassos/docker_commander)](https://hub.docker.com/r/gmpassos/docker_commander/builds)
 
-[![CI](https://img.shields.io/github/workflow/status/gmpassos/docker_commander/Dart%20CI/master?logo=github-actions&logoColor=white)](https://github.com/gmpassos/docker_commander/actions)
+[![Dart CI](https://github.com/gmpassos/docker_commander/actions/workflows/dart.yml/badge.svg?branch=master)](https://github.com/gmpassos/docker_commander/actions/workflows/dart.yml)
+
 [![GitHub Tag](https://img.shields.io/github/v/tag/gmpassos/docker_commander?logo=git&logoColor=white)](https://github.com/gmpassos/docker_commander/releases)
 [![New Commits](https://img.shields.io/github/commits-since/gmpassos/docker_commander/latest?logo=git&logoColor=white)](https://github.com/gmpassos/docker_commander/network)
 [![Last Commits](https://img.shields.io/github/last-commit/gmpassos/docker_commander?logo=git&logoColor=white)](https://github.com/gmpassos/docker_commander/commits/master)
