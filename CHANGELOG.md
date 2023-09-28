@@ -1,6 +1,7 @@
 ## 2.1.2
 
 - apollovm: ^0.0.41
+- dependency_validator: ^3.2.3
 
 ## 2.1.1
 
