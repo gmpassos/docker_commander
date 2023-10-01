@@ -202,7 +202,7 @@ class DockerCommanderFormula {
     _fieldOverwrite[fieldName] = astValue;
   }
 
-  ApolloLanguageRunner _createRunner(ApolloVM vm) {
+  ApolloRunner _createRunner(ApolloVM vm) {
     var runner = vm.createRunner(language);
     if (runner == null) {
       throw StateError("Can't create ApolloVM runner for language: $language");
@@ -318,7 +318,8 @@ class DockerCommanderFormulaSource {
   Future<ApolloVM> createVM() async {
     var vm = ApolloVM();
 
-    var codeUnit = CodeUnit(language, source, 'docker_commander_formula');
+    var codeUnit =
+        SourceCodeUnit(language, source, id: 'docker_commander_formula');
     var loaded = await vm.loadCodeUnit(codeUnit);
 
     if (!loaded) {
