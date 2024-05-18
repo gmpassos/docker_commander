@@ -1,3 +1,11 @@
+## 2.1.6
+
+- swiss_knife: ^3.2.0
+- mercury_client: ^2.2.2
+- apollovm: ^0.0.53
+- test: ^1.25.5
+- path: ^1.9.0
+
 ## 2.1.5
 
 - apollovm: ^0.0.45
