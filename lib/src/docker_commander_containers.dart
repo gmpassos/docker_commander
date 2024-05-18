@@ -1,4 +1,5 @@
 import 'package:swiss_knife/swiss_knife.dart';
+import 'package:version/version.dart';
 
 import 'docker_commander_base.dart';
 import 'docker_commander_host.dart';
@@ -147,13 +148,13 @@ class PostgreSQLContainerConfig
   String pgDatabase;
 
   PostgreSQLContainerConfig(
-      {this.pgUser = 'postgres',
+      {super.version = 'latest',
+      this.pgUser = 'postgres',
       this.pgPassword = 'postgres',
       this.pgDatabase = 'postgres',
       int? hostPort})
       : super(
           'postgres',
-          version: 'latest',
           hostPorts: hostPort != null ? [hostPort] : null,
           containerPorts: [5432],
           environment: {
@@ -271,6 +272,7 @@ class MySQLContainerConfig extends DockerContainerConfig<MySQLContainer> {
   String dbName;
 
   MySQLContainerConfig({
+    super.version = 'latest',
     this.dbUser = 'myuser',
     this.dbPassword = 'mypass',
     this.dbName = 'mydb',
@@ -279,11 +281,10 @@ class MySQLContainerConfig extends DockerContainerConfig<MySQLContainer> {
     List<String>? daemonArguments,
   }) : super(
           'mysql',
-          version: 'latest',
           hostPorts: hostPort != null ? [hostPort] : null,
           containerPorts: [3306],
           imageArgs: _buildImageArgs(
-              forceNativePasswordAuthentication, daemonArguments),
+              version, forceNativePasswordAuthentication, daemonArguments),
           environment: {
             'MYSQL_USER': dbUser,
             'MYSQL_PASSWORD': dbPassword,
@@ -312,12 +313,16 @@ class MySQLContainerConfig extends DockerContainerConfig<MySQLContainer> {
     }
   }
 
-  static List<String>? _buildImageArgs(
+  static List<String>? _buildImageArgs(String? version,
       bool forceNativePasswordAuthentication, List<String>? daemonArguments) {
     var args = <String>[];
 
     if (forceNativePasswordAuthentication) {
-      args.add('--default-authentication-plugin=mysql_native_password');
+      if (_isVersionGreaterThan_8_4_0(version)) {
+        args.add('--mysql-native-password=ON');
+      } else {
+        args.add('--default-authentication-plugin=mysql_native_password');
+      }
     }
 
     if (daemonArguments != null) {
@@ -325,6 +330,23 @@ class MySQLContainerConfig extends DockerContainerConfig<MySQLContainer> {
     }
 
     return args.isNotEmpty ? args : null;
+  }
+
+  static bool _isVersionGreaterThan_8_4_0(String? version) {
+    version = version?.trim();
+
+    if (version == null ||
+        version.isEmpty ||
+        version.toLowerCase() == 'latest') {
+      return true;
+    }
+
+    try {
+      var ver = Version.parse(version);
+      return ver >= Version(8, 4, 0);
+    } catch (_) {
+      return false;
+    }
   }
 
   @override
@@ -398,10 +420,9 @@ class MySQLContainer extends DockerContainer {
 /// Apache HTTPD pre-configured container.
 class ApacheHttpdContainerConfig
     extends DockerContainerConfig<DockerContainer> {
-  ApacheHttpdContainerConfig({int? hostPort})
+  ApacheHttpdContainerConfig({super.version = 'latest', int? hostPort})
       : super(
           'httpd',
-          version: 'latest',
           hostPorts: hostPort != null ? [hostPort] : null,
           containerPorts: [80],
           outputAsLines: true,

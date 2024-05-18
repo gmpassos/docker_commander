@@ -1,8 +1,15 @@
 ## 2.1.6
 
+- `PostgreSQLContainerConfig`, `MySQLContainerConfig`, `ApacheHttpdContainerConfig`, `NginxContainerConfig`:
+  - Constructor: expose `version` parameter.
+
+- `MySQLContainerConfig`:
+  - Fix `_buildImageArgs` for version `8.4.0`+.
+
 - swiss_knife: ^3.2.0
 - mercury_client: ^2.2.2
 - apollovm: ^0.0.53
+- version: ^3.0.2
 - test: ^1.25.5
 - path: ^1.9.0
 
