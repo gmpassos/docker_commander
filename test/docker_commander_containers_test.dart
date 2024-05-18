@@ -116,11 +116,13 @@ Future<void> main() async {
       expect(exitCode == 0 || exitCode == 137, isTrue);
     });
 
-    test('MySQL', () async {
+    testMySQL({bool forceNativePasswordAuthentication = false}) async {
       var freeListenPort =
           await getFreeListenPort(startPort: 3106, endPort: 3206);
 
-      var config = MySQLContainerConfig(hostPort: freeListenPort);
+      var config = MySQLContainerConfig(
+          hostPort: freeListenPort,
+          forceNativePasswordAuthentication: forceNativePasswordAuthentication);
       var dockerContainer = await config.run(dockerCommander);
 
       _log.info(dockerContainer);
@@ -184,7 +186,12 @@ Future<void> main() async {
       _log.info('exitCode: $exitCode');
 
       expect(exitCode == 0, isTrue);
-    });
+    }
+
+    test('MySQL', () async => testMySQL());
+
+    test('MySQL',
+        () async => testMySQL(forceNativePasswordAuthentication: true));
 
     test('Apache Httpd', () async {
       var freeListenPort =

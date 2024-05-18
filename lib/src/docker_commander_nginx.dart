@@ -37,11 +37,11 @@ class NginxContainerConfig extends DockerContainerConfig<DockerContainerNginx> {
 
   final String configPath;
 
-  NginxContainerConfig(this.config, {int? hostPort, String? configPath})
+  NginxContainerConfig(this.config,
+      {super.version = 'latest', int? hostPort, String? configPath})
       : configPath = configPath ?? '/etc/nginx/nginx.conf',
         super(
           'nginx',
-          version: 'latest',
           hostPorts: hostPort != null ? [hostPort] : null,
           containerPorts: [80],
           outputAsLines: true,
