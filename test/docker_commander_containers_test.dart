@@ -190,7 +190,7 @@ Future<void> main() async {
 
     test('MySQL', () async => testMySQL());
 
-    test('MySQL',
+    test('MySQL (forceNativePasswordAuthentication)',
         () async => testMySQL(forceNativePasswordAuthentication: true));
 
     test('Apache Httpd', () async {

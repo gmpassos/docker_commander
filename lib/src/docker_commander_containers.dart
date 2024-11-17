@@ -141,20 +141,50 @@ class DockerContainerConfig<D extends DockerContainer> {
 /// PostgreSQL pre-configured container.
 class PostgreSQLContainerConfig
     extends DockerContainerConfig<PostgreSQLContainer> {
+  /// Postgres DB username.
   String pgUser;
 
+  /// Postgres DB password.
   String pgPassword;
 
+  /// Postgres DB name.
   String pgDatabase;
+
+  /// Runtime Postgres configuration: `-c port=$postgresPort`
+  int? postgresPort;
+
+  /// Runtime Postgres configuration: `-c max_connections=$maxConnections`
+  int? maxConnections;
+
+  /// Runtime Postgres configuration: `-c log_statement=$logStatement`
+  String? logStatement;
 
   PostgreSQLContainerConfig(
       {super.version = 'latest',
       this.pgUser = 'postgres',
       this.pgPassword = 'postgres',
       this.pgDatabase = 'postgres',
+      this.postgresPort,
+      this.maxConnections,
+      this.logStatement,
       int? hostPort})
       : super(
           'postgres',
+          imageArgs: postgresPort != null ||
+                  maxConnections != null ||
+                  logStatement != null
+              ? [
+                  if (postgresPort != null) ...['-c', 'port=$postgresPort'],
+                  if (maxConnections != null) ...[
+                    '-c',
+                    'max_connections=$maxConnections'
+                  ],
+                  if (logStatement != null) ...[
+                    '-c',
+                    'log_statement=$logStatement'
+                  ],
+                ]
+              : null,
           hostPorts: hostPort != null ? [hostPort] : null,
           containerPorts: [5432],
           environment: {
@@ -265,10 +295,13 @@ psql -U ${config.pgUser} -d ${config.pgDatabase} -c $cmdQuoted
 
 /// MySQL pre-configured container.
 class MySQLContainerConfig extends DockerContainerConfig<MySQLContainer> {
+  /// MySQL DB username.
   String dbUser;
 
+  /// MySQL DB password.
   String dbPassword;
 
+  /// MySQL DB name.
   String dbName;
 
   MySQLContainerConfig({
@@ -318,7 +351,9 @@ class MySQLContainerConfig extends DockerContainerConfig<MySQLContainer> {
     var args = <String>[];
 
     if (forceNativePasswordAuthentication) {
-      if (_isVersionGreaterThan_8_4_0(version)) {
+      if (_isVersionGreaterThan_9_0_0(version)) {
+        // Not supported: ignore
+      } else if (_isVersionGreaterThan_8_4_0(version)) {
         args.add('--mysql-native-password=ON');
       } else {
         args.add('--default-authentication-plugin=mysql_native_password');
@@ -330,6 +365,23 @@ class MySQLContainerConfig extends DockerContainerConfig<MySQLContainer> {
     }
 
     return args.isNotEmpty ? args : null;
+  }
+
+  static bool _isVersionGreaterThan_9_0_0(String? version) {
+    version = version?.trim();
+
+    if (version == null ||
+        version.isEmpty ||
+        version.toLowerCase() == 'latest') {
+      return true;
+    }
+
+    try {
+      var ver = Version.parse(version);
+      return ver >= Version(9, 0, 0);
+    } catch (_) {
+      return false;
+    }
   }
 
   static bool _isVersionGreaterThan_8_4_0(String? version) {
