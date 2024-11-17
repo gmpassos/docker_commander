@@ -170,21 +170,8 @@ class PostgreSQLContainerConfig
       int? hostPort})
       : super(
           'postgres',
-          imageArgs: postgresPort != null ||
-                  maxConnections != null ||
-                  logStatement != null
-              ? [
-                  if (postgresPort != null) ...['-c', 'port=$postgresPort'],
-                  if (maxConnections != null) ...[
-                    '-c',
-                    'max_connections=$maxConnections'
-                  ],
-                  if (logStatement != null) ...[
-                    '-c',
-                    'log_statement=$logStatement'
-                  ],
-                ]
-              : null,
+          imageArgs:
+              _buildImageArgs(postgresPort, maxConnections, logStatement),
           hostPorts: hostPort != null ? [hostPort] : null,
           containerPorts: [5432],
           environment: {
@@ -235,6 +222,22 @@ class PostgreSQLContainerConfig
       throw ArgumentError('Invalid pgPassword: $pgUser');
     }
   }
+
+  static List<String>? _buildImageArgs(
+          int? postgresPort, int? maxConnections, String? logStatement) =>
+      postgresPort != null || maxConnections != null || logStatement != null
+          ? [
+              if (postgresPort != null) ...['-c', 'port=$postgresPort'],
+              if (maxConnections != null) ...[
+                '-c',
+                'max_connections=$maxConnections'
+              ],
+              if (logStatement != null) ...[
+                '-c',
+                'log_statement=$logStatement'
+              ],
+            ]
+          : null;
 
   @override
   PostgreSQLContainer? instantiateDockerContainer(DockerRunner runner) =>
