@@ -1,5 +1,8 @@
 ## 2.1.7
 
+- `PostgreSQLContainerConfig`:
+  - `postgresPort`, `maxConnections`, `logStatement`.
+
 - swiss_knife: ^3.2.2
 - mercury_client: ^2.2.4
 - logging: ^1.3.0

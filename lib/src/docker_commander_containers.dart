@@ -141,20 +141,50 @@ class DockerContainerConfig<D extends DockerContainer> {
 /// PostgreSQL pre-configured container.
 class PostgreSQLContainerConfig
     extends DockerContainerConfig<PostgreSQLContainer> {
+  /// Postgres DB username.
   String pgUser;
 
+  /// Postgres DB password.
   String pgPassword;
 
+  /// Postgres DB name.
   String pgDatabase;
+
+  /// Runtime Postgres configuration: `-c port=$postgresPort`
+  int? postgresPort;
+
+  /// Runtime Postgres configuration: `-c max_connections=$maxConnections`
+  int? maxConnections;
+
+  /// Runtime Postgres configuration: `-c log_statement=$logStatement`
+  String? logStatement;
 
   PostgreSQLContainerConfig(
       {super.version = 'latest',
       this.pgUser = 'postgres',
       this.pgPassword = 'postgres',
       this.pgDatabase = 'postgres',
+      this.postgresPort,
+      this.maxConnections,
+      this.logStatement,
       int? hostPort})
       : super(
           'postgres',
+          imageArgs: postgresPort != null ||
+                  maxConnections != null ||
+                  logStatement != null
+              ? [
+                  if (postgresPort != null) ...['-c', 'port=$postgresPort'],
+                  if (maxConnections != null) ...[
+                    '-c',
+                    'max_connections=$maxConnections'
+                  ],
+                  if (logStatement != null) ...[
+                    '-c',
+                    'log_statement=$logStatement'
+                  ],
+                ]
+              : null,
           hostPorts: hostPort != null ? [hostPort] : null,
           containerPorts: [5432],
           environment: {
