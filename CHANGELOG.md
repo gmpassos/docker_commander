@@ -1,3 +1,12 @@
+## 2.1.7
+
+- swiss_knife: ^3.2.2
+- mercury_client: ^2.2.4
+- logging: ^1.3.0
+
+- test: ^1.25.8
+- path: ^1.9.1
+
 ## 2.1.6
 
 - `PostgreSQLContainerConfig`, `MySQLContainerConfig`, `ApacheHttpdContainerConfig`, `NginxContainerConfig`:
