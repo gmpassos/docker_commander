@@ -130,6 +130,8 @@ Future<void> main() async {
       expect(dockerContainer.instanceID > 0, isTrue);
       expect(dockerContainer.name.isNotEmpty, isTrue);
 
+      await Future.delayed(Duration(seconds: 10));
+
       var output = dockerContainer.stdout!.asString;
       expect(output, contains('Database files initialized'));
 

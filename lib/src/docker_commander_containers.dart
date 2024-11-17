@@ -295,10 +295,13 @@ psql -U ${config.pgUser} -d ${config.pgDatabase} -c $cmdQuoted
 
 /// MySQL pre-configured container.
 class MySQLContainerConfig extends DockerContainerConfig<MySQLContainer> {
+  /// MySQL DB username.
   String dbUser;
 
+  /// MySQL DB password.
   String dbPassword;
 
+  /// MySQL DB name.
   String dbName;
 
   MySQLContainerConfig({
