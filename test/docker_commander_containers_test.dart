@@ -130,8 +130,6 @@ Future<void> main() async {
       expect(dockerContainer.instanceID > 0, isTrue);
       expect(dockerContainer.name.isNotEmpty, isTrue);
 
-      await Future.delayed(Duration(seconds: 10));
-
       var output = dockerContainer.stdout!.asString;
       expect(output, contains('Database files initialized'));
 
@@ -192,7 +190,7 @@ Future<void> main() async {
 
     test('MySQL', () async => testMySQL());
 
-    test('MySQL',
+    test('MySQL (forceNativePasswordAuthentication)',
         () async => testMySQL(forceNativePasswordAuthentication: true));
 
     test('Apache Httpd', () async {

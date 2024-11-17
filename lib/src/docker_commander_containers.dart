@@ -351,7 +351,9 @@ class MySQLContainerConfig extends DockerContainerConfig<MySQLContainer> {
     var args = <String>[];
 
     if (forceNativePasswordAuthentication) {
-      if (_isVersionGreaterThan_8_4_0(version)) {
+      if (_isVersionGreaterThan_9_0_0(version)) {
+        // Not supported: ignore
+      } else if (_isVersionGreaterThan_8_4_0(version)) {
         args.add('--mysql-native-password=ON');
       } else {
         args.add('--default-authentication-plugin=mysql_native_password');
@@ -363,6 +365,23 @@ class MySQLContainerConfig extends DockerContainerConfig<MySQLContainer> {
     }
 
     return args.isNotEmpty ? args : null;
+  }
+
+  static bool _isVersionGreaterThan_9_0_0(String? version) {
+    version = version?.trim();
+
+    if (version == null ||
+        version.isEmpty ||
+        version.toLowerCase() == 'latest') {
+      return true;
+    }
+
+    try {
+      var ver = Version.parse(version);
+      return ver >= Version(9, 0, 0);
+    } catch (_) {
+      return false;
+    }
   }
 
   static bool _isVersionGreaterThan_8_4_0(String? version) {
