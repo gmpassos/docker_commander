@@ -442,7 +442,9 @@ abstract class DockerCMD {
       String containerFilePath) async {
     if (isEmptyString(containerName) ||
         isEmptyString(containerFilePath) ||
-        isEmptyString(hostFilePath)) return false;
+        isEmptyString(hostFilePath)) {
+      return false;
+    }
 
     var cmd = await executor
         .command('cp', [hostFilePath, '$containerName:$containerFilePath']);
@@ -459,7 +461,9 @@ abstract class DockerCMD {
       String hostFilePath) async {
     if (isEmptyString(containerName) ||
         isEmptyString(containerFilePath) ||
-        isEmptyString(hostFilePath)) return false;
+        isEmptyString(hostFilePath)) {
+      return false;
+    }
 
     var cmd = await executor
         .command('cp', ['$containerName:$containerFilePath', hostFilePath]);

@@ -1,3 +1,22 @@
+## 2.1.8
+
+- `DockerCMD`:
+  - `copyFileToContainer` and `copyFileFromContainer`: updated input validation to use block braces for clarity.
+  
+- `DockerCommanderConsole`:
+  - Removed default case returning `false` in command output handling switch.
+  
+- `ConsoleCMD`:
+  - Removed default case setting `typeStr` to `null` in return type string conversion.
+
+- Configuration:
+  - Updated Dart SDK constraint to `>=3.6.0 <4.0.0`.
+  - Dependency updates:
+    - `swiss_knife`: ^3.3.5
+    - `mercury_client`: ^2.3.0
+    - `collection`: ^1.19.1
+    - `test`: ^1.29.0
+
 ## 2.1.7
 
 - `PostgreSQLContainerConfig`:

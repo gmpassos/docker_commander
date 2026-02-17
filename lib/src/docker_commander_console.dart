@@ -657,8 +657,6 @@ class DockerCommanderConsole {
           await _printToConsole('EXIT CODE: $exitCode');
           return true;
         }
-      default:
-        return false;
     }
   }
 
@@ -1018,8 +1016,6 @@ class ConsoleCMD {
           typeStr = 'exit_code';
           break;
         }
-      default:
-        typeStr = null;
     }
     _properties['return'] = typeStr;
   }
