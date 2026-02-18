@@ -212,6 +212,7 @@ abstract class DockerCMD {
       var inspect = parseJSON(json);
 
       var list = inspect is List ? inspect : [];
+
       var networkSettings = list
           .whereType<Map>()
           .where((e) => e.containsKey('NetworkSettings'))
@@ -222,11 +223,12 @@ abstract class DockerCMD {
       var ip = networkSettings != null ? networkSettings['IPAddress'] : null;
 
       if (isEmptyString(ip, trim: true)) {
-        var networks = networkSettings!['Networks'] as Map;
+        var networks = networkSettings?['Networks'] as Map?;
 
-        var network = networks.values.firstWhere(
+        var network = networks?.values.firstWhere(
             (e) => isNotEmptyString(e['IPAddress']),
             orElse: () => null);
+
         ip = network != null ? network['IPAddress'] : null;
       }
 
