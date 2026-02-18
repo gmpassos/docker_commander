@@ -231,6 +231,8 @@ abstract class DockerCMD {
             networkSettings.map((e) => e['Networks']).whereType<Map>().toList();
 
         ip = networks
+            .expand((e) => e.values)
+            .whereType<Map>()
             .map((e) => e['IPAddress']?.toString().trim())
             .nonNulls
             .firstWhereOrNull((s) => isNotEmptyString(s));
