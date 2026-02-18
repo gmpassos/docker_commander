@@ -1,4 +1,5 @@
 import 'package:collection/collection.dart' show IterableExtension;
+import 'package:logging/logging.dart' as logging;
 import 'package:swiss_knife/swiss_knife.dart';
 
 import 'docker_commander_host.dart';
@@ -151,6 +152,8 @@ abstract class DockerCMDExecutor {
 }
 
 abstract class DockerCMD {
+  static final _log = logging.Logger('DockerCMD');
+
   /// Returns the container ID by [name].
   static Future<String?> getContainerIDByName(
       DockerCMDExecutor executor, String? name) async {
@@ -205,28 +208,34 @@ abstract class DockerCMD {
     var json = process.stdout!.asString;
     if (isEmptyString(json, trim: true)) return null;
 
-    var inspect = parseJSON(json);
+    try {
+      var inspect = parseJSON(json);
 
-    var list = inspect is List ? inspect : [];
-    var networkSettings = list
-        .whereType<Map>()
-        .where((e) => e.containsKey('NetworkSettings'))
-        .map((e) => e['NetworkSettings'])
-        .whereType<Map>()
-        .firstWhereOrNull((e) => e.containsKey('IPAddress'));
+      var list = inspect is List ? inspect : [];
+      var networkSettings = list
+          .whereType<Map>()
+          .where((e) => e.containsKey('NetworkSettings'))
+          .map((e) => e['NetworkSettings'])
+          .whereType<Map>()
+          .firstWhereOrNull((e) => e.containsKey('IPAddress'));
 
-    var ip = networkSettings != null ? networkSettings['IPAddress'] : null;
+      var ip = networkSettings != null ? networkSettings['IPAddress'] : null;
 
-    if (isEmptyString(ip, trim: true)) {
-      var networks = networkSettings!['Networks'] as Map;
+      if (isEmptyString(ip, trim: true)) {
+        var networks = networkSettings!['Networks'] as Map;
 
-      var network = networks.values.firstWhere(
-          (e) => isNotEmptyString(e['IPAddress']),
-          orElse: () => null);
-      ip = network != null ? network['IPAddress'] : null;
+        var network = networks.values.firstWhere(
+            (e) => isNotEmptyString(e['IPAddress']),
+            orElse: () => null);
+        ip = network != null ? network['IPAddress'] : null;
+      }
+
+      return ip;
+    } catch (e, s) {
+      _log.severe(
+          "Can't resolve container `$name` IP! Inspect JSON:\n$json", e, s);
+      rethrow;
     }
-
-    return ip;
   }
 
   static Future<Map<String, bool>> addContainersHostMapping(
