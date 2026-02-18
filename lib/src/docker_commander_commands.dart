@@ -217,8 +217,9 @@ abstract class DockerCMD {
 
       var networkSettings = list
           .whereType<Map>()
-          .where((e) => e.containsKey('NetworkSettings'))
-          .whereType<Map>();
+          .map((e) => e['NetworkSettings'])
+          .whereType<Map>()
+          .toList();
 
       var ip = networkSettings
           .map((e) => e['IPAddress']?.toString().trim())
