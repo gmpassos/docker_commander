@@ -208,6 +208,8 @@ abstract class DockerCMD {
     var json = process.stdout!.asString;
     if (isEmptyString(json, trim: true)) return null;
 
+    _log.info("Container `$name` inspect JSON:\n$json");
+
     try {
       var inspect = parseJSON(json);
 
