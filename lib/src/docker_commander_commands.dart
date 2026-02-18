@@ -220,7 +220,7 @@ abstract class DockerCMD {
           .whereType<Map>()
           .firstWhereOrNull((e) => e.containsKey('IPAddress'));
 
-      var ip = networkSettings != null ? networkSettings['IPAddress'] : null;
+      var ip = networkSettings?['IPAddress'];
 
       if (isEmptyString(ip, trim: true)) {
         var networks = networkSettings?['Networks'] as Map?;
@@ -229,7 +229,7 @@ abstract class DockerCMD {
             (e) => isNotEmptyString(e['IPAddress']),
             orElse: () => null);
 
-        ip = network != null ? network['IPAddress'] : null;
+        ip = network?['IPAddress'];
       }
 
       return ip;
