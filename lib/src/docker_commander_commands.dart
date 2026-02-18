@@ -218,20 +218,21 @@ abstract class DockerCMD {
       var networkSettings = list
           .whereType<Map>()
           .where((e) => e.containsKey('NetworkSettings'))
-          .map((e) => e['NetworkSettings'])
-          .whereType<Map>()
-          .firstWhereOrNull((e) => e.containsKey('IPAddress'));
+          .whereType<Map>();
 
-      var ip = networkSettings?['IPAddress'];
+      var ip = networkSettings
+          .map((e) => e['IPAddress']?.toString().trim())
+          .nonNulls
+          .firstWhereOrNull((s) => isNotEmptyString(s));
 
       if (isEmptyString(ip, trim: true)) {
-        var networks = networkSettings?['Networks'] as Map?;
+        var networks =
+            networkSettings.map((e) => e['Networks']).whereType<Map>().toList();
 
-        var network = networks?.values.firstWhere(
-            (e) => isNotEmptyString(e['IPAddress']),
-            orElse: () => null);
-
-        ip = network?['IPAddress'];
+        ip = networks
+            .map((e) => e['IPAddress']?.toString().trim())
+            .nonNulls
+            .firstWhereOrNull((s) => isNotEmptyString(s));
       }
 
       return ip;
