@@ -147,11 +147,16 @@ class DockerCommanderFormula {
     return resultValue;
   }
 
-  Map<String, ASTValue>? _toClassInstanceFields(Map<String, dynamic>? fields) {
-    if (fields == null || fields.isEmpty) return null;
-    var map =
-        fields.map((key, value) => MapEntry(key, ASTValue.fromValue(value)));
-    return map;
+  /// The formula's fields as ApolloVM values.
+  ///
+  /// Always a map, never `null`, even when there are no fields: ApolloVM only
+  /// builds a class instance when it is given instance fields, and a formula's
+  /// commands are non-static methods that need a `this`. Returning `null` for a
+  /// field-less formula would run them without an instance, which ApolloVM
+  /// rejects.
+  Map<String, ASTValue> _toClassInstanceFields(Map<String, dynamic>? fields) {
+    if (fields == null || fields.isEmpty) return <String, ASTValue>{};
+    return fields.map((key, value) => MapEntry(key, ASTValue.fromValue(value)));
   }
 
   Future<List<String>> getFunctions() async {
