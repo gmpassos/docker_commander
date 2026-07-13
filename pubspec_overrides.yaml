@@ -1,4 +1,0 @@
-# Local development: resolve `apollovm` from the sibling repo until 2.0.0 is published.
-dependency_overrides:
-  apollovm:
-    path: ../apollovm_dart
