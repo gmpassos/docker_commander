@@ -1,3 +1,26 @@
+## 3.0.0
+
+- `apollovm`: `^0.0.53` → `^2.0.0`.
+  - ApolloVM 2.0.0 no longer depends on `wasm_run`, which dragged an FFI/Rust
+    toolchain and a long-abandoned `flutter_rust_bridge` 1.x into every consumer
+    of `docker_commander`. That pinned `shelf_web_socket ^1.0.2` /
+    `web_socket_channel ^2.2.0` transitively, locking dependents out of a modern
+    shelf/WebSocket stack.
+  - The formulas API is unchanged; this is a major release because
+    `DockerCommanderFormulaSource.getVM()` exposes ApolloVM types in its public
+    API.
+  - Wasm execution is not used by the formulas engine, so `apollovm_wasm` is not
+    needed here.
+
+- `DockerCommanderFormula`: a formula with no fields now runs its commands on a
+  class instance, like any other formula.
+  - ApolloVM builds a class instance only when it is given instance fields, and
+    now rejects calling a non-static method without a `this`. Since formula
+    commands are non-static methods, a field-less formula (`GitLabFormula`,
+    `ApacheFormula`) failed with *"Can't call non-static method
+    'X.getVersion' without a class instance"*. It previously ran against a
+    missing `this` by accident.
+
 ## 2.1.8
 
 - `DockerCMD`:
