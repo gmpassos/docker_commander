@@ -1,3 +1,14 @@
+## 3.0.1
+
+- `DockerCommander.close`: now awaits `dockerHost.close()` inside the `try`, so a
+  failure while closing is actually caught by the surrounding `catch` instead of
+  escaping as an unhandled asynchronous error.
+
+- Dependency updates:
+  - `swiss_knife`: ^3.3.14
+  - `apollovm`: ^2.31.0
+  - `test`: ^1.32.0
+
 ## 3.0.0
 
 - `apollovm`: `^0.0.53` → `^2.0.0`.

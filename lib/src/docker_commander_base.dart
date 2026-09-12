@@ -7,7 +7,7 @@ import 'docker_commander_host.dart';
 class DockerCommander extends DockerCMDExecutor {
   /// The current version of `docker_commander` package.
   // ignore: non_constant_identifier_names
-  static final String VERSION = '3.0.0';
+  static final String VERSION = '3.0.1';
 
   /// Docker machine host.
   final DockerHost dockerHost;
@@ -334,7 +334,7 @@ class DockerCommander extends DockerCMDExecutor {
   /// Closes this instances, and internal [dockerHost].
   Future<void> close() async {
     try {
-      return dockerHost.close();
+      return await dockerHost.close();
     }
     // ignore: empty_catches
     catch (e) {}
