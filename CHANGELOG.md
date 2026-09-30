@@ -46,7 +46,9 @@
     the data directory on a `tmpfs` mount (through `PGDATA`, so it doesn't
     depend on the image's default data path).
   - `PostgreSQLContainer.runSQLScript`: runs a SQL script of any size, with
-    line-breaks and quotes, through `psql -v ON_ERROR_STOP=1 -f`.
+    line-breaks and quotes, through `psql -v ON_ERROR_STOP=1 -f`. The script
+    is copied with `docker cp`, or, through a remote host (no temporary
+    files), written in chunks that fit in a command-line argument.
   - Removed a leftover `print` from the ready check.
   - The empty-password error no longer prints the user name.
 

@@ -138,8 +138,6 @@ Future<void> doBasicTests(
       expect(dockerContainer.id!.isNotEmpty, isTrue);
     });
   }, skip: !dockerRunning);
-
-  await doRunOptionsTests(dockerRunning, dockerHostLocalInstantiator, preSetup);
 }
 
 /// Returns `docker container inspect --format [format]` of [name].
@@ -156,15 +154,18 @@ Future<String> inspectContainer(
 
 /// [DockerRunOptions] against a real Docker daemon, through a local or a
 /// remote host: every flag must be accepted by Docker and take effect.
+///
+/// [dockerHostInstantiator] must return a new host (a new session) on each
+/// call.
 Future<void> doRunOptionsTests(
-    bool dockerRunning, DockerHostLocalInstantiator dockerHostLocalInstantiator,
+    bool dockerRunning, DockerHostLocalInstantiator dockerHostInstantiator,
     [dynamic Function()? preSetup]) async {
   group('DockerRunOptions (integration)', () {
     late DockerCommander dockerCommander;
     var listenPort = 8099;
 
     Future<DockerCommander> newCommander() async {
-      var dc = DockerCommander(dockerHostLocalInstantiator(listenPort));
+      var dc = DockerCommander(dockerHostInstantiator(listenPort));
       await dc.initialize();
       await dc.checkDaemon();
       return dc;
@@ -351,6 +352,23 @@ Future<void> doRunOptionsTests(
           contains('42'));
       expect(await container.runSQLScript('SHOW synchronous_commit;'),
           contains('off'));
+
+      // A script far over the 128 KiB of one command-line argument, with
+      // non-ASCII text: locally copied with `docker cp`, remotely written in
+      // chunks.
+      var rows = 3000;
+      var script = StringBuffer('CREATE TABLE "big" ("id" int, "txt" text);\n');
+      for (var i = 0; i < rows; ++i) {
+        script.writeln('INSERT INTO "big" VALUES ($i, '
+            '\'ação-$i-${'x' * 100}\');');
+      }
+      script.writeln('SELECT count(*) AS total, '
+          'count(*) FILTER (WHERE "txt" LIKE \'ação-%\') AS accented '
+          'FROM "big";');
+      expect(script.length, greaterThan(300 * 1024));
+
+      var output = await container.runSQLScript(script.toString());
+      expect(output, contains(RegExp(r'\b3000\s*\|\s*3000\b')));
 
       await container.stop(timeout: Duration(seconds: 5));
     });

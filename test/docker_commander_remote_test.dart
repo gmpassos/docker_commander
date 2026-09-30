@@ -43,9 +43,11 @@ Future<void> main() async {
     return 0;
   }
 
-  doBasicTests(
-      dockerRunning,
-      (listenPort) => DockerHostRemote('localhost', listenPort,
-          username: 'admin', password: '123'),
-      preSetup);
+  DockerHost remoteHost(int listenPort) =>
+      DockerHostRemote('localhost', listenPort,
+          username: 'admin', password: '123');
+
+  doBasicTests(dockerRunning, remoteHost, preSetup);
+
+  doRunOptionsTests(dockerRunning, remoteHost, preSetup);
 }

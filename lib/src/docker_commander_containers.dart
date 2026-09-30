@@ -325,9 +325,7 @@ class PostgreSQLContainer extends DockerContainer {
     var path =
         '/tmp/docker_commander-${DateTime.now().microsecondsSinceEpoch}.sql';
 
-    var copied = await DockerCMD.copyFileContentToContainer(
-        runner.dockerHost, name, sql, false, path);
-    if (!copied) return null;
+    if (!await _putScript(path, sql)) return null;
 
     try {
       var process = await exec('env', [
@@ -349,6 +347,39 @@ class PostgreSQLContainer extends DockerContainer {
     } finally {
       await execAndWaitExit('rm', ['-f', path]);
     }
+  }
+
+  /// The largest piece of a script (in UTF-16 code units) written with one
+  /// [putFileContent]: it travels base64-encoded in a single command-line
+  /// argument, which Linux limits to 128 KiB. 24 Ki code units are at most
+  /// 72 KiB of UTF-8, 96 KiB in base64.
+  static const int scriptChunkSize = 24 * 1024;
+
+  /// Writes [content] to [path] inside this container: with `docker cp`
+  /// from a host temporary file, or, on a host without temporary files
+  /// (like a remote one), in [scriptChunkSize] pieces.
+  Future<bool> _putScript(String path, String content) async {
+    var copied = await DockerCMD.copyFileContentToContainer(
+        runner.dockerHost, name, content, false, path);
+    if (copied) return true;
+
+    var offset = 0;
+    do {
+      var end = Math.min(offset + scriptChunkSize, content.length);
+      // Don't split a surrogate pair:
+      if (end < content.length &&
+          (content.codeUnitAt(end - 1) & 0xFC00) == 0xD800) {
+        --end;
+      }
+
+      var ok = await putFileContent(path, content.substring(offset, end),
+          append: offset > 0);
+      if (!ok) return false;
+
+      offset = end;
+    } while (offset < content.length);
+
+    return true;
   }
 
   Future<String?> _psqlSQL(String sql) {
