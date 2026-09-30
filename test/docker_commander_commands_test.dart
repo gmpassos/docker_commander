@@ -87,5 +87,22 @@ ff02::2	ip6-allrouters
               'psql -U postgre -d postgre -c \'CREATE TABLE IF NOT EXISTS "address" ( "id" serial, "state" text, "city" text, "street" text, "number" integer, PRIMARY KEY( id ) )\' ; '
               'sleep 1'));
     });
+
+    test('parsePortMappings', () async {
+      expect(DockerCMD.parsePortMappings(''), isEmpty);
+
+      expect(DockerCMD.parsePortMappings('''
+5432/tcp -> 0.0.0.0:49153
+5432/tcp -> [::]:49153
+80/tcp -> 127.0.0.1:8080
+53/udp -> 0.0.0.0:5353
+'''), equals({5432: 49153, 80: 8080, 53: 5353}));
+
+      // The first address wins:
+      expect(
+          DockerCMD.parsePortMappings(
+              '5432/tcp -> 0.0.0.0:1111\n5432/tcp -> [::]:2222\n'),
+          equals({5432: 1111}));
+    });
   });
 }

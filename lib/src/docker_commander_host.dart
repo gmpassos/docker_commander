@@ -8,6 +8,7 @@ import 'package:swiss_knife/swiss_knife.dart';
 
 import 'docker_commander_base.dart';
 import 'docker_commander_commands.dart';
+import 'docker_commander_run_options.dart';
 
 final _log = Logger('docker_commander/host');
 
@@ -203,22 +204,46 @@ abstract class DockerHost extends DockerCMDExecutor {
   /// Initializes instance.
   Future<bool> initialize(DockerCommander dockerCommander);
 
-  static List<String>? normalizeMappedPorts(List<String>? ports) {
-    if (ports == null) return null;
-    var ports2 = ports
-        .where((e) => isNotEmptyString(e, trim: true))
-        .map((e) => e.trim())
-        .toList();
+  /// See [DockerRunOptions.normalizePorts].
+  static List<String>? normalizeMappedPorts(List<String>? ports) =>
+      DockerRunOptions.normalizePorts(ports);
 
-    var portsSet = ports2.map((pair) {
-      var parts = pair.split(':');
-      var p1 = parseInt(parts[0]);
-      var p2 = parts.length > 1 ? parseInt(parts[1], p1) : p1;
-      return '$p1:$p2';
-    }).toSet();
+  /// Options added to every container run or created by this host:
+  /// the [DockerRunOptions.labelSession] label.
+  DockerRunOptions get defaultRunOptions =>
+      DockerRunOptions(labels: {DockerRunOptions.labelSession: '$session'});
 
-    return portsSet.isNotEmpty ? portsSet.toList() : null;
-  }
+  /// Merges the legacy named parameters of [run] and [createContainer]
+  /// with [options] ([options] win).
+  static DockerRunOptions resolveRunOptions({
+    List<String>? ports,
+    String? network,
+    String? hostname,
+    Map<String, String>? environment,
+    Map<String, String>? volumes,
+    bool? cleanContainer,
+    String? healthCmd,
+    Duration? healthInterval,
+    int? healthRetries,
+    Duration? healthStartPeriod,
+    Duration? healthTimeout,
+    String? restart,
+    DockerRunOptions? options,
+  }) =>
+      DockerRunOptions(
+        ports: ports,
+        network: network,
+        hostname: hostname,
+        environment: environment,
+        volumes: volumes,
+        cleanContainer: cleanContainer,
+        healthCmd: healthCmd,
+        healthInterval: healthInterval,
+        healthRetries: healthRetries,
+        healthStartPeriod: healthStartPeriod,
+        healthTimeout: healthTimeout,
+        restart: restart,
+      ).merge(options);
 
   static OutputReadyType resolveOutputReadyType(
       OutputReadyFunction? stdoutReadyFunction,
@@ -253,6 +278,7 @@ abstract class DockerHost extends DockerCMDExecutor {
     Duration? healthStartPeriod,
     Duration? healthTimeout,
     String? restart,
+    DockerRunOptions? options,
   });
 
   /// Removes a container by [containerNameOrID].
@@ -265,6 +291,8 @@ abstract class DockerHost extends DockerCMDExecutor {
       DockerCMD.startContainer(this, containerNameOrID);
 
   /// Runs a Docker containers with [image] and optional [version].
+  ///
+  /// [options] are merged over the other named parameters.
   Future<DockerRunner?> run(
     String image, {
     String? version,
@@ -282,6 +310,7 @@ abstract class DockerHost extends DockerCMDExecutor {
     Duration? healthStartPeriod,
     Duration? healthTimeout,
     String? restart,
+    DockerRunOptions? options,
     bool outputAsLines = true,
     int? outputLimit,
     OutputReadyFunction? stdoutReadyFunction,
@@ -314,6 +343,10 @@ abstract class DockerHost extends DockerCMDExecutor {
     OutputReadyType? outputReadyType,
   });
 
+  /// Builds the arguments of a Docker [cmd] (`run`, `create`...).
+  ///
+  /// Prefer [buildContainerArgsWithOptions], which accepts every
+  /// [DockerRunOptions].
   ContainerInfos buildContainerArgs(
     String cmd,
     String imageName,
@@ -331,68 +364,49 @@ abstract class DockerHost extends DockerCMDExecutor {
     Duration? healthStartPeriod,
     Duration? healthTimeout,
     String? restart,
+  ) =>
+      buildContainerArgsWithOptions(
+        cmd,
+        imageName,
+        version,
+        containerName,
+        resolveRunOptions(
+          ports: ports,
+          network: network,
+          hostname: hostname,
+          environment: environment,
+          volumes: volumes,
+          cleanContainer: cleanContainer,
+          healthCmd: healthCmd,
+          healthInterval: healthInterval,
+          healthRetries: healthRetries,
+          healthStartPeriod: healthStartPeriod,
+          healthTimeout: healthTimeout,
+          restart: restart,
+        ),
+      );
+
+  /// Builds the arguments of a Docker [cmd] (`run`, `create`...) with
+  /// [options]. The image is the last argument.
+  ContainerInfos buildContainerArgsWithOptions(
+    String cmd,
+    String imageName,
+    String? version,
+    String containerName,
+    DockerRunOptions options,
   ) {
     var image = DockerHost.resolveImage(imageName, version);
-
-    ports = DockerHost.normalizeMappedPorts(ports);
 
     var args = <String>[
       if (isNotEmptyString(cmd)) cmd,
       '--name',
       containerName,
+      ...options.toArgs(),
+      image,
     ];
 
-    if (cleanContainer) {
-      args.add('--rm');
-    }
-
-    if (isNotEmptyString(restart, trim: true)) {
-      restart = restart!.trim();
-      args.add('--restart');
-      args.add(restart);
-    }
-
-    if (ports != null) {
-      for (var pair in ports) {
-        args.add('-p');
-        args.add(pair);
-      }
-    }
-
-    String? containerNetwork;
-
-    if (isNotEmptyString(network, trim: true)) {
-      containerNetwork = network!.trim();
-      args.add('--net');
-      args.add(containerNetwork);
-    }
-
-    String? containerHostname;
-
-    if (isNotEmptyString(hostname, trim: true)) {
-      containerHostname = hostname!.trim();
-      args.add('-h');
-      args.add(containerHostname);
-    }
-
-    volumes?.forEach((k, v) {
-      if (isNotEmptyString(k) && isNotEmptyString(k)) {
-        args.add('-v');
-        args.add('$k:$v');
-      }
-    });
-
-    environment?.forEach((k, v) {
-      if (isNotEmptyString(k)) {
-        args.add('-e');
-        args.add('$k=$v');
-      }
-    });
-
-    args.add(image);
-
-    return ContainerInfos(containerName, null, image, ports, containerNetwork,
-        containerHostname, args);
+    return ContainerInfos(containerName, null, image, options.normalizedPorts,
+        options.networkName, options.hostName, args);
   }
 
   /// Creates a Docker service with [serviceName], [image] and optional [version].
@@ -417,23 +431,23 @@ abstract class DockerHost extends DockerCMDExecutor {
       return null;
     }
 
-    var containerInfos = buildContainerArgs(
+    var containerInfos = buildContainerArgsWithOptions(
       'create',
       imageName,
       version,
       serviceName,
-      ports,
-      network,
-      hostname,
-      environment,
-      volumes,
-      false,
-      healthCmd,
-      healthInterval,
-      healthRetries,
-      healthStartPeriod,
-      healthTimeout,
-      null,
+      resolveRunOptions(
+        ports: ports,
+        network: network,
+        hostname: hostname,
+        environment: environment,
+        volumes: volumes,
+        healthCmd: healthCmd,
+        healthInterval: healthInterval,
+        healthRetries: healthRetries,
+        healthStartPeriod: healthStartPeriod,
+        healthTimeout: healthTimeout,
+      ),
     );
 
     var cmdArgs = containerInfos.args!;
@@ -633,8 +647,14 @@ abstract class DockerRunner extends DockerProcess {
   /// The image:version of this container.
   String? get image;
 
-  /// Returns the mapped ports.
+  /// Returns the mapped ports, as `hostPort:containerPort`.
+  /// A host port chosen by Docker (see [DockerRunOptions.ports]) is
+  /// resolved once the container is ready.
   List<String> get ports;
+
+  /// Returns `true` if this runner attached to a container that was
+  /// already running (see [DockerRunOptions.reuse]).
+  bool get isReused;
 
   /// Stops this container.
   Future<bool> stop({Duration? timeout}) =>
@@ -642,7 +662,7 @@ abstract class DockerRunner extends DockerProcess {
 
   @override
   String toString() {
-    return 'DockerRunner{id: $id, instanceID: $instanceID, containerName: $containerName, ready: $isReady, dockerHost: $dockerHost}';
+    return 'DockerRunner{id: $id, instanceID: $instanceID, containerName: $containerName, ready: $isReady, reused: $isReused, dockerHost: $dockerHost}';
   }
 }
 

@@ -420,10 +420,10 @@ void main() async {
   await dockerCommander.initialize();
   
   // Start PostgreSQL container:
-  var dockerContainer = await PostgreSQLContainer().run(dockerCommander);
+  var dockerContainer = await PostgreSQLContainerConfig().run(dockerCommander);
 
   // Print the current STDOUT of the container:
-  var output = dockerContainer.stdout.asString;
+  var output = dockerContainer.stdout!.asString;
   print(output);
 
   // Execute inside the container a `psql` command:
@@ -431,10 +431,10 @@ void main() async {
       ['-d','postgres', '-U','postgres', '-c','\\l']);
 
   // Wait command to execute:
-  var execPsqlExitCode = await execPsql.waitExit();
+  var execPsqlExitCode = await execPsql!.waitExit();
 
   // Command output:
-  print( execPsql.stdout.asString );
+  print( execPsql.stdout!.asString );
   
   // Stops PostgreSQL, with a timeout of 20s:
   await dockerContainer.stop(timeout: Duration(seconds: 20));
@@ -448,7 +448,70 @@ void main() async {
 
 ```
 
+### Throwaway databases for tests
+
+`ephemeral: true` turns durability off (`fsync`, `synchronous_commit` and
+`full_page_writes`), runs `initdb --no-sync`, and keeps the data directory in
+memory (`tmpfs`). Its data is lost when the container stops.
+
+With `hostPort: 0`, Docker picks a free host port, so parallel test runs don't
+collide:
+
+```dart
+var postgres = await PostgreSQLContainerConfig(
+  hostPort: 0,
+  ephemeral: true,
+  settings: {'max_connections': '200'}, // Any `-c key=value`.
+).run(dockerCommander);
+
+var port = postgres.hostPortFor(5432); // The port Docker picked.
+
+// SQL scripts of any size, stopping at the first error:
+await postgres.runSQLScript(schemaSQL);
+```
+
+`MySQLContainerConfig` has the same `ephemeral`, `settings` and
+`extraEnvironment` parameters.
+
 [postgresql]:https://www.postgresql.org/
+
+-------------------------------------------------------------------------------
+
+## Run options
+
+`DockerRunOptions` holds every `docker run` option, and works the same with
+local and remote hosts. Pass it to `DockerCommander.run`,
+`DockerCommander.createContainer` or any container config (`options:`):
+
+```dart
+var container = await dockerCommander.run(
+  'redis',
+  options: DockerRunOptions(
+    ports: ['0:6379'],             // `0`: a free host port chosen by Docker.
+    tmpfs: {'/data': 'size=64m'},
+    memory: '256m',
+    labels: {'owner': 'my-tests'},
+    healthCmd: 'redis-cli ping',
+    healthInterval: Duration(seconds: 1),
+    extraArgs: ['--read-only'],    // Anything not modelled yet.
+  ),
+);
+
+await container!.waitHealthy();
+```
+
+Also: `shmSize`, `cpus`, `ulimits`, `user`, `workdir`, `entrypoint`, `init`,
+`stopSignal`, `stopTimeout`, `platform`, `pull` and `addHosts`.
+
+- **Cleanup:** every container is labelled with its session.
+  `dockerCommander.cleanupSession()` removes this session's containers, and
+  `removeContainersByLabel({...})` removes containers by any label, for example
+  the ones left behind by an interrupted test run.
+- **Reuse:** with `reuse: true`, a run attaches to a running container started
+  with the same image and options instead of starting a new one
+  (`container.isReused`).
+- **Images:** `dockerCommander.ensureImage('postgres', version: '16')` pulls the
+  image only if it isn't available yet.
 
 -------------------------------------------------------------------------------
 

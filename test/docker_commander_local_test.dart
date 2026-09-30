@@ -13,4 +13,7 @@ Future<void> main() async {
   var dockerRunning = await DockerHost.isDaemonRunning(dockerHostLocal);
 
   doBasicTests(dockerRunning, (listenPort) => dockerHostLocal);
+
+  // A new host (a new session) per commander:
+  doRunOptionsTests(dockerRunning, (listenPort) => DockerHostLocal());
 }

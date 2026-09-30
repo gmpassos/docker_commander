@@ -362,4 +362,132 @@ Future<void> main() async {
       await dockerCommander.removeNetwork(network);
     });
   }, skip: !dockerRunning);
+
+  group('DockerRunOptions (Docker)', () {
+    late DockerCommander dockerCommander;
+
+    setUp(() async {
+      dockerCommander = DockerCommander(DockerHostLocal());
+      await dockerCommander.initialize();
+      await dockerCommander.checkDaemon();
+    });
+
+    tearDown(() async {
+      var removed = await dockerCommander.cleanupSession();
+      _log.info('tearDown> removed containers of this session: $removed');
+      await dockerCommander.close();
+    });
+
+    test('ensureImage', () async {
+      expect(await dockerCommander.ensureImage('postgres'), isTrue);
+      expect(await dockerCommander.imageExists('postgres'), isTrue);
+      expect(
+          await dockerCommander.imageExists('docker_commander/no-such-image'),
+          isFalse);
+    });
+
+    test('PostgreSQL: ephemeral, host port chosen by Docker, labels, health',
+        () async {
+      var container = await PostgreSQLContainerConfig(
+        hostPort: 0,
+        ephemeral: true,
+        options: DockerRunOptions(
+          labels: {'docker_commander.test': 'ephemeral'},
+          healthCmd: 'pg_isready -U postgres',
+          healthInterval: Duration(milliseconds: 500),
+        ),
+      ).run(dockerCommander);
+
+      _log.info(container);
+
+      var hostPort = container.hostPortFor(5432);
+      _log.info('Host port chosen by Docker: $hostPort');
+      expect(hostPort, isNotNull);
+      expect(hostPort! > 0, isTrue);
+      expect(await isFreeListenPort(hostPort), isFalse);
+
+      var mappings =
+          await dockerCommander.getContainerPortMappings(container.name);
+      expect(mappings, equals({5432: hostPort}));
+
+      expect(
+          await dockerCommander
+              .listContainersByLabel({'docker_commander.test': 'ephemeral'}),
+          contains(container.name));
+
+      expect(
+          await container.waitHealthy(timeout: Duration(seconds: 30)), isTrue);
+
+      var fsync = await container.runSQLScript('SHOW fsync;');
+      expect(fsync, contains('off'));
+
+      var dataDirectory = await container.runSQLScript('SHOW data_directory;');
+      expect(dataDirectory,
+          contains(PostgreSQLContainerConfig.ephemeralDataMount));
+
+      // Multi-line, with quotes of both kinds:
+      var output = await container.runSQLScript('''
+        CREATE TABLE "item" (
+          "id" serial PRIMARY KEY,
+          "name" text
+        );
+        INSERT INTO "item" ("name") VALUES ('it''s "quoted"');
+        SELECT "name" FROM "item";
+      ''');
+      expect(output, contains('it\'s "quoted"'));
+
+      // Stops at the first error:
+      expect(
+          await container.runSQLScript('SELECT * FROM no_such_table;'), isNull);
+
+      await container.stop(timeout: Duration(seconds: 5));
+      await container.waitExit();
+    });
+
+    test('PostgreSQL: reuse', () async {
+      config() => PostgreSQLContainerConfig(
+            hostPort: 0,
+            ephemeral: true,
+            options: DockerRunOptions(reuse: true),
+          );
+
+      var first = await config().run(dockerCommander);
+      expect(first.isReused, isFalse);
+
+      var second = await config().run(dockerCommander);
+      _log.info('Reused: $second');
+
+      expect(second.isReused, isTrue);
+      expect(second.name, equals(first.name));
+      expect(second.id, equals(first.id));
+      expect(second.hostPortFor(5432), equals(first.hostPortFor(5432)));
+      expect(await second.runSQLScript('SELECT 1 AS one;'), contains('one'));
+
+      // Different options: a new container.
+      var other = await PostgreSQLContainerConfig(
+        hostPort: 0,
+        ephemeral: true,
+        settings: {'max_connections': '50'},
+        options: DockerRunOptions(reuse: true),
+      ).run(dockerCommander);
+      expect(other.isReused, isFalse);
+      expect(other.name, isNot(equals(first.name)));
+
+      await other.stop(timeout: Duration(seconds: 5));
+      await first.stop(timeout: Duration(seconds: 5));
+      await first.waitExit();
+    });
+
+    test('cleanupSession', () async {
+      var container =
+          await PostgreSQLContainerConfig(hostPort: 0, ephemeral: true)
+              .run(dockerCommander);
+
+      var removed = await dockerCommander.cleanupSession();
+      expect(removed, contains(container.name));
+
+      expect(await dockerCommander.psContainerNames(),
+          isNot(contains(container.name)));
+    });
+  }, skip: !dockerRunning);
 }

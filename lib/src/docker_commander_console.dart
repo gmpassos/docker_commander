@@ -4,6 +4,7 @@ import 'package:swiss_knife/swiss_knife.dart';
 
 import 'docker_commander_base.dart';
 import 'docker_commander_host.dart';
+import 'docker_commander_run_options.dart';
 
 typedef ParameterProvider = Future<String> Function(
     String name, String? description);
@@ -44,6 +45,8 @@ class DockerCommanderConsole {
     await _printToConsole('');
     await _printToConsole(
         '  - create-container %containerName %imageName %version %ports %volumes %hostname %network %environment --cleanContainer --restart alway --health-cmd "curl..." ');
+    await _printToConsole(
+        '      Also: --tmpfs /data=size=64m --labels a=1|b=2 --shm-size --memory --cpus --ulimits --user --workdir --entrypoint --init --stop-signal --stop-timeout(ms) --platform --pull --add-hosts --extra-args');
     await _printToConsole(
         '  - create-service %serviceName %imageName %version %replicas %ports %volumes %hostname %network %environment');
     await _printToConsole('');
@@ -142,6 +145,8 @@ class DockerCommanderConsole {
             'health-start-period': cmd.getProperty('health-start-period'),
             'health-timeout': cmd.getProperty('health-timeout'),
             'restart': cmd.getProperty('restart'),
+            for (var p in DockerRunOptions.consoleProperties.keys)
+              p: cmd.getProperty(p),
           }, {
             'containerName',
             'imageName',
@@ -168,6 +173,7 @@ class DockerCommanderConsole {
                 _parseDurationInMs(parameters['health-start-period']),
             healthTimeout: _parseDurationInMs(parameters['health-timeout']),
             restart: parameters['restart'],
+            options: DockerRunOptions.fromProperties(parameters),
           );
 
           if (containerInfos != null) {
@@ -826,6 +832,7 @@ class ConsoleCMD {
             'health-start-period',
             'health-timeout',
             'restart',
+            ...DockerRunOptions.consoleProperties.keys,
           });
 
           return true;

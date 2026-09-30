@@ -8,6 +8,7 @@ import 'package:swiss_knife/swiss_knife.dart';
 
 import 'docker_commander_base.dart';
 import 'docker_commander_host.dart';
+import 'docker_commander_run_options.dart';
 
 final _log = Logger('docker_commander/remote');
 
@@ -138,6 +139,7 @@ class DockerHostRemote extends DockerHost {
     Duration? healthStartPeriod,
     Duration? healthTimeout,
     String? restart,
+    DockerRunOptions? options,
   }) async {
     ports = DockerHost.normalizeMappedPorts(ports);
 
@@ -160,6 +162,7 @@ class DockerHostRemote extends DockerHost {
       if (healthTimeout != null)
         'healthTimeout': '${healthTimeout.inMilliseconds}',
       if (restart != null) 'restart': restart,
+      'options': _encodeOptions(options),
     }) as Map?;
 
     if (response == null) return null;
@@ -194,6 +197,7 @@ class DockerHostRemote extends DockerHost {
     Duration? healthStartPeriod,
     Duration? healthTimeout,
     String? restart,
+    DockerRunOptions? options,
     bool outputAsLines = true,
     int? outputLimit,
     OutputReadyFunction? stdoutReadyFunction,
@@ -226,6 +230,7 @@ class DockerHostRemote extends DockerHost {
       if (healthTimeout != null)
         'healthTimeout': '${healthTimeout.inMilliseconds}',
       if (restart != null) 'restart': restart,
+      'options': _encodeOptions(options),
       'outputAsLines': '$outputAsLines',
       'outputLimit': '$outputLimit',
     }) as Map?;
@@ -235,6 +240,13 @@ class DockerHostRemote extends DockerHost {
     var instanceID = response['instanceID'] as int;
     containerName = response['containerName'] as String?;
     var id = response['id'] as String?;
+    var isReused = response['reused'] == true;
+
+    // Ports resolved by the server (host ports chosen by Docker):
+    var responsePorts = response['ports'];
+    if (responsePorts is List) {
+      ports = responsePorts.map((e) => '$e').toList();
+    }
 
     outputReadyType ??= DockerHost.resolveOutputReadyType(
         stdoutReadyFunction, stderrReadyFunction);
@@ -255,7 +267,8 @@ class DockerHostRemote extends DockerHost {
         stdoutReadyFunction,
         stderrReadyFunction,
         outputReadyType,
-        id);
+        id,
+        isReused: isReused);
 
     _runners[instanceID] = runner;
 
@@ -267,6 +280,12 @@ class DockerHostRemote extends DockerHost {
 
     return runner;
   }
+
+  /// Encodes [options] as JSON, with this client's
+  /// [DockerRunOptions.labelSession] label (so [DockerCommander.cleanupSession]
+  /// finds the containers started through the server).
+  String _encodeOptions(DockerRunOptions? options) =>
+      encodeJSON(defaultRunOptions.merge(options).toJson());
 
   Future<bool> _initializeAndWaitReady(DockerProcessRemote dockerProcess,
       [Function()? onInitialize]) async {
@@ -561,6 +580,9 @@ class DockerRunnerRemote extends DockerProcessRemote implements DockerRunner {
 
   final List<String>? _ports;
 
+  @override
+  final bool isReused;
+
   DockerRunnerRemote(
       DockerHostRemote dockerHostRemote,
       int instanceID,
@@ -572,7 +594,8 @@ class DockerRunnerRemote extends DockerProcessRemote implements DockerRunner {
       OutputReadyFunction stdoutReadyFunction,
       OutputReadyFunction stderrReadyFunction,
       OutputReadyType outputReadyType,
-      this.id)
+      this.id,
+      {this.isReused = false})
       : super(
             dockerHostRemote,
             instanceID,
@@ -592,7 +615,7 @@ class DockerRunnerRemote extends DockerProcessRemote implements DockerRunner {
 
   @override
   String toString() {
-    return 'DockerRunnerRemote{id: $id, image: $image, containerName: $containerName}';
+    return 'DockerRunnerRemote{id: $id, image: $image, containerName: $containerName, ports: $ports${isReused ? ', reused' : ''}}';
   }
 }
 
@@ -603,6 +626,8 @@ class DockerProcessRemote extends DockerProcess {
   final OutputReadyFunction _stdoutReadyFunction;
   final OutputReadyFunction _stderrReadyFunction;
   final OutputReadyType _outputReadyType;
+
+  final List<OutputClient> _outputClients = [];
 
   DockerProcessRemote(
     DockerHostRemote dockerHostRemote,
@@ -648,6 +673,7 @@ class DockerProcessRemote extends DockerProcess {
           outputStream.addLines(e);
         }
       });
+      _outputClients.add(outputClient);
       outputClient.start();
 
       outputStream.onDispose.listen((_) => outputClient.stop());
@@ -667,6 +693,7 @@ class DockerProcessRemote extends DockerProcess {
           OutputClient(dockerHost, this, stderr, outputStream, (entries) {
         outputStream.addAll(entries.cast());
       });
+      _outputClients.add(outputClient);
       outputClient.start();
 
       outputStream.onDispose.listen((_) => outputClient.stop());
@@ -713,15 +740,26 @@ class DockerProcessRemote extends DockerProcess {
   }
 
   Future<int?> _waitExitImpl(Duration? timeout) async {
-    if (_exitCode != null) return _exitCode;
+    if (_exitCode == null) {
+      var code = await dockerHost.processWaitExit(instanceID, timeout);
+      if (code != null) {
+        _setExitCode(code);
+      }
+    }
 
-    var code = await dockerHost.processWaitExit(instanceID, timeout);
-    if (code != null) {
-      _setExitCode(code);
+    // The output is synced in the background: fetch what is left, so the
+    // output is complete once the exit is returned.
+    if (_exitCode != null) {
+      await _drainOutput();
     }
 
     return _exitCode;
   }
+
+  Future<void>? _draining;
+
+  Future<void> _drainOutput() => _draining ??=
+      Future.wait(_outputClients.map((c) => c.drain()).toList(growable: false));
 }
 
 class OutputSync {
@@ -772,7 +810,33 @@ class OutputClient {
 
   int _errorCount = 0;
 
-  Future<bool> sync() async {
+  Future<bool> _lastSync = Future.value(false);
+
+  /// Fetches the new output entries. Returns `true` if there were any.
+  ///
+  /// Calls run one at a time: two at once would fetch the same offset and
+  /// add the same entries twice.
+  Future<bool> sync() => _lastSync =
+      _lastSync.then((_) => _syncImpl(), onError: (_) => _syncImpl());
+
+  /// Fetches the output until there is no more (for a finished process).
+  Future<void> drain() async {
+    // Twice empty in a row: the server may still be reading the last output
+    // of the process.
+    var empty = 0;
+    while (empty < 2) {
+      if (await sync()) {
+        empty = 0;
+      } else {
+        ++empty;
+        if (empty < 2) {
+          await Future.delayed(Duration(milliseconds: 100));
+        }
+      }
+    }
+  }
+
+  Future<bool> _syncImpl() async {
     OutputSync? outputSync;
     try {
       outputSync = await hostRemote.processGetOutput(

@@ -2,7 +2,9 @@ import 'package:swiss_knife/swiss_knife.dart';
 import 'package:version/version.dart';
 
 import 'docker_commander_base.dart';
+import 'docker_commander_commands.dart';
 import 'docker_commander_host.dart';
+import 'docker_commander_run_options.dart';
 
 /// Base class for pre-configured containers.
 class DockerContainerConfig<D extends DockerContainer> {
@@ -23,6 +25,10 @@ class DockerContainerConfig<D extends DockerContainer> {
   final OutputReadyFunction? stdoutReadyFunction;
   final OutputReadyFunction? stderrReadyFunction;
 
+  /// Further run options (tmpfs, labels, health check, resources...),
+  /// merged over the other fields.
+  final DockerRunOptions? options;
+
   DockerContainerConfig(
     this.image, {
     this.version,
@@ -40,6 +46,7 @@ class DockerContainerConfig<D extends DockerContainer> {
     this.outputAsLines = true,
     this.stdoutReadyFunction,
     this.stderrReadyFunction,
+    this.options,
   });
 
   DockerContainerConfig copy({
@@ -59,6 +66,7 @@ class DockerContainerConfig<D extends DockerContainer> {
     bool? outputAsLines,
     OutputReadyFunction? stdoutReadyFunction,
     OutputReadyFunction? stderrReadyFunction,
+    DockerRunOptions? options,
   }) {
     return DockerContainerConfig<D>(
       image ?? this.image,
@@ -77,6 +85,7 @@ class DockerContainerConfig<D extends DockerContainer> {
       outputAsLines: outputAsLines ?? this.outputAsLines,
       stdoutReadyFunction: stdoutReadyFunction ?? this.stdoutReadyFunction,
       stderrReadyFunction: stderrReadyFunction ?? this.stderrReadyFunction,
+      options: options ?? this.options,
     );
   }
 
@@ -119,6 +128,7 @@ class DockerContainerConfig<D extends DockerContainer> {
       environment: environment,
       volumes: volumes,
       cleanContainer: cleanContainer,
+      options: options,
       outputAsLines: outputAsLines,
       outputLimit: outputLimit ?? this.outputLimit,
       stdoutReadyFunction: stdoutReadyFunction,
@@ -141,6 +151,18 @@ class DockerContainerConfig<D extends DockerContainer> {
 /// PostgreSQL pre-configured container.
 class PostgreSQLContainerConfig
     extends DockerContainerConfig<PostgreSQLContainer> {
+  /// The `tmpfs` mount holding the data directory of an [ephemeral]
+  /// container.
+  static const String ephemeralDataMount = '/var/lib/postgresql/ephemeral';
+
+  /// The runtime settings of an [ephemeral] container: no waiting on disk
+  /// writes.
+  static const Map<String, String> ephemeralSettings = {
+    'fsync': 'off',
+    'synchronous_commit': 'off',
+    'full_page_writes': 'off',
+  };
+
   /// Postgres DB username.
   String pgUser;
 
@@ -159,6 +181,22 @@ class PostgreSQLContainerConfig
   /// Runtime Postgres configuration: `-c log_statement=$logStatement`
   String? logStatement;
 
+  /// Further runtime settings, each passed as `-c key=value`.
+  final Map<String, String>? settings;
+
+  /// Arguments to `initdb`, through `POSTGRES_INITDB_ARGS`.
+  final String? initdbArgs;
+
+  /// A throwaway database, for tests: durability off
+  /// ([ephemeralSettings]), `initdb --no-sync`, and the data directory in
+  /// memory ([ephemeralDataMount]). Its data is lost when the container
+  /// stops.
+  final bool ephemeral;
+
+  /// - [hostPort]: `0` publishes on a free host port chosen by Docker
+  ///   (see [DockerContainer.hostPortFor]).
+  /// - [extraEnvironment]: more environment variables, which can override
+  ///   the ones set by this config.
   PostgreSQLContainerConfig(
       {super.version = 'latest',
       this.pgUser = 'postgres',
@@ -167,32 +205,31 @@ class PostgreSQLContainerConfig
       this.postgresPort,
       this.maxConnections,
       this.logStatement,
-      int? hostPort})
+      this.settings,
+      this.initdbArgs,
+      Map<String, String>? extraEnvironment,
+      this.ephemeral = false,
+      int? hostPort,
+      DockerRunOptions? options})
       : super(
           'postgres',
-          imageArgs: postgresPort != null ||
-                  maxConnections != null ||
-                  logStatement != null
-              ? [
-                  if (postgresPort != null) ...['-c', 'port=$postgresPort'],
-                  if (maxConnections != null) ...[
-                    '-c',
-                    'max_connections=$maxConnections'
-                  ],
-                  if (logStatement != null) ...[
-                    '-c',
-                    'log_statement=$logStatement'
-                  ],
-                ]
-              : null,
+          imageArgs: _buildImageArgs(
+              postgresPort, maxConnections, logStatement, settings, ephemeral),
           hostPorts: hostPort != null ? [hostPort] : null,
           containerPorts: [5432],
           environment: {
             'POSTGRES_USER': pgUser,
             'POSTGRES_PASSWORD': pgPassword,
             'POSTGRES_DB': pgDatabase,
+            ..._buildInitEnvironment(initdbArgs, ephemeral),
+            ...?extraEnvironment,
           },
+          options: ephemeral
+              ? DockerRunOptions(tmpfs: {ephemeralDataMount: ''}).merge(options)
+              : options,
           outputAsLines: true,
+          // `pg_ctl` sends the output of the temporary server used by the
+          // first-time setup to STDOUT; the real server logs to STDERR.
           stdoutReadyFunction: (output, data) {
             var lines = data is List ? data : [data];
 
@@ -210,8 +247,6 @@ class PostgreSQLContainerConfig
 
             readyForConnections = afterComplete.any((l) =>
                 l.contains('database system is ready to accept connections'));
-
-            print(readyForConnections);
 
             return readyForConnections;
           },
@@ -232,8 +267,39 @@ class PostgreSQLContainerConfig
     }
 
     if (pgPassword.isEmpty) {
-      throw ArgumentError('Invalid pgPassword: $pgUser');
+      throw ArgumentError('Invalid pgPassword: empty');
     }
+  }
+
+  static List<String>? _buildImageArgs(int? postgresPort, int? maxConnections,
+      String? logStatement, Map<String, String>? settings, bool ephemeral) {
+    var allSettings = <String, String>{
+      if (ephemeral) ...ephemeralSettings,
+      if (postgresPort != null) 'port': '$postgresPort',
+      if (maxConnections != null) 'max_connections': '$maxConnections',
+      if (logStatement != null) 'log_statement': logStatement,
+      ...?settings,
+    };
+
+    if (allSettings.isEmpty) return null;
+
+    return [
+      for (var e in allSettings.entries) ...['-c', '${e.key}=${e.value}'],
+    ];
+  }
+
+  static Map<String, String> _buildInitEnvironment(
+      String? initdbArgs, bool ephemeral) {
+    var args = [
+      if (isNotEmptyString(initdbArgs, trim: true)) initdbArgs!.trim(),
+      if (ephemeral) '--no-sync',
+    ].join(' ');
+
+    return {
+      if (args.isNotEmpty) 'POSTGRES_INITDB_ARGS': args,
+      // A sub-directory: `initdb` needs an empty directory it can own.
+      if (ephemeral) 'PGDATA': '$ephemeralDataMount/pgdata',
+    };
   }
 
   @override
@@ -250,6 +316,71 @@ class PostgreSQLContainer extends DockerContainer {
   ///
   /// Calls [psqlCMD].
   Future<String?> runSQL(String sqlInline) => _psqlSQL(sqlInline);
+
+  /// Runs a SQL script of any size, with line-breaks and quotes.
+  ///
+  /// Copies [sql] into the container and runs it with `psql -f`, stopping
+  /// at the first error. Returns the `psql` output, or `null` on error.
+  Future<String?> runSQLScript(String sql) async {
+    var path =
+        '/tmp/docker_commander-${DateTime.now().microsecondsSinceEpoch}.sql';
+
+    if (!await _putScript(path, sql)) return null;
+
+    try {
+      var process = await exec('env', [
+        'PGPASSWORD=${config.pgPassword}',
+        'psql',
+        '-v',
+        'ON_ERROR_STOP=1',
+        '-U',
+        config.pgUser,
+        '-d',
+        config.pgDatabase,
+        '-f',
+        path,
+      ]);
+      if (process == null) return null;
+
+      var stdout = await process.waitStdout(desiredExitCode: 0);
+      return stdout?.asString;
+    } finally {
+      await execAndWaitExit('rm', ['-f', path]);
+    }
+  }
+
+  /// The largest piece of a script (in UTF-16 code units) written with one
+  /// [putFileContent]: it travels base64-encoded in a single command-line
+  /// argument, which Linux limits to 128 KiB. 24 Ki code units are at most
+  /// 72 KiB of UTF-8, 96 KiB in base64.
+  static const int scriptChunkSize = 24 * 1024;
+
+  /// Writes [content] to [path] inside this container: with `docker cp`
+  /// from a host temporary file, or, on a host without temporary files
+  /// (like a remote one), in [scriptChunkSize] pieces.
+  Future<bool> _putScript(String path, String content) async {
+    var copied = await DockerCMD.copyFileContentToContainer(
+        runner.dockerHost, name, content, false, path);
+    if (copied) return true;
+
+    var offset = 0;
+    do {
+      var end = Math.min(offset + scriptChunkSize, content.length);
+      // Don't split a surrogate pair:
+      if (end < content.length &&
+          (content.codeUnitAt(end - 1) & 0xFC00) == 0xD800) {
+        --end;
+      }
+
+      var ok = await putFileContent(path, content.substring(offset, end),
+          append: offset > 0);
+      if (!ok) return false;
+
+      offset = end;
+    } while (offset < content.length);
+
+    return true;
+  }
 
   Future<String?> _psqlSQL(String sql) {
     sql = _normalizeSQL(sql);
@@ -295,6 +426,18 @@ psql -U ${config.pgUser} -d ${config.pgDatabase} -c $cmdQuoted
 
 /// MySQL pre-configured container.
 class MySQLContainerConfig extends DockerContainerConfig<MySQLContainer> {
+  /// The data directory, on a `tmpfs` mount for an [ephemeral] container.
+  static const String dataDirectory = '/var/lib/mysql';
+
+  /// The server settings of an [ephemeral] container: no waiting on disk
+  /// writes, and no binary log.
+  static const Map<String, String> ephemeralSettings = {
+    'innodb-flush-log-at-trx-commit': '0',
+    'sync-binlog': '0',
+    'innodb-doublewrite': 'OFF',
+    'skip-log-bin': '',
+  };
+
   /// MySQL DB username.
   String dbUser;
 
@@ -304,6 +447,19 @@ class MySQLContainerConfig extends DockerContainerConfig<MySQLContainer> {
   /// MySQL DB name.
   String dbName;
 
+  /// Further server settings, each passed as `--key=value`
+  /// (or `--key` for an empty value).
+  final Map<String, String>? settings;
+
+  /// A throwaway database, for tests: durability off
+  /// ([ephemeralSettings]) and the data directory in memory. Its data is
+  /// lost when the container stops.
+  final bool ephemeral;
+
+  /// - [hostPort]: `0` publishes on a free host port chosen by Docker
+  ///   (see [DockerContainer.hostPortFor]).
+  /// - [extraEnvironment]: more environment variables, which can override
+  ///   the ones set by this config.
   MySQLContainerConfig({
     super.version = 'latest',
     this.dbUser = 'myuser',
@@ -312,18 +468,26 @@ class MySQLContainerConfig extends DockerContainerConfig<MySQLContainer> {
     int? hostPort,
     bool forceNativePasswordAuthentication = false,
     List<String>? daemonArguments,
+    this.settings,
+    Map<String, String>? extraEnvironment,
+    this.ephemeral = false,
+    DockerRunOptions? options,
   }) : super(
           'mysql',
           hostPorts: hostPort != null ? [hostPort] : null,
           containerPorts: [3306],
-          imageArgs: _buildImageArgs(
-              version, forceNativePasswordAuthentication, daemonArguments),
+          imageArgs: _buildImageArgs(version, forceNativePasswordAuthentication,
+              daemonArguments, settings, ephemeral),
           environment: {
             'MYSQL_USER': dbUser,
             'MYSQL_PASSWORD': dbPassword,
             'MYSQL_ROOT_PASSWORD': dbPassword,
             'MYSQL_DATABASE': dbName,
+            ...?extraEnvironment,
           },
+          options: ephemeral
+              ? DockerRunOptions(tmpfs: {dataDirectory: ''}).merge(options)
+              : options,
           outputAsLines: true,
           stdoutReadyFunction: (output, line) => false,
           stderrReadyFunction: (output, data) {
@@ -346,9 +510,22 @@ class MySQLContainerConfig extends DockerContainerConfig<MySQLContainer> {
     }
   }
 
-  static List<String>? _buildImageArgs(String? version,
-      bool forceNativePasswordAuthentication, List<String>? daemonArguments) {
+  static List<String>? _buildImageArgs(
+      String? version,
+      bool forceNativePasswordAuthentication,
+      List<String>? daemonArguments,
+      Map<String, String>? settings,
+      bool ephemeral) {
     var args = <String>[];
+
+    var allSettings = <String, String>{
+      if (ephemeral) ...ephemeralSettings,
+      ...?settings,
+    };
+
+    for (var e in allSettings.entries) {
+      args.add(e.value.isEmpty ? '--${e.key}' : '--${e.key}=${e.value}');
+    }
 
     if (forceNativePasswordAuthentication) {
       if (_isVersionGreaterThan_9_0_0(version)) {
