@@ -155,13 +155,14 @@ abstract class DockerCMD {
   static final _log = logging.Logger('DockerCMD');
 
   /// Returns the full container ID by [name] (like the ID written by
-  /// `docker run --cidfile`).
+  /// `docker run --cidfile`). The name must match exactly.
   static Future<String?> getContainerIDByName(
       DockerCMDExecutor executor, String? name) async {
     if (isEmptyString(name)) return null;
 
-    var process =
-        await executor.command('ps', ['-aq', '--no-trunc', '-f', 'name=$name']);
+    // Not `docker ps -f name=...`: that matches any name *containing* it.
+    var process = await executor
+        .command('container', ['inspect', '--format', '{{.Id}}', name!]);
     if (process == null) return null;
 
     var ok = await process.waitExitAndConfirm(0);

@@ -508,7 +508,9 @@ class DockerHostLocal extends DockerHost {
   }
 
   /// A hash of what defines a reusable container: [image], [version],
-  /// [containerName], [imageArgs] and [options].
+  /// [containerName], [imageArgs] and [options], except the
+  /// [DockerRunOptions.labelSession] label, so any session (including
+  /// remote clients) finds the same container.
   /// See [DockerRunOptions.reuse].
   static String computeConfigHash(
       String image,
@@ -516,6 +518,14 @@ class DockerHostLocal extends DockerHost {
       String? containerName,
       List<String>? imageArgs,
       DockerRunOptions options) {
+    var labels = options.labels;
+    if (labels != null && labels.containsKey(DockerRunOptions.labelSession)) {
+      options = DockerRunOptions.fromJson({
+        ...options.toJson(),
+        'labels': {...labels}..remove(DockerRunOptions.labelSession),
+      });
+    }
+
     var key = [
       DockerHost.resolveImage(image, version),
       containerName ?? '',
@@ -995,18 +1005,8 @@ class DockerRunnerLocal extends DockerProcessLocal implements DockerRunner {
         await DockerCMD.getContainerPortMappings(dockerHost, containerName);
     if (mappings == null || mappings.isEmpty) return;
 
-    var ports = _ports;
-    if (isReused || ports == null) {
-      _ports = mappings.entries.map((e) => '${e.value}:${e.key}').toList();
-      return;
-    }
-
-    _ports = ports.map((p) {
-      if (!p.startsWith('0:')) return p;
-      var containerPort = parseInt(p.substring(2));
-      var hostPort = mappings[containerPort];
-      return hostPort != null ? '$hostPort:$containerPort' : p;
-    }).toList();
+    _ports =
+        DockerRunOptions.applyPortMappings(isReused ? null : _ports, mappings);
   }
 
   @override

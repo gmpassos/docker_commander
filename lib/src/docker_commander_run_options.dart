@@ -112,7 +112,11 @@ class DockerRunOptions {
   /// instead of starting a new one. Not a Docker flag: the container is
   /// found by its [labelConfigHash] label.
   ///
-  /// A reused container belongs to the session that started it.
+  /// - Only for `run`: `createContainer` ignores it.
+  /// - A reused container belongs to the session that started it, and
+  ///   stopping any of its runners stops it for all of them.
+  /// - Two runs starting at the same moment can both find none, and start
+  ///   two containers.
   final bool? reuse;
 
   const DockerRunOptions({
@@ -450,6 +454,24 @@ class DockerRunOptions {
     }).toSet();
 
     return portsSet.isNotEmpty ? portsSet.toList() : null;
+  }
+
+  /// Replaces the host port `0` of each of [ports] with the host port
+  /// Docker chose, from [mappings] (container port → host port, see
+  /// `DockerCMD.getContainerPortMappings`). With no [ports], returns all the
+  /// [mappings] as `hostPort:containerPort`.
+  static List<String> applyPortMappings(
+      List<String>? ports, Map<int, int> mappings) {
+    if (ports == null) {
+      return mappings.entries.map((e) => '${e.value}:${e.key}').toList();
+    }
+
+    return ports.map((p) {
+      if (!p.startsWith('0:')) return p;
+      var containerPort = parseInt(p.substring(2));
+      var hostPort = mappings[containerPort];
+      return hostPort != null ? '$hostPort:$containerPort' : p;
+    }).toList();
   }
 
   /// Parses an inline map: entries separated by `|` or `;`, each entry

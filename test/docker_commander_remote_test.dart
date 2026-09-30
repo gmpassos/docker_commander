@@ -16,7 +16,8 @@ Future<void> main() async {
   var usedPorts = <int>{};
 
   Future<int> preSetup() async {
-    for (var listenPort = 8090; listenPort <= 8099; ++listenPort) {
+    // A server per test (closed by the test), so one port per test:
+    for (var listenPort = 8090; listenPort <= 8129; ++listenPort) {
       if (usedPorts.contains(listenPort)) continue;
 
       try {

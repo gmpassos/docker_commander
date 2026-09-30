@@ -191,6 +191,67 @@ void main() {
           equals(['127.0.0.1:80:80']));
     });
 
+    test('toArgs: blank values are skipped', () {
+      var options = DockerRunOptions(
+        cleanContainer: false,
+        restart: '  ',
+        network: ' ',
+        hostname: '',
+        user: ' ',
+        healthCmd: '',
+        volumes: {'/host': '', '': '/data'},
+        environment: {'': 'x', 'EMPTY': ''},
+        tmpfs: {' ': 'size=1m'},
+        labels: {' ': 'x', ' owner ': 'tests'},
+        addHosts: {'db': '', '': '10.0.0.1'},
+        init: false,
+      );
+
+      expect(
+          options.toArgs(),
+          equals([
+            '-e', 'EMPTY=', //
+            '--label', 'owner=tests',
+          ]));
+      expect(options.networkName, isNull);
+      expect(options.hostName, isNull);
+    });
+
+    test('toArgs: stop timeout in whole seconds', () {
+      expect(
+          DockerRunOptions(stopTimeout: Duration(milliseconds: 2500)).toArgs(),
+          equals(['--stop-timeout', '2']));
+    });
+
+    test('fromJson: non-string values', () {
+      var options = DockerRunOptions.fromJson({
+        'environment': {'PORT': 5432, 'EMPTY': null},
+        'healthRetries': '3',
+        'ports': [8080, '0:5432'],
+      });
+
+      expect(options.environment, equals({'PORT': '5432', 'EMPTY': ''}));
+      expect(options.healthRetries, equals(3));
+      expect(options.ports, equals(['8080', '0:5432']));
+      expect(DockerRunOptions.fromJson({}).isEmpty, isTrue);
+    });
+
+    test('applyPortMappings', () {
+      var mappings = {5432: 49153, 80: 8080};
+
+      expect(
+          DockerRunOptions.applyPortMappings(
+              ['0:5432', '9000:9000', '0:6379'], mappings),
+          equals(['49153:5432', '9000:9000', '0:6379']));
+
+      // No ports (a reused container): all its published ports.
+      expect(DockerRunOptions.applyPortMappings(null, mappings),
+          equals(['49153:5432', '8080:80']));
+
+      expect(DockerRunOptions.applyPortMappings(['0:5432'], {}),
+          equals(['0:5432']));
+    });
+
     test('parseInlineMap', () {
       expect(DockerRunOptions.parseInlineMap(null), isNull);
       expect(DockerRunOptions.parseInlineMap('  '), isNull);
@@ -261,6 +322,64 @@ void main() {
       expect(infos.containerNetwork, equals('n1'));
     });
 
+    test('resolveRunOptions: options win over the named parameters', () {
+      var options = DockerHost.resolveRunOptions(
+        ports: ['80:80'],
+        environment: {'A': '1', 'B': '1'},
+        cleanContainer: true,
+        restart: 'no',
+        healthCmd: 'true',
+        options: DockerRunOptions(
+          ports: ['443:443'],
+          environment: {'B': '2'},
+          cleanContainer: false,
+          restart: 'always',
+        ),
+      );
+
+      expect(options.ports, equals(['80:80', '443:443']));
+      expect(options.environment, equals({'A': '1', 'B': '2'}));
+      expect(options.cleanContainer, isFalse);
+      expect(options.restart, equals('always'));
+      expect(options.healthCmd, equals('true'));
+    });
+
+    test('defaultRunOptions: the session label, per host', () {
+      var h1 = DockerHostLocal();
+      var h2 = DockerHostLocal();
+
+      expect(h1.defaultRunOptions.labels,
+          equals({DockerRunOptions.labelSession: '${h1.session}'}));
+      expect(h1.defaultRunOptions.labels,
+          isNot(equals(h2.defaultRunOptions.labels)));
+    });
+
+    test('computeConfigHash ignores the session label', () {
+      var options = DockerRunOptions(ports: ['0:5432'], labels: {'a': '1'});
+
+      var hash = DockerHostLocal.computeConfigHash(
+          'postgres', null, null, null, options);
+
+      for (var host in [DockerHostLocal(), DockerHostLocal()]) {
+        expect(
+            DockerHostLocal.computeConfigHash('postgres', null, null, null,
+                host.defaultRunOptions.merge(options)),
+            equals(hash));
+      }
+
+      // Other labels count:
+      expect(
+          DockerHostLocal.computeConfigHash('postgres', null, null, null,
+              options.merge(DockerRunOptions(labels: {'a': '2'}))),
+          isNot(equals(hash)));
+
+      // And so does the container name:
+      expect(
+          DockerHostLocal.computeConfigHash(
+              'postgres', null, 'pg1', null, options),
+          isNot(equals(hash)));
+    });
+
     test('computeConfigHash', () {
       var options = DockerRunOptions(ports: ['0:5432']);
 
@@ -277,6 +396,40 @@ void main() {
       expect(h1, equals(h2));
       expect(h1, isNot(equals(h3)));
       expect(h1, isNot(equals(h4)));
+    });
+  });
+
+  group('DockerContainer', () {
+    DockerContainer container(List<String> ports, {bool reused = false}) =>
+        DockerContainer(_FakeRunner(ports, isReused: reused));
+
+    test('hostPortFor', () {
+      var c = container(['49153:5432', '127.0.0.1:8080:80', '0:6379']);
+
+      expect(c.hostPortFor(5432), equals(49153));
+      expect(c.hostPortFor(80), equals(8080)); // The IP is ignored.
+      expect(c.hostPortFor(6379), isNull); // Not resolved yet.
+      expect(c.hostPortFor(1234), isNull); // Not published.
+
+      expect(c.hostPorts, equals([49153, 8080, 0]));
+      expect(c.containerPorts, equals([5432, 80, 6379]));
+    });
+
+    test('isReused', () {
+      expect(container([]).isReused, isFalse);
+      expect(container([], reused: true).isReused, isTrue);
+    });
+  });
+
+  group('DockerContainerConfig', () {
+    test('copy keeps the options', () {
+      var options = DockerRunOptions(labels: {'a': '1'});
+      var config = DockerContainerConfig('alpine', options: options);
+
+      expect(config.copy().options, same(options));
+
+      var other = DockerRunOptions(user: 'x');
+      expect(config.copy(options: other).options, same(other));
     });
   });
 
@@ -378,4 +531,37 @@ void main() {
       expect(config.options, isNull);
     });
   });
+}
+
+/// A [DockerRunner] with fixed [ports], for tests without Docker.
+class _FakeRunner extends DockerRunner {
+  final List<String> _ports;
+
+  @override
+  final bool isReused;
+
+  _FakeRunner(this._ports, {this.isReused = false})
+      : super(DockerHostLocal(), DockerProcess.incrementInstanceID(), 'fake');
+
+  @override
+  String? get id => 'fake-id';
+
+  @override
+  String? get image => 'fake:latest';
+
+  @override
+  List<String> get ports => _ports;
+
+  @override
+  bool get isRunning => true;
+
+  @override
+  int? get exitCode => null;
+
+  @override
+  DateTime? get exitTime => null;
+
+  @override
+  Future<int?> waitExit({int? desiredExitCode, Duration? timeout}) async =>
+      null;
 }

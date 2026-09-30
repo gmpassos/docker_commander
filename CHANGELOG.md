@@ -31,6 +31,8 @@
 - **Reuse**: `DockerRunOptions(reuse: true)` attaches to a running container
   started with the same image and options (found by a config-hash label),
   following its logs, instead of starting a new one. `DockerContainer.isReused`.
+  The hash leaves out the session label, so other sessions and remote clients
+  find the same container. Only for `run`.
 
 - **Health checks**: `DockerContainer.waitHealthy` and `healthStatus`.
 
@@ -57,10 +59,11 @@
     `healthStartPeriod`, `healthTimeout`) were accepted but never passed to
     Docker. They are now.
   - `DockerCommander.run` dropped `restart`.
-  - `DockerHost.getContainerIDByName` returned a truncated 12-character ID,
+  - `DockerHost.getContainerIDByName` used `docker ps -f name=...`, which
+    matches any name *containing* the given one (`app-7` also matched
+    `app-70`, returning both IDs), and returned a truncated 12-character ID
     while a container started by `run` has the full ID (from `--cidfile`).
-    It now returns the full ID too, so a container's `id` is the same however
-    it was found.
+    It now uses `docker container inspect`: an exact match, and the full ID.
   - `docker_commander_server`: a remote `run` with `imageArgs` failed casting
     the decoded JSON list to `List<String>`.
   - The server's `create` response now returns the normalized ports, network
