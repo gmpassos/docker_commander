@@ -60,7 +60,10 @@
   - The health options (`healthCmd`, `healthInterval`, `healthRetries`,
     `healthStartPeriod`, `healthTimeout`) were accepted but never passed to
     Docker. They are now.
-  - `DockerCommander.run` dropped `restart`.
+  - `DockerCommander.run` dropped `restart`. It now passes it, and a restart
+    policy other than `no` combined with `cleanContainer` (`--rm`, the default
+    of `run`) throws an `ArgumentError` before contacting Docker (which would
+    refuse it): pass `cleanContainer: false`. See `DockerRunOptions.validate`.
   - `DockerHost.getContainerIDByName` used `docker ps -f name=...`, which
     matches any name *containing* the given one (`app-7` also matched
     `app-70`, returning both IDs), and returned a truncated 12-character ID

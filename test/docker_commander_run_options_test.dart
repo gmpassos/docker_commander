@@ -19,7 +19,7 @@ void main() {
     test('toArgs: every option', () {
       var options = DockerRunOptions(
         cleanContainer: true,
-        restart: 'always',
+        restart: 'no', // The only policy allowed with `--rm`.
         ports: ['8080:80', '5432', '0:6379', '127.0.0.1:9000:9000'],
         network: ' net1 ',
         hostname: 'host1',
@@ -52,7 +52,7 @@ void main() {
           options.toArgs(),
           equals([
             '--rm',
-            '--restart', 'always', //
+            '--restart', 'no', //
             '-p', '8080:80',
             '-p', '5432:5432',
             '-p', '6379', // host port 0: chosen by Docker
@@ -189,6 +189,68 @@ void main() {
           equals(['80:80', '8080:80']));
       expect(DockerRunOptions.normalizePorts(['127.0.0.1:80:80']),
           equals(['127.0.0.1:80:80']));
+    });
+
+    test('validate: a restart policy with cleanContainer', () {
+      for (var restart in [
+        'always',
+        'on-failure',
+        'on-failure:3',
+        ' unless-stopped '
+      ]) {
+        var options = DockerRunOptions(cleanContainer: true, restart: restart);
+        expect(options.validate, throwsArgumentError, reason: restart);
+        expect(options.toArgs, throwsArgumentError, reason: restart);
+
+        // Without `--rm`:
+        expect(
+            DockerRunOptions(cleanContainer: false, restart: restart).toArgs(),
+            equals(['--restart', restart.trim()]));
+        expect(DockerRunOptions(restart: restart).toArgs(),
+            equals(['--restart', restart.trim()]));
+      }
+
+      for (var restart in [null, '', '  ', 'no', 'NO']) {
+        expect(DockerRunOptions(cleanContainer: true, restart: restart).toArgs,
+            returnsNormally,
+            reason: restart);
+      }
+
+      // The error explains the way out:
+      expect(
+          () => DockerRunOptions(cleanContainer: true, restart: 'always')
+              .validate(),
+          throwsA(isA<ArgumentError>().having(
+              (e) => e.message, 'message', contains('cleanContainer: false'))));
+    });
+
+    test('DockerCommander.run: rejects restart with the default cleanContainer',
+        () async {
+      // Rejected before contacting Docker, for local and remote hosts:
+      for (var host in [
+        DockerHostLocal(),
+        DockerHostRemote('localhost', 1),
+      ]) {
+        var dockerCommander = DockerCommander(host);
+
+        await expectLater(dockerCommander.run('alpine', restart: 'always'),
+            throwsArgumentError);
+        await expectLater(
+            dockerCommander.run('alpine',
+                options: DockerRunOptions(restart: 'unless-stopped')),
+            throwsArgumentError);
+        await expectLater(
+            dockerCommander.createContainer('c1', 'alpine',
+                cleanContainer: true, restart: 'on-failure'),
+            throwsArgumentError);
+        await expectLater(
+            PostgreSQLContainerConfig(
+                    options: DockerRunOptions(restart: 'always'))
+                .run(dockerCommander),
+            throwsArgumentError);
+
+        expect(dockerCommander.isInitialized, isFalse);
+      }
     });
 
     test('toArgs: blank values are skipped', () {

@@ -41,7 +41,11 @@ class DockerRunOptions {
   /// Removes the container when it exits (`--rm`).
   final bool? cleanContainer;
 
-  /// The restart policy (`--restart`).
+  /// The restart policy (`--restart`): `no`, `on-failure[:max-retries]`,
+  /// `always` or `unless-stopped`.
+  ///
+  /// Docker refuses a policy other than `no` together with `--rm`, so it
+  /// requires [cleanContainer] `false` (see [validate]).
   final String? restart;
 
   /// The health check command (`--health-cmd`).
@@ -207,9 +211,26 @@ class DockerRunOptions {
     );
   }
 
+  /// Throws an [ArgumentError] for options Docker would refuse:
+  /// - A [restart] policy other than `no` with [cleanContainer] (`--rm`).
+  void validate() {
+    var restart = _trimOrNull(this.restart);
+    if ((cleanContainer ?? false) &&
+        restart != null &&
+        restart.toLowerCase() != 'no') {
+      throw ArgumentError.value(
+          restart,
+          'restart',
+          "A restart policy can't be combined with `cleanContainer` "
+              '(`--rm`, the default of `run`): pass `cleanContainer: false`');
+    }
+  }
+
   /// The Docker CLI arguments of these options, without the command,
-  /// the container name and the image.
+  /// the container name and the image. Calls [validate].
   List<String> toArgs() {
+    validate();
+
     var args = <String>[];
 
     if (cleanContainer ?? false) {

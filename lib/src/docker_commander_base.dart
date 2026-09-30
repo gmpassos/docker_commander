@@ -85,6 +85,13 @@ class DockerCommander extends DockerCMDExecutor {
     String? restart,
     DockerRunOptions? options,
   }) async {
+    // Before anything else, and also for a remote host:
+    DockerHost.resolveRunOptions(
+      cleanContainer: cleanContainer,
+      restart: restart,
+      options: options,
+    ).validate();
+
     await ensureInitialized();
     return dockerHost.createContainer(
       containerName,
@@ -122,6 +129,9 @@ class DockerCommander extends DockerCMDExecutor {
   /// Runs a Docker container, using [image] and optional [version].
   ///
   /// [options] are merged over the other named parameters.
+  ///
+  /// Throws an [ArgumentError] for a [restart] policy with [cleanContainer]
+  /// (the default): see [DockerRunOptions.validate].
   Future<DockerContainer?> run(
     String image, {
     String? version,
@@ -146,6 +156,13 @@ class DockerCommander extends DockerCMDExecutor {
     OutputReadyFunction? stderrReadyFunction,
     DockerContainerInstantiator? dockerContainerInstantiator,
   }) async {
+    // Before anything else, and also for a remote host:
+    DockerHost.resolveRunOptions(
+      cleanContainer: cleanContainer,
+      restart: restart,
+      options: options,
+    ).validate();
+
     await ensureInitialized();
 
     var runner = await dockerHost.run(
