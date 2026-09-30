@@ -7,3 +7,4 @@ export 'src/docker_commander_formulas.dart';
 export 'src/docker_commander_host.dart';
 export 'src/docker_commander_nginx.dart';
 export 'src/docker_commander_remote.dart';
+export 'src/docker_commander_run_options.dart';

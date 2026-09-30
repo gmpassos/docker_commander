@@ -543,6 +543,140 @@ abstract class DockerCMD {
     return process.waitExitAndConfirm(0);
   }
 
+  /// Returns the published ports of [containerNameOrID], as
+  /// container port → host port (`docker port`).
+  static Future<Map<int, int>?> getContainerPortMappings(
+      DockerCMDExecutor executor, String containerNameOrID) async {
+    if (isEmptyString(containerNameOrID)) return null;
+
+    var process = await executor.command('port', [containerNameOrID]);
+    if (process == null) return null;
+
+    var exitCode = await process.waitExit();
+    if (exitCode != 0) return null;
+
+    var stdout = process.stdout!;
+    await stdout.waitForDataMatch('->', timeout: executor.defaultOutputTime);
+
+    return parsePortMappings(stdout.asString);
+  }
+
+  /// Parses the output of `docker port`, as container port → host port.
+  /// For a port published on several addresses, the first one is used.
+  static Map<int, int> parsePortMappings(String output) {
+    var re = RegExp(r'^\s*(\d+)/\w+\s*->\s*\S*:(\d+)\s*$', multiLine: true);
+
+    var mappings = <int, int>{};
+    for (var m in re.allMatches(output)) {
+      var containerPort = int.parse(m.group(1)!);
+      var hostPort = int.parse(m.group(2)!);
+      mappings.putIfAbsent(containerPort, () => hostPort);
+    }
+    return mappings;
+  }
+
+  /// Lists the names of the containers with all the [labels]
+  /// (an empty label value matches any value).
+  /// - If [all] is `false`, lists only running containers.
+  static Future<List<String>?> listContainersByLabel(
+      DockerCMDExecutor executor, Map<String, String> labels,
+      {bool all = true}) async {
+    if (labels.isEmpty) return null;
+
+    var process = await executor.command('ps', [
+      if (all) '-a',
+      for (var e in labels.entries) ...[
+        '--filter',
+        e.value.isEmpty ? 'label=${e.key}' : 'label=${e.key}=${e.value}',
+      ],
+      '--format',
+      '{{.Names}}',
+    ]);
+    if (process == null) return null;
+
+    var exitCode = await process.waitExit();
+    if (exitCode != 0) return null;
+
+    var stdout = process.stdout!;
+    await stdout.waitForDataMatch(RegExp(r'\w'),
+        timeout: executor.defaultOutputTime);
+
+    return stdout.asString
+        .split(RegExp(r'\s+'))
+        .where((n) => n.isNotEmpty)
+        .toList();
+  }
+
+  /// Removes (with `--force`) the containers with all the [labels].
+  /// Returns the names of the removed containers.
+  static Future<List<String>> removeContainersByLabel(
+      DockerCMDExecutor executor, Map<String, String> labels) async {
+    var names = await listContainersByLabel(executor, labels);
+    if (names == null || names.isEmpty) return <String>[];
+
+    var process = await executor.command('rm', ['--force', ...names]);
+    if (process == null) return <String>[];
+
+    var ok = await process.waitExitAndConfirm(0);
+    return ok ? names : <String>[];
+  }
+
+  /// Returns `true` if [image] is available locally.
+  static Future<bool> imageExists(
+      DockerCMDExecutor executor, String image) async {
+    if (isEmptyString(image, trim: true)) return false;
+
+    var process = await executor
+        .command('image', ['inspect', '--format', '{{.Id}}', image.trim()]);
+    if (process == null) return false;
+
+    var exitCode = await process.waitExit();
+    return exitCode == 0;
+  }
+
+  /// Pulls [image].
+  static Future<bool> pullImage(
+      DockerCMDExecutor executor, String image) async {
+    if (isEmptyString(image, trim: true)) return false;
+
+    var process = await executor.command('pull', [image.trim()]);
+    if (process == null) return false;
+
+    return process.waitExitAndConfirm(0);
+  }
+
+  /// Pulls [image] if it isn't available locally.
+  static Future<bool> ensureImage(
+      DockerCMDExecutor executor, String image) async {
+    if (await imageExists(executor, image)) return true;
+    return pullImage(executor, image);
+  }
+
+  /// Returns the health status of [containerNameOrID] (`starting`,
+  /// `healthy` or `unhealthy`), or `null` if it has no health check.
+  static Future<String?> getContainerHealthStatus(
+      DockerCMDExecutor executor, String containerNameOrID) async {
+    if (isEmptyString(containerNameOrID)) return null;
+
+    var process = await executor.command('container', [
+      'inspect',
+      '--format',
+      '{{if .State.Health}}{{.State.Health.Status}}{{end}}',
+      containerNameOrID,
+    ]);
+    if (process == null) return null;
+
+    var exitCode = await process.waitExit();
+    if (exitCode != 0) return null;
+
+    var stdout = process.stdout!;
+    await stdout.waitForDataMatch(RegExp(r'\w'),
+        timeout: executor.defaultOutputTime);
+
+    var status = stdout.asString.trim();
+    return status.isNotEmpty ? status : null;
+  }
+
   /// Starts a container by [containerNameOrID].
   static Future<bool> startContainer(
       DockerCMDExecutor executor, String? containerNameOrID) async {

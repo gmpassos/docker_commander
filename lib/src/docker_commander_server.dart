@@ -9,6 +9,7 @@ import 'package:swiss_knife/swiss_knife.dart';
 import 'docker_commander_base.dart';
 import 'docker_commander_host.dart';
 import 'docker_commander_local.dart';
+import 'docker_commander_run_options.dart';
 
 final _log = Logger('docker_commander/server');
 
@@ -663,6 +664,8 @@ class DockerHostServer {
 
     String? restart = _getParameter(parameters, json, 'restart');
 
+    var options = _parseRunOptions(parameters, json);
+
     var ports = isNotEmptyString(portsLine) ? portsLine!.split(',') : null;
 
     var environment = decodeQueryString(environmentLine);
@@ -685,6 +688,7 @@ class DockerHostServer {
       healthStartPeriod: _parseDurationInMs(healthStartPeriod),
       healthTimeout: _parseDurationInMs(healthTimeout),
       restart: restart,
+      options: options,
     );
 
     if (containerInfos == null) return null;
@@ -693,15 +697,24 @@ class DockerHostServer {
       'containerName': containerInfos.containerName,
       'id': containerInfos.id,
       'image': imageName,
-      'ports': ports,
-      'network': network,
-      'hostname': hostname,
+      'ports': containerInfos.ports,
+      'network': containerInfos.containerNetwork,
+      'hostname': containerInfos.containerHostname,
     };
   }
 
   Duration? _parseDurationInMs(dynamic duration) {
     var ms = parseInt(duration);
     return ms != null ? Duration(milliseconds: ms) : null;
+  }
+
+  /// Parses the `options` parameter: a JSON [DockerRunOptions].
+  DockerRunOptions? _parseRunOptions(Map<String, String> parameters, json) {
+    String? optionsEncoded = _getParameter(parameters, json, 'options');
+    if (isEmptyString(optionsEncoded, trim: true)) return null;
+
+    var optionsJson = parseJSON(optionsEncoded);
+    return optionsJson is Map ? DockerRunOptions.fromJson(optionsJson) : null;
   }
 
   Future<Map?> _processRun(
@@ -731,6 +744,8 @@ class DockerHostServer {
     String? outputAsLines = _getParameter(parameters, json, 'outputAsLines');
     String? outputLimit = _getParameter(parameters, json, 'outputLimit');
 
+    var options = _parseRunOptions(parameters, json);
+
     var ports = isNotEmptyString(portsLine) ? portsLine!.split(',') : null;
 
     var environment = decodeQueryString(environmentLine);
@@ -739,7 +754,10 @@ class DockerHostServer {
 
     List<String>? imageArgs;
     if (isNotEmptyString(imageArgsEncoded)) {
-      imageArgs = parseJSON(imageArgsEncoded);
+      var list = parseJSON(imageArgsEncoded);
+      if (list is List) {
+        imageArgs = list.map((e) => '$e').toList();
+      }
     }
 
     var runner = await _dockerHostLocal!.run(imageName,
@@ -758,6 +776,7 @@ class DockerHostServer {
         healthStartPeriod: _parseDurationInMs(healthStartPeriod),
         healthTimeout: _parseDurationInMs(healthTimeout),
         restart: restart,
+        options: options,
         outputAsLines: parseBool(outputAsLines),
         outputLimit: parseInt(outputLimit));
 
@@ -765,6 +784,8 @@ class DockerHostServer {
       'instanceID': runner.instanceID,
       'containerName': runner.containerName,
       'id': runner.id,
+      'ports': runner.ports,
+      'reused': runner.isReused,
     };
   }
 

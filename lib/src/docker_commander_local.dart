@@ -9,6 +9,7 @@ import 'docker_commander_base.dart';
 import 'docker_commander_commands.dart';
 import 'docker_commander_formulas.dart';
 import 'docker_commander_host.dart';
+import 'docker_commander_run_options.dart';
 
 final _log = Logger('docker_commander/io');
 
@@ -128,42 +129,20 @@ class DockerHostLocal extends DockerHost {
   }
 
   @override
-  ContainerInfosLocal buildContainerArgs(
+  ContainerInfosLocal buildContainerArgsWithOptions(
     String cmd,
     String imageName,
     String? version,
     String containerName,
-    List<String>? ports,
-    String? network,
-    String? hostname,
-    Map<String, String>? environment,
-    Map<String, String>? volumes,
-    bool cleanContainer,
-    String? healthCmd,
-    Duration? healthInterval,
-    int? healthRetries,
-    Duration? healthStartPeriod,
-    Duration? healthTimeout,
-    String? restart, {
+    DockerRunOptions options, {
     bool addCIDFile = false,
   }) {
-    var containerInfos = super.buildContainerArgs(
+    var containerInfos = super.buildContainerArgsWithOptions(
       cmd,
       imageName,
       version,
       containerName,
-      ports,
-      network,
-      hostname,
-      environment,
-      volumes,
-      cleanContainer,
-      healthCmd,
-      healthInterval,
-      healthRetries,
-      healthStartPeriod,
-      healthTimeout,
-      restart,
+      options,
     );
 
     var args = containerInfos.args!;
@@ -225,28 +204,34 @@ class DockerHostLocal extends DockerHost {
     Duration? healthStartPeriod,
     Duration? healthTimeout,
     String? restart,
+    DockerRunOptions? options,
   }) async {
     if (isEmptyString(containerName, trim: true)) {
       return null;
     }
 
-    var containerInfos = buildContainerArgs(
+    var runOptions = defaultRunOptions.merge(DockerHost.resolveRunOptions(
+      ports: ports,
+      network: network,
+      hostname: hostname,
+      environment: environment,
+      volumes: volumes,
+      cleanContainer: cleanContainer,
+      healthCmd: healthCmd,
+      healthInterval: healthInterval,
+      healthRetries: healthRetries,
+      healthStartPeriod: healthStartPeriod,
+      healthTimeout: healthTimeout,
+      restart: restart,
+      options: options,
+    ));
+
+    var containerInfos = buildContainerArgsWithOptions(
       'create',
       imageName,
       version,
       containerName,
-      ports,
-      network,
-      hostname,
-      environment,
-      volumes,
-      cleanContainer,
-      healthCmd,
-      healthInterval,
-      healthRetries,
-      healthStartPeriod,
-      healthTimeout,
-      restart,
+      runOptions,
       addCIDFile: true,
     );
 
@@ -352,6 +337,7 @@ class DockerHostLocal extends DockerHost {
     Duration? healthStartPeriod,
     Duration? healthTimeout,
     String? restart,
+    DockerRunOptions? options,
     bool? outputAsLines = true,
     int? outputLimit,
     OutputReadyFunction? stdoutReadyFunction,
@@ -368,27 +354,60 @@ class DockerHostLocal extends DockerHost {
 
     var instanceID = DockerProcess.incrementInstanceID();
 
+    var runOptions = DockerHost.resolveRunOptions(
+      ports: ports,
+      network: network,
+      hostname: hostname,
+      environment: environment,
+      volumes: volumes,
+      cleanContainer: cleanContainer,
+      healthCmd: healthCmd,
+      healthInterval: healthInterval,
+      healthRetries: healthRetries,
+      healthStartPeriod: healthStartPeriod,
+      healthTimeout: healthTimeout,
+      restart: restart,
+      options: options,
+    );
+
+    if (runOptions.reuse ?? false) {
+      // Computed before the session label, so other sessions match it:
+      var configHash = computeConfigHash(
+          image, version, containerName, imageArgs, runOptions);
+
+      runOptions = runOptions.merge(DockerRunOptions(
+          labels: {DockerRunOptions.labelConfigHash: configHash}));
+
+      var running = await DockerCMD.listContainersByLabel(
+          this, {DockerRunOptions.labelConfigHash: configHash},
+          all: false);
+
+      if (running != null && running.isNotEmpty) {
+        return _attachRunner(
+            instanceID,
+            running.first,
+            DockerHost.resolveImage(image, version),
+            runOptions,
+            outputAsLines,
+            outputLimit,
+            stdoutReadyFunction,
+            stderrReadyFunction,
+            outputReadyType);
+      }
+    }
+
+    runOptions = defaultRunOptions.merge(runOptions);
+
     if (isEmptyString(containerName, trim: true)) {
       containerName = 'docker_commander-$session-$instanceID';
     }
 
-    var containerInfos = buildContainerArgs(
+    var containerInfos = buildContainerArgsWithOptions(
       'run',
       image,
       version,
       containerName!,
-      ports,
-      network,
-      hostname,
-      environment,
-      volumes,
-      cleanContainer,
-      healthCmd,
-      healthInterval,
-      healthRetries,
-      healthStartPeriod,
-      healthTimeout,
-      restart,
+      runOptions,
       addCIDFile: true,
     );
 
@@ -430,10 +449,90 @@ class DockerHostLocal extends DockerHost {
     });
 
     if (ok) {
+      if (runOptions.hasEphemeralPorts) {
+        await runner.resolvePorts();
+      }
       _log.info('Runner[$ok]: $runner');
     }
 
     return runner;
+  }
+
+  /// Attaches a runner to the running container [containerName]
+  /// (see [DockerRunOptions.reuse]), following its logs.
+  Future<DockerRunner> _attachRunner(
+      int instanceID,
+      String containerName,
+      String image,
+      DockerRunOptions runOptions,
+      bool outputAsLines,
+      int? outputLimit,
+      OutputReadyFunction stdoutReadyFunction,
+      OutputReadyFunction stderrReadyFunction,
+      OutputReadyType outputReadyType) async {
+    // The logs replay from the start, so the ready functions see the
+    // container's startup output again:
+    var cmdArgs = ['logs', '--follow', containerName];
+    _log.info('reuse[CMD]>\t$dockerBinaryPath ${cmdArgs.join(' ')}');
+
+    var process = await Process.start(dockerBinaryPath!, cmdArgs);
+
+    var runner = DockerRunnerLocal(
+        this,
+        instanceID,
+        containerName,
+        image,
+        process,
+        null,
+        runOptions.normalizedPorts,
+        runOptions.networkName,
+        runOptions.hostName,
+        outputAsLines,
+        outputLimit,
+        stdoutReadyFunction,
+        stderrReadyFunction,
+        outputReadyType,
+        isReused: true);
+
+    _runners[instanceID] = runner;
+    _processes[instanceID] = runner;
+
+    var ok = await _initializeAndWaitReady(runner);
+
+    if (ok) {
+      await runner.resolvePorts();
+      _log.info('Runner[reused]: $runner');
+    }
+
+    return runner;
+  }
+
+  /// A hash of what defines a reusable container: [image], [version],
+  /// [containerName], [imageArgs] and [options].
+  /// See [DockerRunOptions.reuse].
+  static String computeConfigHash(
+      String image,
+      String? version,
+      String? containerName,
+      List<String>? imageArgs,
+      DockerRunOptions options) {
+    var key = [
+      DockerHost.resolveImage(image, version),
+      containerName ?? '',
+      ...?imageArgs,
+      '--',
+      ...options.toArgs(),
+    ].join('\u0000');
+
+    // Two FNV-1a 32-bit hashes with different seeds: 64 bits.
+    String fnv1a(int hash) {
+      for (var c in key.codeUnits) {
+        hash = ((hash ^ c) * 0x01000193) & 0xFFFFFFFF;
+      }
+      return hash.toRadixString(16).padLeft(8, '0');
+    }
+
+    return fnv1a(0x811c9dc5) + fnv1a(0x050c5d1f);
   }
 
   Future<void> _configureContainerNetwork(
@@ -831,10 +930,13 @@ class DockerRunnerLocal extends DockerProcessLocal implements DockerRunner {
   /// An optional [File] that contains the container ID.
   final File? idFile;
 
-  final List<String>? _ports;
+  List<String>? _ports;
 
   final String? network;
   final String? hostname;
+
+  @override
+  final bool isReused;
 
   DockerRunnerLocal(
       DockerHostLocal dockerHost,
@@ -850,7 +952,8 @@ class DockerRunnerLocal extends DockerProcessLocal implements DockerRunner {
       int? outputLimit,
       OutputReadyFunction stdoutReadyFunction,
       OutputReadyFunction stderrReadyFunction,
-      OutputReadyType outputReadyType)
+      OutputReadyType outputReadyType,
+      {this.isReused = false})
       : super(
             dockerHost,
             instanceID,
@@ -885,13 +988,34 @@ class DockerRunnerLocal extends DockerProcessLocal implements DockerRunner {
   @override
   List<String> get ports => List.unmodifiable(_ports ?? []);
 
+  /// Resolves the host ports chosen by Docker (host port `0`) from the
+  /// running container. A reused container takes all its published ports.
+  Future<void> resolvePorts() async {
+    var mappings =
+        await DockerCMD.getContainerPortMappings(dockerHost, containerName);
+    if (mappings == null || mappings.isEmpty) return;
+
+    var ports = _ports;
+    if (isReused || ports == null) {
+      _ports = mappings.entries.map((e) => '${e.value}:${e.key}').toList();
+      return;
+    }
+
+    _ports = ports.map((p) {
+      if (!p.startsWith('0:')) return p;
+      var containerPort = parseInt(p.substring(2));
+      var hostPort = mappings[containerPort];
+      return hostPort != null ? '$hostPort:$containerPort' : p;
+    }).toList();
+  }
+
   @override
   Future<bool> stop({Duration? timeout}) =>
       dockerHost.stopByInstanceID(instanceID, timeout: timeout);
 
   @override
   String toString() {
-    return 'DockerRunnerLocal{id: $id, image: $image, containerName: $containerName}';
+    return 'DockerRunnerLocal{id: $id, image: $image, containerName: $containerName, ports: $ports${isReused ? ', reused' : ''}}';
   }
 }
 

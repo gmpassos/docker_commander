@@ -2,12 +2,13 @@ import 'package:swiss_knife/swiss_knife.dart';
 
 import 'docker_commander_commands.dart';
 import 'docker_commander_host.dart';
+import 'docker_commander_run_options.dart';
 
 /// The Docker manager.
 class DockerCommander extends DockerCMDExecutor {
   /// The current version of `docker_commander` package.
   // ignore: non_constant_identifier_names
-  static final String VERSION = '3.0.1';
+  static final String VERSION = '3.1.0';
 
   /// Docker machine host.
   final DockerHost dockerHost;
@@ -82,6 +83,7 @@ class DockerCommander extends DockerCMDExecutor {
     Duration? healthStartPeriod,
     Duration? healthTimeout,
     String? restart,
+    DockerRunOptions? options,
   }) async {
     await ensureInitialized();
     return dockerHost.createContainer(
@@ -100,6 +102,7 @@ class DockerCommander extends DockerCMDExecutor {
       healthStartPeriod: healthStartPeriod,
       healthTimeout: healthTimeout,
       restart: restart,
+      options: options,
     );
   }
 
@@ -117,6 +120,8 @@ class DockerCommander extends DockerCMDExecutor {
       dockerHost.stopByName(containerNameOrID, timeout: timeout);
 
   /// Runs a Docker container, using [image] and optional [version].
+  ///
+  /// [options] are merged over the other named parameters.
   Future<DockerContainer?> run(
     String image, {
     String? version,
@@ -133,6 +138,8 @@ class DockerCommander extends DockerCMDExecutor {
     int? healthRetries,
     Duration? healthStartPeriod,
     Duration? healthTimeout,
+    String? restart,
+    DockerRunOptions? options,
     bool outputAsLines = true,
     int? outputLimit,
     OutputReadyFunction? stdoutReadyFunction,
@@ -157,6 +164,8 @@ class DockerCommander extends DockerCMDExecutor {
       healthRetries: healthRetries,
       healthStartPeriod: healthStartPeriod,
       healthTimeout: healthTimeout,
+      restart: restart,
+      options: options,
       outputAsLines: outputAsLines,
       outputLimit: outputLimit,
       stdoutReadyFunction: stdoutReadyFunction,
@@ -226,6 +235,42 @@ class DockerCommander extends DockerCMDExecutor {
   /// Executes Docker command `docker ps --format "{{.Names}}"`
   Future<List<String>?> psContainerNames({bool all = true}) async =>
       DockerCMD.psContainerNames(this, all: all);
+
+  /// Lists the names of the containers with all the [labels].
+  /// See [DockerCMD.listContainersByLabel].
+  Future<List<String>?> listContainersByLabel(Map<String, String> labels,
+          {bool all = true}) async =>
+      DockerCMD.listContainersByLabel(this, labels, all: all);
+
+  /// Removes the containers with all the [labels].
+  /// Returns the names of the removed containers.
+  Future<List<String>> removeContainersByLabel(
+          Map<String, String> labels) async =>
+      DockerCMD.removeContainersByLabel(this, labels);
+
+  /// Removes the containers started by this [session]
+  /// (see [DockerRunOptions.labelSession]).
+  /// Returns the names of the removed containers.
+  Future<List<String>> cleanupSession() async => removeContainersByLabel(
+      {DockerRunOptions.labelSession: '${dockerHost.session}'});
+
+  /// Returns `true` if [image] (with optional [version]) is available locally.
+  Future<bool> imageExists(String image, {String? version}) async =>
+      DockerCMD.imageExists(this, DockerHost.resolveImage(image, version));
+
+  /// Pulls [image] (with optional [version]).
+  Future<bool> pullImage(String image, {String? version}) async =>
+      DockerCMD.pullImage(this, DockerHost.resolveImage(image, version));
+
+  /// Pulls [image] (with optional [version]) if it isn't available locally.
+  Future<bool> ensureImage(String image, {String? version}) async =>
+      DockerCMD.ensureImage(this, DockerHost.resolveImage(image, version));
+
+  /// Returns the published ports of [containerNameOrID], as
+  /// container port → host port.
+  Future<Map<int, int>?> getContainerPortMappings(
+          String containerNameOrID) async =>
+      DockerCMD.getContainerPortMappings(this, containerNameOrID);
 
   /// Returns a list of services names.
   Future<List<String>?> listServicesNames() async =>
@@ -534,9 +579,11 @@ class DockerContainer {
   /// List of mapped ports.
   List<String> get ports => runner.ports;
 
-  /// List of mapped ports as [Pair<int>].
+  /// List of mapped ports as [Pair<int>] (host port, container port).
+  /// A port bound to an IP (`ip:hostPort:containerPort`) ignores the IP.
   List<Pair<int>> get portsAsPair => ports.map((e) {
         var parts = e.split(':');
+        if (parts.length > 2) parts = parts.sublist(parts.length - 2);
         var p1 = parseInt(parts[0])!;
         var p2 = parts.length > 1 ? (parseInt(parts[1]) ?? p1) : p1;
         return Pair(p1, p2);
@@ -547,6 +594,44 @@ class DockerContainer {
 
   /// List of container ports.
   List<int> get containerPorts => portsAsPair.map((e) => e.b).toList();
+
+  /// The host port mapped to [containerPort], or `null` if not published.
+  ///
+  /// For a port published on a host port chosen by Docker (host port `0`,
+  /// see [DockerRunOptions.ports]), this is the port Docker chose.
+  int? hostPortFor(int containerPort) {
+    for (var p in portsAsPair) {
+      if (p.b == containerPort) return p.a > 0 ? p.a : null;
+    }
+    return null;
+  }
+
+  /// Returns `true` if this container was already running and was reused
+  /// (see [DockerRunOptions.reuse]).
+  bool get isReused => runner.isReused;
+
+  /// Returns the health status of this container (`starting`, `healthy` or
+  /// `unhealthy`), or `null` if it has no health check.
+  Future<String?> healthStatus() =>
+      DockerCMD.getContainerHealthStatus(runner.dockerHost, name);
+
+  /// Waits for this container's health check to report `healthy`.
+  /// Returns `false` if it reports `unhealthy`, has no health check, or
+  /// [timeout] (default: 1 minute) passes.
+  Future<bool> waitHealthy(
+      {Duration? timeout,
+      Duration interval = const Duration(milliseconds: 250)}) async {
+    var deadline = DateTime.now().add(timeout ?? Duration(minutes: 1));
+
+    while (true) {
+      var status = await healthStatus();
+      if (status == 'healthy') return true;
+      if (status == null || status == 'unhealthy') return false;
+
+      if (DateTime.now().isAfter(deadline)) return false;
+      await Future.delayed(interval);
+    }
+  }
 
   @override
   String toString() {

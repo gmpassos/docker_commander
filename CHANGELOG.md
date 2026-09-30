@@ -1,3 +1,73 @@
+## 3.1.0
+
+- **`DockerRunOptions`**: every option of a `docker run` / `docker create`, in
+  one class that builds the CLI arguments (`toArgs`) and the JSON sent to a
+  remote host (`toJson` / `fromJson`). Local and remote hosts and the console
+  all accept it. `DockerCommander.run`, `DockerCommander.createContainer`,
+  `DockerHost.run`, `DockerHost.createContainer` and `DockerContainerConfig`
+  take a new `options` parameter, merged over the existing named parameters,
+  which keep working.
+  - New options: `tmpfs`, `shmSize`, `memory`, `cpus`, `ulimits`, `user`,
+    `workdir`, `entrypoint`, `init`, `stopSignal`, `stopTimeout`, `platform`,
+    `pull`, `labels`, `addHosts`, and `extraArgs` for anything not modelled
+    yet.
+  - `DockerHost.buildContainerArgsWithOptions` builds the arguments;
+    `buildContainerArgs` now delegates to it.
+    `DockerHostLocal.buildContainerArgs` no longer takes `addCIDFile` (moved to
+    `buildContainerArgsWithOptions`).
+
+- **Host ports chosen by Docker**: a host port of `0` (`ports: ['0:5432']`, or
+  `hostPort: 0` in the container configs) publishes on a free host port. The
+  chosen port is resolved once the container is ready:
+  `DockerContainer.hostPortFor(5432)`, `DockerContainer.ports` and
+  `DockerCommander.getContainerPortMappings`. No race between parallel runs
+  picking the same port.
+
+- **Labels and cleanup**: every container run or created is labelled with its
+  session (`docker_commander.session`).
+  - `DockerCommander.cleanupSession`, `removeContainersByLabel` and
+    `listContainersByLabel`.
+
+- **Reuse**: `DockerRunOptions(reuse: true)` attaches to a running container
+  started with the same image and options (found by a config-hash label),
+  following its logs, instead of starting a new one. `DockerContainer.isReused`.
+
+- **Health checks**: `DockerContainer.waitHealthy` and `healthStatus`.
+
+- **Images**: `DockerCommander.imageExists`, `pullImage` and `ensureImage`.
+
+- `PostgreSQLContainerConfig`:
+  - `settings` (each `-c key=value`), `initdbArgs` (`POSTGRES_INITDB_ARGS`),
+    `extraEnvironment` and `options`.
+  - `ephemeral`: a throwaway database for tests: `fsync`,
+    `synchronous_commit` and `full_page_writes` off, `initdb --no-sync`, and
+    the data directory on a `tmpfs` mount (through `PGDATA`, so it doesn't
+    depend on the image's default data path).
+  - `PostgreSQLContainer.runSQLScript`: runs a SQL script of any size, with
+    line-breaks and quotes, through `psql -v ON_ERROR_STOP=1 -f`.
+  - Removed a leftover `print` from the ready check.
+  - The empty-password error no longer prints the user name.
+
+- `MySQLContainerConfig`: `settings` (each `--key=value`), `extraEnvironment`,
+  `ephemeral` (durability off, no binary log, data directory on `tmpfs`) and
+  `options`.
+
+- Fixes:
+  - The health options (`healthCmd`, `healthInterval`, `healthRetries`,
+    `healthStartPeriod`, `healthTimeout`) were accepted but never passed to
+    Docker. They are now.
+  - `DockerCommander.run` dropped `restart`.
+  - `docker_commander_server`: a remote `run` with `imageArgs` failed casting
+    the decoded JSON list to `List<String>`.
+  - The server's `create` response now returns the normalized ports, network
+    and hostname.
+  - A volume with an empty container path no longer produces `-v host:`.
+  - `DockerRunOptions.normalizePorts` keeps a port bound to an IP
+    (`127.0.0.1:80:80`) as it is.
+
+- README: the PostgreSQL example used `PostgreSQLContainer()` instead of
+  `PostgreSQLContainerConfig()`.
+
 ## 3.0.1
 
 - `DockerCommander.close`: now awaits `dockerHost.close()` inside the `try`, so a
