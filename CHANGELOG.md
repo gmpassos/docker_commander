@@ -57,6 +57,10 @@
     `healthStartPeriod`, `healthTimeout`) were accepted but never passed to
     Docker. They are now.
   - `DockerCommander.run` dropped `restart`.
+  - `DockerHost.getContainerIDByName` returned a truncated 12-character ID,
+    while a container started by `run` has the full ID (from `--cidfile`).
+    It now returns the full ID too, so a container's `id` is the same however
+    it was found.
   - `docker_commander_server`: a remote `run` with `imageArgs` failed casting
     the decoded JSON list to `List<String>`.
   - The server's `create` response now returns the normalized ports, network
