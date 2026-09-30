@@ -627,6 +627,8 @@ class DockerProcessRemote extends DockerProcess {
   final OutputReadyFunction _stderrReadyFunction;
   final OutputReadyType _outputReadyType;
 
+  final List<OutputClient> _outputClients = [];
+
   DockerProcessRemote(
     DockerHostRemote dockerHostRemote,
     int instanceID,
@@ -671,6 +673,7 @@ class DockerProcessRemote extends DockerProcess {
           outputStream.addLines(e);
         }
       });
+      _outputClients.add(outputClient);
       outputClient.start();
 
       outputStream.onDispose.listen((_) => outputClient.stop());
@@ -690,6 +693,7 @@ class DockerProcessRemote extends DockerProcess {
           OutputClient(dockerHost, this, stderr, outputStream, (entries) {
         outputStream.addAll(entries.cast());
       });
+      _outputClients.add(outputClient);
       outputClient.start();
 
       outputStream.onDispose.listen((_) => outputClient.stop());
@@ -736,15 +740,26 @@ class DockerProcessRemote extends DockerProcess {
   }
 
   Future<int?> _waitExitImpl(Duration? timeout) async {
-    if (_exitCode != null) return _exitCode;
+    if (_exitCode == null) {
+      var code = await dockerHost.processWaitExit(instanceID, timeout);
+      if (code != null) {
+        _setExitCode(code);
+      }
+    }
 
-    var code = await dockerHost.processWaitExit(instanceID, timeout);
-    if (code != null) {
-      _setExitCode(code);
+    // The output is synced in the background: fetch what is left, so the
+    // output is complete once the exit is returned.
+    if (_exitCode != null) {
+      await _drainOutput();
     }
 
     return _exitCode;
   }
+
+  Future<void>? _draining;
+
+  Future<void> _drainOutput() => _draining ??=
+      Future.wait(_outputClients.map((c) => c.drain()).toList(growable: false));
 }
 
 class OutputSync {
@@ -795,7 +810,33 @@ class OutputClient {
 
   int _errorCount = 0;
 
-  Future<bool> sync() async {
+  Future<bool> _lastSync = Future.value(false);
+
+  /// Fetches the new output entries. Returns `true` if there were any.
+  ///
+  /// Calls run one at a time: two at once would fetch the same offset and
+  /// add the same entries twice.
+  Future<bool> sync() => _lastSync =
+      _lastSync.then((_) => _syncImpl(), onError: (_) => _syncImpl());
+
+  /// Fetches the output until there is no more (for a finished process).
+  Future<void> drain() async {
+    // Twice empty in a row: the server may still be reading the last output
+    // of the process.
+    var empty = 0;
+    while (empty < 2) {
+      if (await sync()) {
+        empty = 0;
+      } else {
+        ++empty;
+        if (empty < 2) {
+          await Future.delayed(Duration(milliseconds: 100));
+        }
+      }
+    }
+  }
+
+  Future<bool> _syncImpl() async {
     OutputSync? outputSync;
     try {
       outputSync = await hostRemote.processGetOutput(

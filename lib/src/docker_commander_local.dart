@@ -1046,9 +1046,18 @@ class DockerProcessLocal extends DockerProcess {
 
   final Completer<int?> _exitCompleter = Completer();
 
+  /// Completed when STDOUT and STDERR are fully read.
+  final List<Completer<void>> _outputsDone = [];
+
   Future<bool> initialize() async {
+    // `exitCode` can complete before the output is fully read: record the
+    // exit only after the output (or 5s, if a stream never closes).
     // ignore: unawaited_futures
-    process.exitCode.then(_setExitCode);
+    process.exitCode.then((exitCode) async {
+      await Future.wait(_outputsDone.map((c) => c.future))
+          .timeout(Duration(seconds: 5), onTimeout: () => []);
+      _setExitCode(exitCode);
+    });
 
     var anyOutputReadyCompleter = Completer<bool>();
 
@@ -1084,6 +1093,12 @@ class DockerProcessLocal extends DockerProcess {
       Stream<List<int>> output,
       OutputReadyFunction outputReadyFunction,
       Completer<bool> anyOutputReadyCompleter) {
+    var done = Completer<void>();
+    _outputsDone.add(done);
+    void onDone() {
+      if (!done.isCompleted) done.complete();
+    }
+
     if (outputAsLines!) {
       var outputStream = OutputStream<String>(
         outputStreamType,
@@ -1096,7 +1111,7 @@ class DockerProcessLocal extends DockerProcess {
 
       var listenSubscription = output
           .transform(systemEncoding.decoder)
-          .listen((s) => outputStream.addLines(s));
+          .listen((s) => outputStream.addLines(s), onDone: onDone);
 
       outputStream.onDispose.listen((_) {
         try {
@@ -1117,7 +1132,8 @@ class DockerProcessLocal extends DockerProcess {
         anyOutputReadyCompleter,
       );
 
-      var listenSubscription = output.listen((b) => outputStream.addAll(b));
+      var listenSubscription =
+          output.listen((b) => outputStream.addAll(b), onDone: onDone);
 
       outputStream.onDispose.listen((_) {
         try {

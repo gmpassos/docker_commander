@@ -70,6 +70,15 @@
     the decoded JSON list to `List<String>`.
   - The server's `create` response now returns the normalized ports, network
     and hostname.
+  - Output could be incomplete right after a process exited:
+    - Remote: `waitExit` (and so `waitStdout`, `runSQL`, `psqlCMD`,
+      `execCat`...) returned as soon as the server reported the exit, while
+      the output was still being synced in the background. It now fetches
+      the remaining output first. Output syncs run one at a time, so they
+      can't add the same entries twice.
+    - Local: the exit was recorded when `Process.exitCode` completed, which
+      can be before STDOUT/STDERR are fully read. It now waits for them
+      (up to 5s).
   - A volume with an empty container path no longer produces `-v host:`.
   - `DockerRunOptions.normalizePorts` keeps a port bound to an IP
     (`127.0.0.1:80:80`) as it is.
